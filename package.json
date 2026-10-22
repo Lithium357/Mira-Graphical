@@ -1,0 +1,40 @@
+{
+  "name": "mira-graphical",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "main": "dist/apps/graph/main.js",
+  "scripts": {
+    "build": "tsc && node scripts/build.mjs",
+    "lint": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "dev": "pnpm build && electron .",
+    "smoke": "tsx scripts/smoke.ts",
+    "licenses": "node scripts/licenses.mjs"
+  },
+  "dependencies": {
+    "@xyflow/react": "12.12.0",
+    "chevrotain": "13.2.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "@types/react": "19.1.6",
+    "@types/react-dom": "19.1.6",
+    "@types/vscode": "1.96.0",
+    "@types/ws": "8.18.1",
+    "@vscode/test-electron": "^3.1.0",
+    "electron": "45.0.0",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "5.8.3",
+    "vite": "8.3.5"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "packageManager": "pnpm@11.25.0"
+}

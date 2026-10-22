@@ -1,0 +1,4 @@
+*.ts
+dist/smoke.cjs
+dist/**/*.map
+node_modules/**

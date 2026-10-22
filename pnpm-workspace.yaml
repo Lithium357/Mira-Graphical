@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - extensions/*
+  - packages/*
+allowBuilds:
+  electron: true
+  esbuild: true

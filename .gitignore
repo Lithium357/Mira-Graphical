@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.hdlgraph/
+*.vsix
+test-results/
+.vscode-test/
+extensions/vscode/LICENSE
+extensions/vscode/THIRD_PARTY_NOTICES.txt

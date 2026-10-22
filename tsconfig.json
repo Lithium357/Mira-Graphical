@@ -1,0 +1,4 @@
+{
+  "compilerOptions": {"target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "esModuleInterop": true, "skipLibCheck": true, "outDir": "dist", "rootDir": ".", "jsx": "react-jsx", "sourceMap": true},
+  "include": ["packages/**/*.ts", "apps/**/*.ts", "apps/**/*.tsx", "extensions/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"]
+}
