@@ -49,13 +49,13 @@ Drag a named signal or component result handle to an input socket, or select a c
 
 Changes preview immediately and synchronize as one native VS Code edit after 15 quiet seconds. **Undo pending**, **Redo pending** and **Discard pending** manage the current batch; after synchronization use VS Code's native Undo. Structural changes wait while newer source text is pending. Superseded/discarded drafts have full preview text in recovery snapshots.
 
-The inspector can disconnect a named driver, remove an unused component, or explicitly replace an expression with zero. Undriven wires and outputs are visibly marked. Removing a result still used elsewhere is refused; disconnect consumers first. Ports stay in the module interface, shared wire declarations must be split in VS Code before deletion, and edits that would delete comments are refused. Widths remain Verilog widths: assignment extension/truncation is not an inserted conversion component.
+The inspector can disconnect a named driver, remove an unused component, or explicitly replace an expression with zero. Undriven wires and outputs are visibly marked. Removing a result still used elsewhere is refused; disconnect consumers first. Ports stay in the module interface, shared wire declarations must be split in VS Code before deletion, and edits that would delete comments are refused. Verilog/SystemVerilog use assignment extension/truncation; VHDL enforces exact types and widths and emits explicit conversions/resizes when wiring requires them.
 
 ## Buses, diagnostics and faster editing
 
 Use **concat** to join a comma-separated list of signals in most-significant-first order. Use **split** with a source bus and chunk width to create named slice results, `_0` starting at the least-significant end. Ascending declarations are respected. A fixed slice such as `[3]` selects one bit. Each concatenation part has its own wiring socket.
 
-The canvas flags undriven and unused signals, width extension, truncation and vector selectors. Expand **circuit warnings** in the inspector to select the relevant component. Widths follow unsigned Verilog context rules; a wider arithmetic destination can preserve carry/product bits. Diagnostics describe width conversions rather than inserting conversion hardware.
+The canvas flags undriven and unused signals, width extension, truncation and vector selectors. Expand **circuit warnings** in the inspector to select the relevant component. Verilog/SystemVerilog widths follow unsigned context rules; a wider arithmetic destination can preserve carry/product bits. VHDL follows native numeric_std result widths and requires explicit resize/conversion nodes.
 
 Search the component palette by name or by “bus”/“port”. Drag a selection box on empty canvas, or hold Shift while dragging; Ctrl/Meta-click adds nodes. Use **Copy**, **Paste**, **Duplicate**, or Ctrl/Meta+C/V/D while the canvas is focused. Ctrl/Meta+K opens the palette. The clipboard stays inside Mira. Named subgraphs preserve internal connections, create unique names and retain external references only when those signals exist in the destination. Select a root expression to duplicate its result as a wire; selecting a port explicitly duplicates that interface port, which can be refused if it would invalidate existing instances. **Wire labels** shows signal names and widths.
 
@@ -88,7 +88,8 @@ pnpm run licenses # locked installed dependency licenses + full notices
 pnpm build      # desktop UI, core and bundled VS Code extension
 pnpm smoke      # desktop + isolated VSIX install + two real editor passes
 pnpm package:extension # build an unsigned installable VSIX
-pnpm test:reference # optional differential test; requires Icarus Verilog in PATH
+pnpm test:reference # Verilog differential test; requires Icarus Verilog in PATH
+pnpm test:languages # VHDL/SystemVerilog differential test; requires GHDL and Icarus
 pnpm audit      # online dependency vulnerability check
 pnpm format:check # consistent source and documentation formatting
 ```
