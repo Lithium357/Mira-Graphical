@@ -4,6 +4,46 @@ import assert from 'node:assert/strict';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function run() {
   const folder = vscode.workspace.workspaceFolders![0];
+  const undo = async (document: vscode.TextDocument) => {
+    const started = Date.now();
+    let acknowledged = false;
+    while (Date.now() - started < 10000) {
+      try {
+        const states = JSON.parse(
+          Buffer.from(
+            await vscode.workspace.fs.readFile(
+              vscode.Uri.joinPath(folder.uri, '.hdlgraph', 'smoke-states.json'),
+            ),
+          ).toString('utf8'),
+        );
+        if (
+          states.some(
+            (s: { uri: string; version: number; status: string }) =>
+              s.uri === document.uri.toString() &&
+              s.version === document.version &&
+              s.status === 'Synced',
+          )
+        ) {
+          acknowledged = true;
+          break;
+        }
+      } catch {
+        /* The harness may be atomically progressing to its next state. */
+      }
+      await sleep(50);
+    }
+    assert(acknowledged, `Patch acknowledgment before Undo: ${document.uri.path}`);
+    await vscode.window.showTextDocument(document, { preview: false, preserveFocus: false });
+    await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+    const before = document.version;
+    await vscode.commands.executeCommand('undo');
+    const undoStart = Date.now();
+    while (Date.now() - undoStart < 5000 && document.version === before) await sleep(50);
+    assert(
+      document.version > before,
+      `Native Undo must change the focused buffer: ${document.uri.path}`,
+    );
+  };
   const uri = vscode.Uri.joinPath(folder.uri, 'adder.v');
   const doc = await vscode.workspace.openTextDocument(uri);
   await vscode.window.showTextDocument(doc);
@@ -26,7 +66,7 @@ export async function run() {
   assert(doc.isDirty);
   const disk = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8');
   assert.equal(disk, original, 'Disk source must stay untouched');
-  await vscode.commands.executeCommand('undo');
+  await undo(doc);
   assert.equal(doc.getText(), unsaved, 'Native undo restores the source operator');
   const afterUndo = Date.now();
   let reflected = false;
@@ -65,7 +105,7 @@ export async function run() {
     Buffer.from(await vscode.workspace.fs.readFile(comboURI)).toString('utf8'),
     comboOriginal,
   );
-  await vscode.commands.executeCommand('undo');
+  await undo(combo);
   assert.equal(
     combo.getText(),
     comboOriginal,
@@ -96,7 +136,7 @@ export async function run() {
     Buffer.from(await vscode.workspace.fs.readFile(hierarchyURI)).toString('utf8'),
     hierarchyOriginal,
   );
-  await vscode.commands.executeCommand('undo');
+  await undo(hierarchy);
   assert.equal(
     hierarchy.getText(),
     hierarchyOriginal,
@@ -128,7 +168,7 @@ export async function run() {
       Buffer.from(await vscode.workspace.fs.readFile(nativeUri)).toString('utf8'),
       diskSource,
     );
-    await vscode.commands.executeCommand('undo');
+    await undo(native);
     assert.equal(native.getText(), liveSource, `${ext} entire batch uses one native undo`);
   }
   const recoveryUri = vscode.Uri.joinPath(folder.uri, 'hierarchy.vhdl');

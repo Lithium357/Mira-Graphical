@@ -93,6 +93,10 @@ for (let pass = 0; pass < 2; pass++) {
     comboEdited = false,
     hierarchyEdited = false;
   service.subscribe((states) => {
+    writeFileSync(
+      join(workspace, '.hdlgraph', 'smoke-states.json'),
+      JSON.stringify(states.map((s) => ({ uri: s.uri, version: s.version, status: s.status }))),
+    );
     for (const s of states) {
       if (
         /hierarchy\.(sv|vhd|vhdl)$/.test(s.uri) &&
