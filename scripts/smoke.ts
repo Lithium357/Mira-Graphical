@@ -7,6 +7,7 @@ import {
   createWriteStream,
   readdirSync,
   existsSync,
+  renameSync,
 } from 'node:fs';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -19,6 +20,12 @@ mkdirSync(output, { recursive: true });
 const stamp = Date.now();
 const workspace = join(output, `smoke-workspace-${stamp}`);
 mkdirSync(workspace);
+function writeSmokeState(name: string, value: unknown) {
+  const path = join(workspace, '.hdlgraph', name),
+    temporary = path + '.tmp';
+  writeFileSync(temporary, JSON.stringify(value));
+  renameSync(temporary, path);
+}
 for (const name of ['adder', 'combinational', 'hierarchy'])
   writeFileSync(join(workspace, `${name}.v`), readFileSync(`fixtures/${name}.v`));
 for (const ext of ['sv', 'vhd', 'vhdl'])
@@ -93,9 +100,9 @@ for (let pass = 0; pass < 2; pass++) {
     comboEdited = false,
     hierarchyEdited = false;
   service.subscribe((states) => {
-    writeFileSync(
-      join(workspace, '.hdlgraph', 'smoke-states.json'),
-      JSON.stringify(states.map((s) => ({ uri: s.uri, version: s.version, status: s.status }))),
+    writeSmokeState(
+      'smoke-states.json',
+      states.map((s) => ({ uri: s.uri, version: s.version, status: s.status })),
     );
     for (const s of states) {
       if (
@@ -118,14 +125,11 @@ for (let pass = 0; pass < 2; pass++) {
         assert.equal(service.simulate(s.uri, { a: '9', b: '3' }).signals.result.value, '0x06');
       }
       if (s.uri.endsWith('adder.v')) {
-        writeFileSync(
-          join(workspace, '.hdlgraph', 'smoke-state.json'),
-          JSON.stringify({
-            version: s.version,
-            status: s.status,
-            op: s.graph?.nodes.find((n) => n.kind === 'op')?.op,
-          }),
-        );
+        writeSmokeState('smoke-state.json', {
+          version: s.version,
+          status: s.status,
+          op: s.graph?.nodes.find((n) => n.kind === 'op')?.op,
+        });
         if (!edited && s.status === 'Synced' && s.graph) {
           edited = true;
           const op = s.graph.nodes.find((n) => n.kind === 'op')!;

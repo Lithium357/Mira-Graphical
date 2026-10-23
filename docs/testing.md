@@ -37,6 +37,8 @@ Both passes edit an unsaved adder buffer, apply a guarded graph patch, verify na
 
 Before issuing native Undo, the harness waits for the exact buffer version to be acknowledged as synchronized and explicitly focuses that document. It then waits for a version change and retains every exact source/atomicity assertion. This avoids testing an unfocused global command or racing the completion of WorkspaceEdit registration.
 
+Harness status JSON is atomically replaced so the editor cannot observe an empty or partially rewritten status file while checking acknowledgment/Undo propagation.
+
 ## Independent simulator check
 
 `pnpm test:languages` requires GHDL and Icarus in PATH (`MIRA_GHDL`, `MIRA_IVERILOG`, `MIRA_VVP` may override executables). It constructs and duplicates circuits through native source actions, then compares 256 deterministic input vectors × 9 outputs × 2 languages: **4,608 matching values**. An independent arithmetic oracle also checks Mira's expected results. Four additional native GHDL assertions check scalar/vector type conversion and resizing, including qualification needed to resolve overloaded concatenation. Local verification used GHDL 5.0.1 and Icarus 12.0 through WSL. The Ubuntu CI job installs both tools and runs this check; artifacts include generated source, benches, simulator logs and results.
