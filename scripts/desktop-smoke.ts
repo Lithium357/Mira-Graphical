@@ -16,6 +16,8 @@ async function until(f: () => boolean | Promise<boolean>, timeout = 20_000) {
   throw new Error('Desktop smoke timed out');
 }
 export async function desktopSmoke(service: SyncService, win: BrowserWindow, root: string) {
+  // Exercise construction/selection in a laptop-sized viewport on every host.
+  win.setSize(1000, 680);
   const config = await service.ready();
   const ws = new WebSocket(`ws://127.0.0.1:${config.port}`);
   let patches = 0;
@@ -449,6 +451,11 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     `document.querySelector('.react-flow__controls-fitview').click()`,
   );
   await sleep(600);
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `(()=>{const area=document.querySelector('.flow-surface').getBoundingClientRect();return Array.from(document.querySelectorAll('.react-flow__node')).every(n=>{const r=n.getBoundingClientRect();return r.left>=area.left+8&&r.right<=area.right-8&&r.top>=area.top+8&&r.bottom<=area.bottom-8;});})()`,
+    ),
+  );
   const inputs = parent.nodes.filter((n) => ['a', 'b'].includes(n.label));
   const box = await win.webContents.executeJavaScript(
     `(()=>{const rects=${JSON.stringify(inputs.map((n) => n.id))}.map(id=>document.querySelector('[data-id="'+id+'"]').getBoundingClientRect());return {x:Math.round(Math.min(...rects.map(r=>r.x))-8),y:Math.round(Math.min(...rects.map(r=>r.y))-8),right:Math.round(Math.max(...rects.map(r=>r.right))+8),bottom:Math.round(Math.max(...rects.map(r=>r.bottom))+8)}})()`,

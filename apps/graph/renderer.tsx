@@ -137,6 +137,10 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
   );
 }
 const nodeTypes = { circuit: CircuitNode };
+// React Flow queues fits in its store. Stable props must not overwrite a queued
+// overview fit when a layout/status update renders the parent in the same frame.
+const initialFit = { padding: 0.15, minZoom: 0.65, maxZoom: 1 };
+const overviewFit = { padding: 0.15, minZoom: 0.25, maxZoom: 1 };
 function Diagram({
   state,
   shared,
@@ -510,7 +514,7 @@ function Diagram({
             }}
             defaultViewport={state.layout.viewport}
             fitView={!state.layout.viewport}
-            fitViewOptions={{ padding: 0.15, minZoom: 0.65, maxZoom: 1 }}
+            fitViewOptions={initialFit}
             onInit={(flow) => {
               flowInstance.current = async () => {
                 const fitted = await flow.fitView({ padding: 0.15, minZoom: 0.75, maxZoom: 1 });
@@ -561,10 +565,7 @@ function Diagram({
             }}
           >
             <Background color="#26354c" gap={24} size={1} />
-            <Controls
-              showInteractive={false}
-              fitViewOptions={{ padding: 0.15, minZoom: 0.25, maxZoom: 1 }}
-            />
+            <Controls showInteractive={false} fitViewOptions={overviewFit} />
             <MiniMap
               pannable
               zoomable
