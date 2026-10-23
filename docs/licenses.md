@@ -2,7 +2,7 @@
 
 Original project source is GPL-3.0-only; the existing root LICENSE contains GPL version 3. Source files carry SPDX identifiers. Dependencies retain their own licenses.
 
-`pnpm licenses` traverses the actually installed dependency graph from the root production and development dependencies, avoiding stale packages left in pnpm's store. It records package name, exact version, declared SPDX license and discovered license/notice files in `third-party-licenses.json`, and concatenates the full discovered notice texts into `THIRD_PARTY_NOTICES.txt`. Unknown license expressions fail the check for review. Optional packages for other operating systems are not installed/audited on Windows; rerun on each release platform.
+`pnpm run licenses` traverses the actually installed dependency graph from root dependencies, avoiding stale packages in pnpm's store. The explicit `run` is required because pnpm has a separate built-in `licenses` command. The audit records package name, exact version, declared SPDX license and discovered notice files in `third-party-licenses.json`, and concatenates full notices into `THIRD_PARTY_NOTICES.txt`. Unknown licenses fail for review. Optional packages for other operating systems are not installed/audited on Windows; rerun on each release platform.
 
 Reviewed families: MIT, ISC, BSD-2-Clause, BSD-3-Clause, 0BSD, Unlicense, CC0-1.0, Apache-2.0 and Python-2.0 are compatible with GPLv3 aggregation. For dual-license packages, select MIT/Apache/CC0 rather than imposing another GPL license. Lightning CSS's standard MPL-2.0 license is compatible with GPLv3 through its secondary-license provision; its unmodified code remains MPL and its notice is retained. No dependency is being relicensed.
 

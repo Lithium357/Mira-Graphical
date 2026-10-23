@@ -2,7 +2,7 @@
 
 A local, bidirectional Verilog graph companion. Write RTL in VS Code; inspect and change supported operators in a separate desktop window. Semantic edits synchronize after **15 seconds of inactivity**. Original code is **GPL-3.0-only**.
 
-This repository implements the Milestone 0 foundation and Milestone 1 adder MVP. It is an RTL expression viewer/editor for a documented subset, not a synthesized schematic or general SystemVerilog IDE.
+Version 0.2.0 includes the Milestone 0/1 foundation and the first Milestone 2 combinational editing features. It is an RTL expression viewer/editor for a documented subset, not a synthesized schematic or general SystemVerilog IDE.
 
 ## Install and run
 
@@ -12,7 +12,7 @@ Requires Node **22.12+**, pnpm **11.25.0**, and VS Code **1.96+**. Windows is th
 git clone https://github.com/Lithium357/Mira-Graphical.git
 cd Mira-Graphical
 pnpm install
-pnpm licenses
+pnpm run licenses
 pnpm build
 pnpm exec electron .
 ```
@@ -44,17 +44,22 @@ Later semantic user edits take priority over pending earlier edits. Movement may
 ```powershell
 pnpm lint       # strict TypeScript check
 pnpm test       # unit + authenticated localhost protocol integration
-pnpm licenses   # locked installed dependency licenses + full notices
+pnpm run licenses # locked installed dependency licenses + full notices
 pnpm build      # desktop UI, core and bundled VS Code extension
 pnpm smoke      # real Electron window + official VS Code extension host
 pnpm audit      # online dependency vulnerability check
+pnpm format:check # consistent source and documentation formatting
 ```
 
 The smoke runner uses actual 15-second timers, writes to isolated test workspaces, captures the desktop canvas in `test-results/desktop-smoke.png`, and writes JSON results. It downloads an isolated official VS Code test runtime on first run and uses separate user data. It does not change your installed VS Code, settings or source files. Set `MIRA_CODE_EXE` to use a particular executable. A graphical desktop session and permission to bind loopback sockets are required. See [test coverage and remaining manual checks](docs/testing.md).
 
 ## Supported scope and limitations
 
-Supports one combinational ANSI-style module per file; scalar/vector input and output ports; internal wires; continuous assignments; identifiers and unsigned decimal literals; parentheses; binary `+`, `-`, `*`, `&`, `|`, `^`. Operator replacement is the only graph semantic edit. See the [exact syntax matrix](docs/supported-syntax.md).
+Supports one combinational ANSI-style module per file; scalar/vector input and output ports; internal wires; continuous assignments; unsigned decimal and sized binary/octal/decimal/hex constants; fixed bit/part selections; parentheses; binary `+`, `-`, `*`, `&`, `|`, `^`; and ternary mux expressions. The inspector can change operators, literal tokens, slice ranges, and simple scalar mux selectors. See the [exact syntax matrix](docs/supported-syntax.md).
+
+Try `fixtures/combinational.v`: select `8'h0F` and queue `8'h2A`, select `a[7:0]` and queue `[3:0]`, or select MUX and choose `select_b`. Each change stays within its exact source span after 15 quiet seconds. Invalid digits, overflowing constants, out-of-bounds slices, cycles and unsafe precedence changes are rejected.
+
+Keyboard arrow keys move selected nodes and save their positions. Newly shared modules open automatically in the module picker. Window bounds are saved on close and restored on a connected monitor; unplugged-monitor bounds are clamped back on screen.
 
 Unsupported constructs reject the projection rather than silently disappearing. Layout and graph identities are independent of source formatting and operator spelling. New nodes receive left-to-right dependency placement; a committed removal discards their old position. Renames and structural expression rewrites may create new identities. Recovery restore is manual. No circuit construction, rewiring, simulation, synthesis, multi-workspace window management or arbitrary Verilog support is claimed.
 
@@ -70,4 +75,4 @@ Unsupported constructs reject the projection rather than silently disappearing. 
 
 Dependency licenses are audited from the actual installed dependency closure. Generated notices retain MIT/BSD/ISC/Apache/MPL terms; dual licenses use their permissive option. Electron's binary also ships Chromium notices in `node_modules/electron/dist/LICENSES.chromium.html`, which must accompany any future packaged desktop distribution. See [license audit notes](docs/licenses.md).
 
-The next milestone is useful combinational RTL: slices, literals, muxes and safe local expression edits, each with bidirectional tests before it is advertised.
+The remaining Milestone 2 work is concatenation, richer expression construction, safe node insertion/removal and connection editing. No graph construction or rewiring is advertised yet.

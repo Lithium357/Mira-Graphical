@@ -1,48 +1,45 @@
-# Verification report
+# Verification report — 0.2.0
 
-Recorded on Windows on 2026-10-22. Node 24.19.0, pnpm 11.25.0, Electron 45.0.0; the official isolated VS Code test runtime is 1.143.1. No Linux or macOS runtime claim is made.
+Windows verification on 2026-10-22, with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an isolated official VS Code 1.143.1 test runtime. Linux/macOS have not been validated.
 
-## Commands actually run
+## Reproducible checks
 
-- `pnpm test`: **22 passed, 0 failed**. Includes fake-clock tests and a real authenticated loopback WebSocket integration test.
-- `pnpm build`: passed TypeScript compilation, extension/preload bundling and desktop renderer build.
-- `node node_modules/typescript/bin/tsc --noEmit` (the check used by `pnpm lint`): passed.
-- `pnpm licenses`: **104 installed package versions, 0 unresolved license classifications**; full notices generated.
-- `pnpm audit --json`: **0 reported advisories**, including the test harness.
-- `pnpm smoke`: Electron and isolated VS Code runs passed with actual 15-second debounce intervals, including the reverse graph update after native Undo. JSON reports and the captured canvas are in `test-results/` (not committed).
+- `pnpm test`: **40 passed, 0 failed**. Includes parser/patch, fake-clock scheduling, identity/layout, actual authenticated WebSocket protocol, live-buffer guards and monitor-bound restoration tests.
+- `pnpm lint`, `pnpm build`, `pnpm format:check`: passed.
+- `pnpm run licenses`: **105 installed package versions**, no unresolved license classifications. Use explicit `run`: `pnpm licenses` invokes a different built-in pnpm command. The CI workflow now uses the correct invocation.
+- `pnpm audit --json`: **0 reported advisories**.
+- `pnpm smoke`: desktop/extension round trips passed, including constants, slices, mux selectors, multiple documents, native Undo and disk preservation. The final two-pass editor/service restart test is recorded in `test-results/vscode-smoke.json`.
 
-The renderer bundler reports that React Flow's `use client` directive is ignored. This desktop application is entirely client-rendered; there is no React server-component boundary. The build and runtime smoke succeed with this informational warning.
+The renderer bundler emits an informational warning about React Flow's `use client` directive. The entire app is client-rendered; no server-component boundary exists, and builds/runtime smoke succeed.
 
-The installed VS Code initially could not launch because its updater held a mutex. The smoke runner uses the official test harness and a downloaded isolated copy instead; it does not change the installed editor or interfere with its update.
+## Desktop and extension evidence
 
-## Acceptance coverage
+The desktop test uses actual 15-second timers, a four-node adder and an eleven-node combinational fixture. It selects inspector operations, edits literal/range/selector fields and verifies the exact resulting source. Real Chromium pointer-down/move/up events in a focused window move a node; the persisted position survives a canvas reload without any RTL patch. It verifies two simultaneous modules and records a screenshot in `test-results/desktop-smoke.png`.
 
-| Acceptance scenario | Evidence |
-| --- | --- |
-| Text-to-graph adder | Four nodes, three edges and eight-bit widths tested; real desktop waits 15 seconds before projection |
-| Graph-to-text | Desktop inspector click produces exactly one operator-token patch; real VS Code applies it to the live document |
-| Unsaved text | Extension host edits the buffer without saving; service receives its snapshot and returns a minimal patch; disk remains unchanged |
-| Debounce reset | Fake clock edits at 0, 10 and 20 seconds; no graph until 35 seconds |
-| Temporary invalid RTL | Last valid graph retained with diagnostics; graph edit over invalid source refused |
-| Persistent layout | Core recreation with persisted metadata, disk serialization/deserialization, and real renderer reload tested; full quit/restart of both UI apps remains a manual check |
-| Operator identity | Formatting and operator edits retain IDs and manual coordinates |
-| Remove/recreate | Committed removal prunes the ID and position; recreated operation gets a fresh ID |
-| Last semantic edit wins | Both orderings tested with recovery; graph-last safely rebases the selected operator and preserves unrelated newer source |
-| Layout-only changes | No source patches; authority unchanged; drag-end IPC exercised in desktop smoke |
-| Echo prevention | One matched patch acknowledgment commits without scheduling another semantic update; VS Code native Undo works |
-| Disconnect | Pending edits are checkpointed; timers stop; status becomes Disconnected; reconnect requires explicit buffer sharing |
-| Unsupported Verilog | Whole projection refused, exact token/error panel shown; stale graph retained |
-| Multiple documents | Independent Session clocks and state tested; adapter scopes documents by explicit URI |
-| Protocol safety | Bad auth, bad versions, unshared/out-of-scope URI, fake sync origin and stale patch token handling covered |
+The VS Code test runs inside the real extension host. It changes the adder operator in memory without saving, shares the live buffer, receives the graph patch, checks exact source/comment preservation, and verifies native Undo and the reverse graph update after another debounce. It then shares the combinational module, applies three limited edits in one native workspace edit, and confirms that Undo reverses them together and that neither source file on disk was changed. The first module remains untouched while editing the second.
 
-`tests/core.test.ts` checks parser, spans, identity, arbitration, scheduling and recovery. `tests/service.test.ts` uses real sockets and temporary directories. `tests/extension.test.ts` tests live-buffer patch guards without mocking the entire VS Code API. `scripts/desktop-smoke.ts` drives the real renderer and its narrow IPC; `extensions/vscode/smoke.ts` runs inside the actual extension host.
+The two-pass runner closes and recreates both the synchronization service and extension-host process using the same metadata directory. The second pass checks the original operation ID and custom coordinates before applying further edits. It uses a fresh editor profile and a new connection token; pending patches are never replayed. `restartedEditorAndService` in the final JSON distinguishes this check from a renderer-only reload.
 
-## Manual checks and current boundaries
+Native Windows automation also exercised the visible desktop app's module picker, operation inspector, keyboard movement and a full graph process quit/restart. The saved position and operator remained, while the other document retained its independent ADD operation. A disposable mock editor supplied the source for this particular native window test; the extension-host test separately verifies the real editor adapter.
 
-Physical pointer dragging, keyboard/screen-reader usability, multi-monitor window positioning, a complete quit/restart of both UI applications, and a multi-document UI walkthrough have not been manually verified. The automated desktop test dispatches a real inspector click but exercises dragging through the same IPC invoked by drag end. Automated layout recreation verifies metadata reuse separately from OS window lifecycles.
+## Safety regressions
 
-No requested semantic acceptance scenario is intentionally left unimplemented for the documented subset. Conservative refusal is deliberate when pending text changes the operation's operands or grouping. Arbitrary Verilog, multiple modules per file, graph node construction/rewiring, signed/base literals, automatic recovery restore, release installers and non-Windows platform validation are outside the delivered scope. See `supported-syntax.md` for the complete boundary.
+- Movement cannot cancel a patch acknowledgment timeout or clear a conflict.
+- Late acknowledgments cannot overwrite a newer user buffer.
+- Nested operand changes cannot match merely because their display labels are identical.
+- Replacing an operation with a literal, committing, then recreating it gets a new entity ID.
+- Invalid/unsupported source retains the last valid graph and never causes source replacement.
+- Malformed metadata cannot supply invalid coordinates or zoom to the canvas.
+- Literal overflow/base errors, invalid or reversed slices, unsafe operator regrouping, undeclared names, cycles, stale hashes/revisions, overlapping patches and whole-document rewrites are refused.
 
-## Reproducing
+## Monitor and accessibility limits
 
-Run `pnpm install`, `pnpm licenses`, `pnpm build`, `pnpm test`, then `pnpm smoke` from the root. First smoke run downloads Electron and an official VS Code runtime; later runs reuse them. Test workspaces, editor settings and logs stay under `test-results/`, with the runtime under `.vscode-test/`. Permit local sockets and native app launch. The smoke test writes a disposable adder fixture; it never shares or patches user project documents. CI is configured for Windows, but a hosted CI run has not been observed from this workspace.
+Only one physical display is currently exposed to the test process, so moving the app onto an actual second monitor cannot be verified here. Automated geometry tests cover a connected second monitor and recovery when that monitor is removed. The smoke runner will also test a real second display when one is available and records `secondMonitorTested`.
+
+Keyboard node movement and module selection were exercised. Screen-reader behavior, touch/pen interaction, non-Windows releases, signed installers and arbitrary circuit construction remain unverified or outside this version's scope. Recovery restore is still manual. See `supported-syntax.md` for precise syntax/edit boundaries.
+
+## Running again
+
+Run `pnpm install`, `pnpm run licenses`, `pnpm build`, `pnpm test`, then `pnpm smoke`. Allow roughly four minutes for real debounce intervals and the two editor passes, plus first-run downloads. A graphical desktop and loopback sockets are required. Test workspaces/profiles/logs remain under ignored `test-results/`; the isolated editor runtime lives in `.vscode-test/`. No personal source documents or installed editor settings are modified.
+
+`pnpm qa:native` opens two disposable modules for an interactive desktop check and restarts the graph once after it is closed. Make edits/move nodes in the first run, inspect restoration in the second, then close again. This script requires a person or desktop automation to operate the window; it is not part of unattended CI. CI uses the fully automated smoke runner instead.

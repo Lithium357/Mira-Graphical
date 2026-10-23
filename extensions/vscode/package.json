@@ -1,14 +1,55 @@
 {
-  "name": "mira-graphical", "displayName": "Mira Graphical", "description": "Local bidirectional Verilog graph companion", "version": "0.1.0", "publisher": "mira-graphical", "license": "GPL-3.0-only",
-  "engines": {"vscode": "^1.96.0"}, "categories": ["Other"],
-  "type": "module", "main": "./dist/extension.cjs", "activationEvents": ["onLanguage:verilog"],
+  "name": "mira-graphical",
+  "displayName": "Mira Graphical",
+  "description": "Local bidirectional Verilog graph companion",
+  "version": "0.2.0",
+  "publisher": "mira-graphical",
+  "license": "GPL-3.0-only",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "type": "module",
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onLanguage:verilog"
+  ],
   "contributes": {
     "commands": [
-      {"command": "mira.open", "title": "RTL Graph: Open Current Module"},
-      {"command": "mira.connect", "title": "RTL Graph: Connect/Disconnect"},
-      {"command": "mira.status", "title": "RTL Graph: Show Sync Status"}
+      {
+        "command": "mira.open",
+        "title": "RTL Graph: Open Current Module"
+      },
+      {
+        "command": "mira.connect",
+        "title": "RTL Graph: Connect/Disconnect"
+      },
+      {
+        "command": "mira.status",
+        "title": "RTL Graph: Show Sync Status"
+      }
     ],
-    "menus": {"editor/context": [{"command": "mira.open", "when": "resourceExtname == .v", "group": "navigation"}]},
-    "languages": [{"id": "verilog", "extensions": [".v"], "aliases": ["Verilog"]}]
+    "menus": {
+      "editor/context": [
+        {
+          "command": "mira.open",
+          "when": "resourceExtname == .v",
+          "group": "navigation"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "verilog",
+        "extensions": [
+          ".v"
+        ],
+        "aliases": [
+          "Verilog"
+        ]
+      }
+    ]
   }
 }

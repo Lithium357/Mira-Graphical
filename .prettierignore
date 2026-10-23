@@ -1,0 +1,11 @@
+node_modules/
+dist/
+apps/graph/dist/
+extensions/vscode/dist/
+test-results/
+.vscode-test/
+pnpm-lock.yaml
+docs/THIRD_PARTY_NOTICES.txt
+docs/third-party-licenses.json
+extensions/vscode/LICENSE
+extensions/vscode/THIRD_PARTY_NOTICES.txt

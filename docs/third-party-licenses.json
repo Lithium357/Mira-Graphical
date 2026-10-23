@@ -590,6 +590,14 @@
     ]
   },
   {
+    "name": "prettier",
+    "version": "3.9.10",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/prettier@3.9.10/node_modules/prettier/LICENSE"
+    ]
+  },
+  {
     "name": "process-nextick-args",
     "version": "2.0.1",
     "license": "MIT",
