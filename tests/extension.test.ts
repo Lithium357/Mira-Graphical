@@ -50,3 +50,43 @@ test('extension rejects whole-document, overlapping and non-operator edits', asy
     assert(!(await applyLivePatch(doc, { baseVersion: 1, baseHash: hash(text), edits }, hash)).ok);
   assert.equal(calls, 0);
 });
+
+test('structural patches require exact replay proof and apply atomically to an unsaved live buffer', async () => {
+  const { planTransaction } = await import('../packages/verilog/construction.js');
+  let text = '// unsaved checkpoint\nmodule m(input a, output y);assign y=a;endmodule';
+  const original = text;
+  let calls = 0;
+  let version = 4;
+  const transaction = [
+    { kind: 'create', component: 'operation', name: 'product', width: 1, operator: '*' },
+    { kind: 'connect', source: 'm/net/a', target: 'm/assign/product/expr', port: 'left' },
+    { kind: 'connect', source: 'm/net/product', target: 'm/net/y', port: 'left' },
+  ] as import('../packages/protocol/index.js').SourceAction[];
+  const planned = planTransaction(text, transaction);
+  const p = { baseVersion: version, baseHash: hash(text), edits: planned.edits(), transaction };
+  const doc = {
+    text: () => text,
+    version: () => version,
+    apply: async (edits: any[]) => {
+      calls++;
+      for (const e of edits) text = text.slice(0, e.start) + e.text + text.slice(e.end);
+      version++;
+      return true;
+    },
+  };
+  assert(!(await applyLivePatch(doc, { ...p, transaction: undefined }, hash)).ok);
+  assert(
+    !(
+      await applyLivePatch(
+        doc,
+        { ...p, edits: [{ start: 0, end: text.length, text: planned.text }] },
+        hash,
+      )
+    ).ok,
+  );
+  assert.equal(calls, 0);
+  assert((await applyLivePatch(doc, p, hash)).ok);
+  assert.equal(calls, 1);
+  assert.equal(text, planned.text);
+  assert(text.startsWith(original.split('\n')[0]));
+});

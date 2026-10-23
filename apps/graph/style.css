@@ -493,3 +493,52 @@ footer {
 .node-name {
   overflow-wrap: anywhere;
 }
+.construction-toolbar {
+  position: absolute;
+  top: 48px;
+  left: 16px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.construction-toolbar button {
+  background: #172b40;
+  color: #c8e5ef;
+  border: 1px solid #415570;
+  border-radius: 5px;
+  padding: 8px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.undriven {
+  color: #ffcb76;
+  font-size: 11px;
+  margin-top: 6px;
+}
+.wiring-form {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0;
+}
+.wiring-form select,
+.wiring-form button {
+  padding: 8px;
+  background: #172339;
+  color: #dce8f7;
+  border: 1px solid #415570;
+  border-radius: 5px;
+  max-width: 100%;
+}
+.flow-surface {
+  position: absolute;
+  inset: 95px 0 0;
+}
+.node-result {
+  font-size: 11px;
+  color: #9dd8cc;
+  margin-top: 6px;
+}

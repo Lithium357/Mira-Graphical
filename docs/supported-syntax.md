@@ -31,3 +31,7 @@ Input widths and expression widths are derived for this unsigned subset. This is
 Each editable token, range or selector has independent parser, source-span and bidirectional patch tests. The editor independently parses and validates allowed AST spans before applying a patch. The exact source revision and hash must still match. No change pretty-prints or replaces the whole file.
 
 Formatting/operator changes retain structural IDs and manual positions. Renamed nets/targets/modules or changed expression structure may allocate new IDs. Literal, operation, slice and mux entities use distinct identity keys; replacing a component with another kind and later recreating it does not revive its old position.
+
+## Construction in 0.3
+
+The canvas can add operations, muxes, constants, fixed slices, individual wires and ANSI ports; connect or replace sockets using named signals; disconnect drivers; and remove unused individually declared components. Nested expressions may be replaced with explicit zeros. Undriven declarations stay visible with a warning. Ports cannot be deleted through the graph. Shared wire declarations and comment-bearing regions require source edits for destructive changes. See the README for the construction workflow and pending history controls.

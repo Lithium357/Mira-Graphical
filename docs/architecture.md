@@ -19,3 +19,11 @@ Evaluated the installed Chevrotain toolkit's tokenization API and position track
 ## Layout decision
 
 Electron + React + React Flow provide independent desktop UI, keyboard selection/movement, dragging, pan and zoom. The canvas holds local drag state during a gesture instead of resetting it from service snapshots. The smoke test feeds Chromium real pointer-down/move/up events in a focused window and verifies persisted movement. A small deterministic dependency-depth layout replaces ELK. It is not a crossing-minimizing layout engine. No connectivity is inferred from coordinates. Window bounds are saved on close, checked against connected displays and clamped on-screen when a monitor disappears. Node insertion, deletion, connection editing, synthesis and simulation remain unavailable.
+
+## Construction transactions
+
+The desktop projects a separate pending graph while the committed graph remains tied to the acknowledged editor buffer. Each action resolves node IDs to structural AST keys and plans bounded source insertions or replacements. A piece table composes edits inside newly added code into minimal spans against the original buffer. A batch contains at most 100 actions and retains up to 50 pending history frames.
+
+Structural patches include their ordered source actions. After checking the exact live version and SHA, the VS Code adapter independently replays the actions through the parser/projector and compares the resulting composed edits before one WorkspaceEdit. Parsing alone is not sufficient authorization for a structural rewrite. Comment deletion, cycles and ambiguous shared-declaration removal are refused.
+
+Newer source text supersedes pending structure and saves the complete preview and action log to recovery. Invalid source keeps the last committed graph visible; construction waits for a valid synchronized source. ACK/conflict locks apply to history as well as circuit changes. Commit transfers preview identities and retains manually placed coordinates. Native editor Undo reverses the entire committed batch.

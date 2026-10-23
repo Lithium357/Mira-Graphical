@@ -32,7 +32,7 @@ class ParseError extends Error implements Diagnostic {
     super(message);
   }
 }
-export type Expr =
+export type Expr = (
   | { kind: 'ref'; value: string; start: number; end: number }
   | { kind: 'literal'; value: string; start: number; end: number }
   | {
@@ -56,13 +56,16 @@ export type Expr =
       rangeStart: number;
       rangeEnd: number;
     }
-  | { kind: 'mux'; condition: Expr; truthy: Expr; falsy: Expr; start: number; end: number };
+  | { kind: 'mux'; condition: Expr; truthy: Expr; falsy: Expr; start: number; end: number }
+) & { outerStart?: number; outerEnd?: number };
 export type Net = {
   name: string;
   direction: 'input' | 'output' | 'wire';
   width: number;
   msb: number;
   lsb: number;
+  declarationStart?: number;
+  declarationEnd?: number;
 };
 function children(e: Expr): [string, Expr][] {
   return e.kind === 'op'
@@ -78,7 +81,33 @@ function children(e: Expr): [string, Expr][] {
         ]
       : [];
 }
-export type Module = { name: string; nets: Net[]; assigns: { target: string; expr: Expr }[] };
+export type Module = {
+  name: string;
+  nets: Net[];
+  assigns: { target: string; expr: Expr; start: number; end: number }[];
+  portClose: number;
+  lastPortEnd: number;
+  portCount: number;
+  endmoduleStart: number;
+};
+const keywords = new Set(
+  'always and assign automatic begin buf bufif0 bufif1 case casex casez cell cmos config deassign default defparam design disable edge else end endcase endconfig endfunction endgenerate endmodule endprimitive endspecify endtable endtask event for force forever fork function generate genvar highz0 highz1 if ifnone incdir include initial inout input instance integer join large liblist library localparam macromodule medium module nand negedge nmos nor noshowcancelled not notif0 notif1 or output parameter pmos posedge primitive pull0 pull1 pulldown pullup pulsestyle_onevent pulsestyle_ondetect rcmos real realtime reg release repeat rnmos rpmos rtran rtranif0 rtranif1 scalared showcancelled signed small specify specparam strong0 strong1 supply0 supply1 table task time tran tranif0 tranif1 tri tri0 tri1 triand trior trireg unsigned use vectored wait wand weak0 weak1 while wire wor xnor xor logic bit int byte shortint longint always_comb always_ff always_latch interface endinterface package endpackage typedef struct union enum return void'.split(
+    ' ',
+  ),
+);
+export function assertIdentifier(value: string) {
+  if (
+    typeof value !== 'string' ||
+    value.length > 128 ||
+    !/^[a-zA-Z_][a-zA-Z0-9_$]*$/.test(value) ||
+    keywords.has(value)
+  )
+    throw new Error('Use a unique Verilog identifier (not a keyword, maximum 128 characters).');
+}
+export const expressionSpan = (e: Expr) => ({
+  start: e.outerStart ?? e.start,
+  end: e.outerEnd ?? e.end,
+});
 const precedence: Record<string, number> = { '|': 1, '^': 2, '&': 3, '+': 4, '-': 4, '*': 5 };
 export function parse(source: string): Module {
   if (source.length > 1_000_000)
@@ -109,25 +138,14 @@ export function parse(source: string): Module {
   };
   const name = () => {
     if (tokens[i]?.tokenType !== Identifier) fail('Expected identifier.');
-    const n = take().image;
-    if (
-      [
-        'always',
-        'reg',
-        'signed',
-        'inout',
-        'parameter',
-        'generate',
-        'endmodule',
-        'module',
-        'assign',
-        'input',
-        'output',
-        'wire',
-      ].includes(n)
-    )
-      fail(`Unsupported or misplaced keyword ${n}.`);
-    return n;
+    const token = take();
+    if (keywords.has(token.image))
+      throw new ParseError(
+        `Unsupported or misplaced keyword ${token.image}.`,
+        token.startOffset,
+        token.endOffset! + 1,
+      );
+    return token.image;
   };
   const integer = () => {
     if (tokens[i]?.tokenType !== Integer) fail('Expected unsigned decimal integer.');
@@ -148,9 +166,10 @@ export function parse(source: string): Module {
     if (++recursion > 128) fail('Expression nesting exceeds 128 levels.');
     let left: Expr;
     if (peek() === '(') {
-      take('(');
+      const open = take('(');
       left = expr();
-      take(')');
+      const close = take(')');
+      left = { ...left, outerStart: open.startOffset, outerEnd: close.endOffset! + 1 };
     } else {
       const t = tokens[i];
       if (t?.tokenType === Integer || t?.tokenType === Based) {
@@ -193,8 +212,8 @@ export function parse(source: string): Module {
         op: t.image as Operator,
         left,
         right,
-        start: left.start,
-        end: right.end,
+        start: expressionSpan(left).start,
+        end: expressionSpan(right).end,
         tokenStart: t.startOffset,
         tokenEnd: t.endOffset! + 1,
       };
@@ -204,7 +223,14 @@ export function parse(source: string): Module {
       const truthy = expr();
       take(':');
       const falsy = expr();
-      left = { kind: 'mux', condition: left, truthy, falsy, start: left.start, end: falsy.end };
+      left = {
+        kind: 'mux',
+        condition: left,
+        truthy,
+        falsy,
+        start: expressionSpan(left).start,
+        end: expressionSpan(falsy).end,
+      };
     }
     recursion--;
     return left;
@@ -227,29 +253,39 @@ export function parse(source: string): Module {
     take(',');
     if (peek() === ')') fail('Trailing port comma.');
   }
+  if (!tokens[i]) fail('Expected closing port list.');
+  const portClose = tokens[i].startOffset,
+    lastPortEnd = tokens[i - 1].endOffset! + 1,
+    portCount = nets.length;
   take(')');
   take(';');
   const assigns: Module['assigns'] = [];
   while (peek() !== 'endmodule') {
     if (peek() === 'wire') {
-      take();
+      const start = take().startOffset,
+        first = nets.length;
       const w = width();
       do {
         nets.push({ name: name(), direction: 'wire', ...w });
         if (peek() !== ',') break;
         take(',');
       } while (true);
-      take(';');
+      const end = take(';').endOffset! + 1;
+      for (const net of nets.slice(first)) {
+        net.declarationStart = start;
+        net.declarationEnd = end;
+      }
     } else if (peek() === 'assign') {
-      take();
+      const start = take().startOffset;
       const target = name();
       take('=');
-      assigns.push({ target, expr: expr() });
-      take(';');
+      const expression = expr();
+      const end = take(';').endOffset! + 1;
+      assigns.push({ target, expr: expression, start, end });
     } else
       fail(`Unsupported construct ${peek() ?? '(incomplete module)'}. Last valid graph retained.`);
   }
-  take('endmodule');
+  const endmoduleStart = take('endmodule').startOffset;
   if (i !== tokens.length) fail('Only one module per shared document is supported.');
   const declared = new Map<string, Net>();
   for (const net of nets) {
@@ -285,7 +321,7 @@ export function parse(source: string): Module {
     };
     check(a.expr);
   }
-  return { name: moduleName, nets, assigns };
+  return { name: moduleName, nets, assigns, portClose, lastPortEnd, portCount, endmoduleStart };
 }
 export type Node = {
   id: string;
@@ -301,6 +337,10 @@ export type Node = {
   selector?: string;
   depth: number;
   row: number;
+  sourceNet?: string;
+  assignmentTarget?: string;
+  undriven?: boolean;
+  netRange?: string;
 };
 export type Circuit = {
   module: string;
@@ -331,7 +371,14 @@ export function project(
   const nets = new Map(
     ast.nets.map((n) => [
       n.name,
-      add(`${ast.name}/net/${n.name}`, { kind: n.direction, label: n.name, width: n.width }),
+      add(`${ast.name}/net/${n.name}`, {
+        kind: n.direction,
+        label: n.name,
+        width: n.width,
+        sourceNet: n.name,
+        netRange: n.width === 1 ? '[0]' : `[${n.msb}:${n.lsb}]`,
+        undriven: n.direction !== 'input' && !ast.assigns.some((a) => a.target === n.name),
+      }),
     ]),
   );
   const connect = (source: Node, target: Node, port: string) =>
@@ -384,6 +431,7 @@ export function project(
     const r = visit(e.right, `${key}/R`);
     const n = add(key, {
       kind: 'op',
+      expressionKey: key,
       label: opNames[e.op],
       op: e.op,
       operands: [l.label, r.label],
@@ -394,8 +442,14 @@ export function project(
     connect(r, n, 'right');
     return n;
   }
-  for (const a of ast.assigns)
-    connect(visit(a.expr, `${ast.name}/assign/${a.target}/expr`), nets.get(a.target)!, 'left');
+  for (const a of ast.assigns) {
+    const root = visit(a.expr, `${ast.name}/assign/${a.target}/expr`);
+    if (!['input', 'output', 'wire'].includes(root.kind)) {
+      root.sourceNet = a.target;
+      root.assignmentTarget = a.target;
+    }
+    connect(root, nets.get(a.target)!, 'left');
+  }
   const incoming = new Map(
     nodes.map((n) => [n.id, edges.filter((e) => e.target === n.id).map((e) => e.source)]),
   );
@@ -418,7 +472,7 @@ export function project(
   }
   return { module: ast.name, nodes, edges };
 }
-function expressions(ast: Module) {
+export function expressions(ast: Module) {
   const all = new Map<string, Expr>();
   const visit = (e: Expr, k: string) => {
     all.set(k, e);

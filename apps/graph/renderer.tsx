@@ -15,6 +15,8 @@ import {
 import '@xyflow/react/dist/style.css';
 import './style.css';
 import type { State } from '../../packages/core/index.js';
+import { ConstructionForm, WiringInspector } from './construction-form.js';
+import type { CircuitAction } from '../../packages/protocol/index.js';
 import type { Operator } from '../../packages/protocol/index.js';
 type Command = { type: string; [key: string]: unknown };
 declare global {
@@ -34,9 +36,9 @@ const names: Record<Operator, string> = {
   '^': 'XOR',
 };
 type Data = { label: string; kind: string; width?: number; op?: Operator; [key: string]: unknown };
-function CircuitNode({ data, selected }: NodeProps<FlowNode<Data>>) {
+function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
   return (
-    <div className={`circuit-node ${data.kind} ${selected ? 'selected' : ''}`}>
+    <div className={`circuit-node ${data.kind} ${data.inspected ? 'selected' : ''}`}>
       {data.kind !== 'input' && data.kind !== 'literal' && (
         <Handle
           type="target"
@@ -68,14 +70,28 @@ function CircuitNode({ data, selected }: NodeProps<FlowNode<Data>>) {
         {data.width ?? '?'} bit{data.width === 1 ? '' : 's'}
         {data.kind === 'op' ? ' · RTL expression' : ''}
       </div>
-      <Handle type="source" position={Position.Right} />
+      {data.assignmentTarget ? (
+        <div className="node-result">→ {String(data.assignmentTarget)}</div>
+      ) : null}
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectableStart={!!data.sourceNet && !!data.connectable}
+      />
+      {data.undriven ? <div className="undriven">UNDRIVEN</div> : null}
     </div>
   );
 }
 const nodeTypes = { circuit: CircuitNode };
 function Diagram({ state, onError }: { state: State; onError: (s: string) => void }) {
+  const graph = state.previewGraph ?? state.graph;
+  const [adding, setAdding] = useState(false);
+  const inspector = useRef<HTMLElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode<Data>>([]);
   const [selected, setSelected] = useState<string>();
+  useEffect(() => {
+    inspector.current?.scrollTo(0, 0);
+  }, [selected, adding]);
   const pending = state.pendingEdits ?? {};
   const [draft, setDraft] = useState('');
   const keyboardMove = useRef(false);
@@ -85,20 +101,27 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
     if (dragging.current) return;
     setNodes(
       (old) =>
-        state.graph?.nodes.map((n) => ({
+        graph?.nodes.map((n) => ({
           id: n.id,
           type: 'circuit',
           position: state.layout.nodes[n.id] ?? { x: n.depth * 250, y: n.row * 120 },
           selected: old.find((o) => o.id === n.id)?.selected,
-          data: { ...n, label: n.label },
+          data: { ...n, label: n.label, connectable: state.canConstruct },
         })) ?? [],
     );
-  }, [state.graph, state.layout, state.status, setNodes]);
-  const node = state.graph?.nodes.find((n) => n.id === selected);
+  }, [graph, state.layout, state.status, state.canConstruct, setNodes]);
+  const node = graph?.nodes.find((n) => n.id === selected);
   useEffect(() => {
     setDraft(node ? (pending[node.id]?.value ?? node.range ?? node.selector ?? node.label) : '');
   }, [selected, node?.label, node?.range, node?.selector, pending[selected ?? '']?.value]);
   const command = (c: Command) => window.mira.command(c).catch((e: Error) => onError(e.message));
+  const action = async (action: CircuitAction) => {
+    const result = await command({ type: 'circuit', uri: state.uri, action });
+    if (result?.selectedId) {
+      setSelected(result.selectedId);
+      setAdding(false);
+    }
+  };
   const change = async (op: Operator) => {
     try {
       await window.mira.command({ type: 'edit', uri: state.uri, id: selected, op });
@@ -110,11 +133,12 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
     () =>
       nodes.map((n) => {
         const p = pending[n.id];
-        if (!p) return n;
+        if (!p) return { ...n, data: { ...n.data, inspected: n.id === selected } };
         return {
           ...n,
           data: {
             ...n.data,
+            inspected: n.id === selected,
             ...(p.kind === 'operator'
               ? { op: p.value as Operator }
               : p.kind === 'literal'
@@ -125,7 +149,7 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
           },
         };
       }),
-    [nodes, pending],
+    [nodes, pending, selected],
   );
   return (
     <div className="workspace">
@@ -141,67 +165,117 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
         <div className="canvas-caption">
           <span className="live-dot" /> SOURCE LEVEL RTL{' '}
           <span className="caption-count">
-            {state.graph?.nodes.length ?? 0} nodes · {state.graph?.edges.length ?? 0} connections
+            {graph?.nodes.length ?? 0} nodes · {graph?.edges.length ?? 0} connections
           </span>
         </div>
-        <ReactFlow
-          nodes={displayNodes}
-          edges={state.graph?.edges ?? []}
-          nodeTypes={nodeTypes}
-          onNodesChange={(changes) => {
-            for (const c of changes)
-              if (c.type === 'position' && c.position) {
-                latestPositions.current.set(c.id, c.position);
-                if (c.dragging) dragging.current = true;
-                if (keyboardMove.current)
-                  void command({
-                    type: 'move',
-                    uri: state.uri,
-                    id: c.id,
-                    x: c.position.x,
-                    y: c.position.y,
-                  });
-              }
-            onNodesChange(changes);
-            keyboardMove.current = false;
-          }}
-          onNodeClick={(_e, n) => setSelected(n.id)}
-          onSelectionChange={useCallback(
-            ({ nodes }: { nodes: FlowNode[] }) => setSelected(nodes[0]?.id),
-            [],
-          )}
-          onPaneClick={() => setSelected(undefined)}
-          onNodeDragStart={() => {
-            dragging.current = true;
-          }}
-          onNodeDragStop={(_e, n) => {
-            dragging.current = false;
-            const p = latestPositions.current.get(n.id) ?? n.position;
-            void command({ type: 'move', uri: state.uri, id: n.id, x: p.x, y: p.y });
-          }}
-          onMoveEnd={(_e, v) => {
-            void command({ type: 'viewport', uri: state.uri, ...v });
-          }}
-          defaultViewport={state.layout.viewport}
-          fitView={!state.layout.viewport}
-          fitViewOptions={{ padding: 0.3 }}
-          nodesConnectable={false}
-          deleteKeyCode={null}
-          minZoom={0.25}
-          maxZoom={2}
-          colorMode="dark"
-          defaultEdgeOptions={{ type: 'smoothstep', style: { stroke: '#718aaa', strokeWidth: 2 } }}
-        >
-          <Background color="#26354c" gap={24} size={1} />
-          <Controls showInteractive={false} />
-          <MiniMap
-            pannable
-            zoomable
-            nodeColor={(n) => (n.data.kind === 'op' ? '#56debd' : '#667ba0')}
-            maskColor="#0b1220bb"
-          />
-        </ReactFlow>
-        {!state.graph && (
+        <div className="construction-toolbar">
+          <button
+            disabled={!state.canConstruct}
+            onClick={() => {
+              setAdding(true);
+              setSelected(undefined);
+            }}
+          >
+            Add component
+          </button>
+          <button
+            disabled={!state.canConstruct || !state.undoCount}
+            onClick={() => void command({ type: 'history', uri: state.uri, direction: 'undo' })}
+          >
+            Undo pending
+          </button>
+          <button
+            disabled={!state.canConstruct || !state.redoCount}
+            onClick={() => void command({ type: 'history', uri: state.uri, direction: 'redo' })}
+          >
+            Redo pending
+          </button>
+          <button
+            disabled={!state.canConstruct || !state.pendingSteps}
+            onClick={() => void command({ type: 'discard', uri: state.uri })}
+          >
+            Discard pending
+          </button>
+        </div>
+        <div className="flow-surface">
+          <ReactFlow
+            nodes={displayNodes}
+            edges={graph?.edges ?? []}
+            nodeTypes={nodeTypes}
+            onNodesChange={(changes) => {
+              for (const c of changes)
+                if (c.type === 'position' && c.position) {
+                  latestPositions.current.set(c.id, c.position);
+                  if (c.dragging) dragging.current = true;
+                  if (keyboardMove.current)
+                    void command({
+                      type: 'move',
+                      uri: state.uri,
+                      id: c.id,
+                      x: c.position.x,
+                      y: c.position.y,
+                    });
+                }
+              onNodesChange(changes);
+              keyboardMove.current = false;
+            }}
+            onNodeClick={(_e, n) => {
+              setSelected(n.id);
+              setAdding(false);
+            }}
+            onPaneClick={() => setSelected(undefined)}
+            onSelectionChange={useCallback(
+              ({ nodes }: { nodes: FlowNode[] }) => setSelected(nodes[0]?.id),
+              [],
+            )}
+            onNodeDragStart={() => {
+              dragging.current = true;
+            }}
+            onNodeDragStop={(_e, n) => {
+              dragging.current = false;
+              const p = latestPositions.current.get(n.id) ?? n.position;
+              void command({ type: 'move', uri: state.uri, id: n.id, x: p.x, y: p.y });
+            }}
+            onMoveEnd={(_e, v) => {
+              void command({ type: 'viewport', uri: state.uri, ...v });
+            }}
+            defaultViewport={state.layout.viewport}
+            fitView={!state.layout.viewport}
+            fitViewOptions={{ padding: 0.3 }}
+            nodesConnectable={!!state.canConstruct}
+            isValidConnection={(c) =>
+              !!graph?.nodes.find((n) => n.id === c.source)?.sourceNet &&
+              c.source !== c.target &&
+              ['left', 'right', 'select'].includes(c.targetHandle ?? '')
+            }
+            onConnect={(c) =>
+              void action({
+                kind: 'connect',
+                source: c.source,
+                target: c.target,
+                port: c.targetHandle as 'left' | 'right' | 'select',
+              })
+            }
+            deleteKeyCode={null}
+            minZoom={0.25}
+            maxZoom={2}
+            colorMode="dark"
+            defaultEdgeOptions={{
+              type: 'smoothstep',
+              style: { stroke: '#718aaa', strokeWidth: 2 },
+            }}
+          >
+            <Background color="#26354c" gap={24} size={1} />
+            <Controls showInteractive={false} />
+            <MiniMap
+              pannable
+              zoomable
+              nodeColor={(n) => (n.data.kind === 'op' ? '#56debd' : '#667ba0')}
+              maskColor="#0b1220bb"
+            />
+          </ReactFlow>
+        </div>
+        {!graph && (
           <div className="empty">
             <div className="empty-symbol">⌘</div>
             <h2>Waiting for the first circuit</h2>
@@ -212,9 +286,15 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
           ○ Input &nbsp; ◇ Operation &nbsp; □ Output <span>Drag to arrange · Scroll to zoom</span>
         </div>
       </section>
-      <aside className="inspector">
+      <aside className="inspector" ref={inspector}>
         <div className="eyebrow">COMPONENT INSPECTOR</div>
-        {node ? (
+        {adding && graph ? (
+          <ConstructionForm
+            graph={graph}
+            disabled={!state.canConstruct}
+            onCreate={(a) => void action(a)}
+          />
+        ) : node ? (
           <>
             <h2>
               {node.kind === 'op'
@@ -228,6 +308,15 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
                   ? 'MUX · select, true, false inputs'
                   : 'Source-defined ' + node.kind}
             </p>
+            {graph && (
+              <WiringInspector
+                key={node.id}
+                node={node}
+                graph={graph}
+                disabled={!state.canConstruct}
+                onAction={(a) => void action(a)}
+              />
+            )}
             <dl>
               <dt>Width</dt>
               <dd>{node.width} bits</dd>
@@ -295,7 +384,7 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                   >
-                    {state.graph?.nodes
+                    {graph?.nodes
                       .filter((n) => ['input', 'wire', 'output'].includes(n.kind) && n.width === 1)
                       .map((n) => (
                         <option key={n.id} value={n.label}>
@@ -331,7 +420,7 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
           <>
             <h2>Explore the circuit</h2>
             <p className="muted">
-              Select an operation to inspect its operands and change its function.
+              Add components, connect named signals, or select an existing component to edit it.
             </p>
             <div className="info-card">
               <span>01</span>
@@ -397,7 +486,7 @@ function App() {
           <span>Verilog graph companion</span>
         </div>
         <div className="header-right">
-          <span className="version">0.2 · COMBINATIONAL</span>
+          <span className="version">0.3 · CONSTRUCTION</span>
           <span
             className={`status ${(state?.status ?? 'Disconnected').replaceAll(' ', '-')}`}
             role="status"

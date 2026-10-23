@@ -83,6 +83,23 @@ for (let pass = 0; pass < 2; pass++) {
           const n = s.graph.nodes.find((n) => n.kind === (kind === 'selector' ? 'mux' : kind))!;
           service.graphChange(s.uri, n.id, { kind, value });
         }
+        const product = service.circuitAction(s.uri, {
+          kind: 'create',
+          component: 'operation',
+          name: 'product',
+          width: 8,
+          operator: '*',
+        }).selectedId!;
+        for (const [name, port] of [
+          ['a', 'left'],
+          ['b', 'right'],
+        ] as const)
+          service.circuitAction(s.uri, {
+            kind: 'connect',
+            source: s.graph.nodes.find((n) => n.label === name)!.id,
+            target: product,
+            port,
+          });
       }
     }
   });

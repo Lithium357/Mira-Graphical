@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- Added construction of operations, muxes, constants, slices, wires and ANSI input/output ports.
+- Added drag-to-wire and inspector connections, driver disconnection, unused component removal and explicit zero replacement.
+- Added immediate draft previews, pending Undo/Redo/discard and full draft recovery snapshots.
+- Composed batches retain original source spans. The editor independently replays construction actions before applying one native workspace edit.
+- Added visible undriven markers, cycle/name/socket validation, comment-preserving refusals and stable draft identities/manual layout.
+- Extended real desktop pointer and VS Code native Undo checks for construction.
+
+Remaining work includes concatenation, simulation, richer HDL support and packaged releases.
+
 ## 0.2.0
 
 - Added sized unsigned binary/octal/decimal/hex literals, fixed bit/part selections and ternary mux projection.

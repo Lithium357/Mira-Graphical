@@ -2,7 +2,7 @@
   "name": "mira-graphical",
   "displayName": "Mira Graphical",
   "description": "Local bidirectional Verilog graph companion",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "mira-graphical",
   "license": "GPL-3.0-only",
   "engines": {

@@ -6,6 +6,24 @@ export const operators = ['+', '-', '*', '&', '|', '^'] as const;
 export type Operator = (typeof operators)[number];
 export type Edit = { start: number; end: number; text: string };
 export type GraphChange = { kind: 'operator' | 'literal' | 'slice' | 'selector'; value: string };
+export type InputPort = 'left' | 'right' | 'select';
+export type CreateComponent = {
+  kind: 'create';
+  component: 'operation' | 'mux' | 'constant' | 'slice' | 'wire' | 'input' | 'output';
+  name: string;
+  width: number;
+  operator?: Operator;
+  value?: string;
+  source?: string;
+  range?: string;
+};
+/** UI actions address node IDs; transaction proofs use structural source keys instead. */
+export type CircuitAction =
+  | CreateComponent
+  | { kind: 'connect'; source: string; target: string; port: InputPort }
+  | { kind: 'remove' | 'disconnect'; target: string }
+  | { kind: 'zero'; target: string; port?: InputPort };
+export type SourceAction = CircuitAction | { kind: 'change'; target: string; change: GraphChange };
 export type EditorMessage =
   | { type: 'hello'; protocolVersion: 1; token: string; editor: 'vscode'; workspace: string }
   | { type: 'document.open'; uri: string; version: number; text: string }
@@ -36,6 +54,7 @@ export type ServiceMessage =
       baseHash: string;
       patchId: string;
       edits: Edit[];
+      transaction?: SourceAction[];
     }
   | { type: 'status'; uri: string; status: string; detail?: string }
   | { type: 'error'; error: string };

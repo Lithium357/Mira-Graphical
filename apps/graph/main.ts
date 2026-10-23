@@ -4,7 +4,12 @@ import { readFileSync, writeFileSync, renameSync, existsSync, lstatSync } from '
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { SyncService } from '../../packages/core/service.js';
-import { operators, type Operator, type GraphChange } from '../../packages/protocol/index.js';
+import {
+  operators,
+  type Operator,
+  type GraphChange,
+  type CircuitAction,
+} from '../../packages/protocol/index.js';
 import { restoreBounds } from './window-state.js';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 let service: SyncService | undefined;
@@ -104,6 +109,11 @@ else {
           typeof c.zoom === 'number'
         )
           service!.viewport(c.uri, { x: c.x, y: c.y, zoom: c.zoom });
+        else if (c.type === 'circuit' && c.action && typeof c.action === 'object')
+          return service!.circuitAction(c.uri, c.action as CircuitAction);
+        else if (c.type === 'history' && (c.direction === 'undo' || c.direction === 'redo'))
+          service!.constructionHistory(c.uri, c.direction);
+        else if (c.type === 'discard') service!.discardGraphChanges(c.uri);
         else throw new Error('Unsupported graph command.');
       });
       service.subscribe((states) => {

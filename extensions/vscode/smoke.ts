@@ -51,13 +51,15 @@ export async function run() {
   await vscode.window.showTextDocument(combo);
   await vscode.commands.executeCommand('mira.open');
   const comboStart = Date.now();
-  while (Date.now() - comboStart < 40_000 && !combo.getText().includes("8'h2A")) await sleep(100);
+  while (Date.now() - comboStart < 40_000 && !combo.getText().includes('assign product = a * b;'))
+    await sleep(100);
   assert.equal(
     combo.getText(),
     comboOriginal
       .replace("8'h0F", "8'h2A")
       .replace('a[7:0]', 'a[3:0]')
-      .replace('= select_a ?', '= select_b ?'),
+      .replace('= select_a ?', '= select_b ?')
+      .replace('endmodule', '    wire [7:0] product;\n    assign product = a * b;\nendmodule'),
   );
   assert.equal(
     Buffer.from(await vscode.workspace.fs.readFile(comboURI)).toString('utf8'),
@@ -83,6 +85,7 @@ export async function run() {
           diskUnchanged: true,
           multiDocument: true,
           literalSliceSelector: true,
+          constructionWiring: true,
           realDebounceMs: 15000,
         },
         null,

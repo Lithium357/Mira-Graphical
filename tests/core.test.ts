@@ -299,3 +299,67 @@ test('operation replaced by literal and recreated loses the old identity', () =>
   const c = project(parse(source), b);
   assert.notEqual(c.nodes.find((n) => n.kind === 'op')!.id, op.id);
 });
+
+test('construction preview, history, composed patch and ACK preserve new identity and manual placement', () => {
+  const { s, time, patches } = setup();
+  time.tick(15000);
+  const committed = s.state.graph;
+  const { selectedId } = s.circuitAction({
+    kind: 'create',
+    component: 'operation',
+    name: 'product',
+    width: 8,
+    operator: '*',
+  });
+  assert(selectedId);
+  assert.equal(s.state.graph, committed);
+  assert(s.state.previewGraph!.nodes.some((n) => n.id === selectedId));
+  s.constructionHistory('undo');
+  assert(!s.state.previewGraph!.nodes.some((n) => n.id === selectedId));
+  s.constructionHistory('redo');
+  const input = s.state.previewGraph!.nodes.find((n) => n.label === 'a')!;
+  s.circuitAction({ kind: 'connect', source: input.id, target: selectedId, port: 'left' });
+  s.move(selectedId, 999, 444);
+  time.tick(14999);
+  assert.equal(patches.length, 0);
+  time.tick(1);
+  const p = patches[0];
+  assert.equal(p.transaction.length, 2);
+  let text = source;
+  for (const e of p.edits) text = text.slice(0, e.start) + e.text + text.slice(e.end);
+  assert(text.includes("assign product = a * 8'd0;"));
+  assert.throws(() => s.constructionHistory('undo'));
+  assert(s.patchResult(p.patchId, true, 2, text));
+  assert(s.state.graph!.nodes.some((n) => n.id === selectedId));
+  assert.equal(s.state.layout.nodes[selectedId].x, 999);
+});
+test('source changes supersede structural drafts with recoverable preview; discard never patches source', () => {
+  const { s, time, patches, recovery } = setup();
+  time.tick(15000);
+  s.circuitAction({ kind: 'create', component: 'wire', name: 'spare', width: 8 });
+  s.discardGraphChanges();
+  time.tick(15000);
+  assert.equal(patches.length, 0);
+  assert(recovery.at(-1)!.previewText!.includes('wire [7:0] spare;'));
+  s.circuitAction({ kind: 'create', component: 'wire', name: 'later', width: 8 });
+  s.userText(2, source.replace('a + b', 'a +'));
+  assert(!s.state.previewGraph);
+  assert(recovery.at(-1)!.previewText!.includes('later'));
+  assert.throws(() =>
+    s.circuitAction({ kind: 'create', component: 'wire', name: 'blocked', width: 1 }),
+  );
+  time.tick(15000);
+  assert.equal(s.state.status, 'Invalid source');
+  assert.equal(patches.length, 0);
+});
+
+test('disconnect saves a structural-only draft for recovery without replaying a patch', () => {
+  const { s, time, patches, recovery } = setup();
+  time.tick(15000);
+  s.circuitAction({ kind: 'create', component: 'wire', name: 'offline', width: 8 });
+  s.disconnect();
+  time.tick(60000);
+  assert.equal(patches.length, 0);
+  assert(recovery.at(-1)!.previewText!.includes('offline'));
+  assert.equal(s.state.canConstruct, false);
+});

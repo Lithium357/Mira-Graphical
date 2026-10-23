@@ -1,10 +1,10 @@
-# Verification report — 0.2.0
+# Verification report — 0.3.0
 
 Windows verification on 2026-10-22, with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an isolated official VS Code 1.143.1 test runtime. Linux/macOS have not been validated.
 
 ## Reproducible checks
 
-- `pnpm test`: **40 passed, 0 failed**. Includes parser/patch, fake-clock scheduling, identity/layout, actual authenticated WebSocket protocol, live-buffer guards and monitor-bound restoration tests.
+- `pnpm test`: **53 passed, 0 failed**. Includes parser/patch, fake-clock scheduling, identity/layout, actual authenticated WebSocket protocol, live-buffer guards and monitor-bound restoration tests.
 - `pnpm lint`, `pnpm build`, `pnpm format:check`: passed.
 - `pnpm run licenses`: **105 installed package versions**, no unresolved license classifications. Use explicit `run`: `pnpm licenses` invokes a different built-in pnpm command. The CI workflow now uses the correct invocation.
 - `pnpm audit --json`: **0 reported advisories**.
@@ -22,6 +22,8 @@ The two-pass runner closes and recreates both the synchronization service and ex
 
 Native Windows automation also exercised the visible desktop app's module picker, operation inspector, keyboard movement and a full graph process quit/restart. The saved position and operator remained, while the other document retained its independent ADD operation. A disposable mock editor supplied the source for this particular native window test; the extension-host test separately verifies the real editor adapter.
 
+The construction desktop smoke creates an operation through the form, wires an input through Chromium pointer events, exercises pending Undo/Redo, and verifies the delayed exact source insertion. Both real VS Code passes combine token changes with operation creation and two input connections, checking that native Undo reverses the whole batch without saving to disk. Unit tests also cover component kinds, deletion/disconnection, comment loss refusal, draft recovery, ACK identity/placement and forged transaction rejection.
+
 ## Safety regressions
 
 - Movement cannot cancel a patch acknowledgment timeout or clear a conflict.
@@ -36,10 +38,10 @@ Native Windows automation also exercised the visible desktop app's module picker
 
 Only one physical display is currently exposed to the test process, so moving the app onto an actual second monitor cannot be verified here. Automated geometry tests cover a connected second monitor and recovery when that monitor is removed. The smoke runner will also test a real second display when one is available and records `secondMonitorTested`.
 
-Keyboard node movement and module selection were exercised. Screen-reader behavior, touch/pen interaction, non-Windows releases, signed installers and arbitrary circuit construction remain unverified or outside this version's scope. Recovery restore is still manual. See `supported-syntax.md` for precise syntax/edit boundaries.
+Keyboard node movement and module selection were exercised. Screen-reader behavior, touch/pen interaction, non-Windows releases, signed installers and arbitrary Verilog construction remain unverified or outside this version's scope. Recovery restore is still manual. See `supported-syntax.md` for precise syntax/edit boundaries.
 
 ## Running again
 
-Run `pnpm install`, `pnpm run licenses`, `pnpm build`, `pnpm test`, then `pnpm smoke`. Allow roughly four minutes for real debounce intervals and the two editor passes, plus first-run downloads. A graphical desktop and loopback sockets are required. Test workspaces/profiles/logs remain under ignored `test-results/`; the isolated editor runtime lives in `.vscode-test/`. No personal source documents or installed editor settings are modified.
+Run `pnpm install`, `pnpm run licenses`, `pnpm build`, `pnpm test`, then `pnpm smoke`. Allow roughly five minutes for real debounce intervals and the two editor passes, plus first-run downloads. A graphical desktop and loopback sockets are required. Test workspaces/profiles/logs remain under ignored `test-results/`; the isolated editor runtime lives in `.vscode-test/`. No personal source documents or installed editor settings are modified.
 
 `pnpm qa:native` opens two disposable modules for an interactive desktop check and restarts the graph once after it is closed. Make edits/move nodes in the first run, inspect restoration in the second, then close again. This script requires a person or desktop automation to operate the window; it is not part of unattended CI. CI uses the fully automated smoke runner instead.

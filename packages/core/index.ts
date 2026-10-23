@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { createHash, randomUUID } from 'node:crypto';
-import { DEBOUNCE_MS, type Edit, type Operator, type GraphChange } from '../protocol/index.js';
+import {
+  DEBOUNCE_MS,
+  type Edit,
+  type Operator,
+  type GraphChange,
+  type CircuitAction,
+  type SourceAction,
+} from '../protocol/index.js';
+import { PatchDraft } from '../verilog/patches.js';
+import { sourceActionEdits, validateConstructionProof } from '../verilog/construction.js';
 import {
   parse,
   project,
@@ -25,6 +34,8 @@ export type Recovery = {
   version: number;
   text: string;
   graphEdits: [string, GraphChange][];
+  previewText?: string;
+  graphActions?: SourceAction[];
 };
 export type State = {
   uri: string;
@@ -36,6 +47,11 @@ export type State = {
   deadline?: number;
   diagnostics: Diagnostic[];
   pendingEdits?: Record<string, GraphChange>;
+  previewGraph?: Circuit;
+  pendingSteps?: number;
+  undoCount?: number;
+  redoCount?: number;
+  canConstruct?: boolean;
 };
 export interface Clock {
   now(): number;
@@ -55,10 +71,18 @@ export interface Hooks {
     baseHash: string;
     patchId: string;
     edits: Edit[];
+    transaction?: SourceAction[];
   }): void;
   recover(snapshot: Recovery): void;
   persist(uri: string, layout: Layout): void;
 }
+type DraftFrame = {
+  table: PatchDraft;
+  graph: Circuit;
+  steps: SourceAction[];
+  edits: [string, GraphChange][];
+};
+type ConstructionDraft = DraftFrame & { undo: DraftFrame[]; redo: DraftFrame[] };
 export class Session {
   state: State;
   text: string;
@@ -70,6 +94,7 @@ export class Session {
   private conflicted = false;
   private inFlight?: { id: string; expected: string; version: number };
   private connected = true;
+  private draft?: ConstructionDraft;
   constructor(
     uri: string,
     version: number,
@@ -92,6 +117,16 @@ export class Session {
   }
   private emit() {
     this.state.pendingEdits = Object.fromEntries(this.edits);
+    this.state.previewGraph = this.draft?.graph;
+    this.state.pendingSteps = this.draft?.steps.length ?? 0;
+    this.state.undoCount = this.draft?.undo.length ?? 0;
+    this.state.redoCount = this.draft?.redo.length ?? 0;
+    this.state.canConstruct =
+      !!this.state.graph &&
+      this.connected &&
+      !this.pendingText &&
+      !this.inFlight &&
+      !this.conflicted;
     this.hooks.publish(structuredClone(this.state));
   }
   private snapshot(reason: string) {
@@ -102,6 +137,8 @@ export class Session {
       version: this.state.version,
       text: this.text,
       graphEdits: [...this.edits],
+      previewText: this.draft?.table.text,
+      graphActions: this.draft?.steps,
     });
   }
   private activity() {
@@ -123,10 +160,11 @@ export class Session {
   }
   userText(version: number, text: string) {
     if (version <= this.state.version) return;
-    if (this.edits.size) {
+    if (this.edits.size || this.draft) {
       this.snapshot('Text superseded pending graph edits');
       this.state.detail = 'Pending graph edits saved to recovery.';
       this.edits.clear();
+      this.clearDraft();
     }
     this.state.version = version;
     this.text = text;
@@ -142,6 +180,12 @@ export class Session {
       throw new Error(
         'Reconnect / reopen the module after a conflict, or wait for the patch acknowledgment.',
       );
+    if (!this.pendingText) {
+      const node = (this.draft?.graph ?? this.state.graph)?.nodes.find((n) => n.id === id);
+      if (!node) throw new Error('Component no longer exists.');
+      this.draftStep({ kind: 'change', target: node.key, change }, [id, change]);
+      return;
+    }
     const patch = graphPatch(this.text, this.state.graph, id, change);
     if (this.text.slice(patch.start, patch.end) === patch.text) {
       const removed = this.edits.delete(id);
@@ -159,9 +203,132 @@ export class Session {
     this.authority = 'graph';
     this.activity();
   }
+  private editableConstruction() {
+    if (
+      !this.connected ||
+      this.inFlight ||
+      this.conflicted ||
+      this.pendingText ||
+      !this.state.graph
+    )
+      throw new Error(
+        'Wait for valid source to synchronize before changing circuit structure. Reopen after a conflict.',
+      );
+  }
+  private frame(draft: ConstructionDraft): DraftFrame {
+    return {
+      table: draft.table.clone(),
+      graph: structuredClone(draft.graph),
+      steps: structuredClone(draft.steps),
+      edits: structuredClone([...this.edits]),
+    };
+  }
+  private place(graph: Circuit) {
+    for (const n of graph.nodes)
+      if (!this.state.layout.nodes[n.id]?.manuallyPlaced)
+        this.state.layout.nodes[n.id] = { x: n.depth * 250, y: n.row * 120, manuallyPlaced: false };
+  }
+  private clearDraft() {
+    this.draft = undefined;
+    this.state.previewGraph = undefined;
+    if (this.state.graph) {
+      const ids = new Set(this.state.graph.nodes.map((n) => n.id));
+      this.state.layout.nodes = Object.fromEntries(
+        Object.entries(this.state.layout.nodes).filter(([id]) => ids.has(id)),
+      );
+      this.place(this.state.graph);
+    }
+  }
+  private draftStep(action: SourceAction, change?: [string, GraphChange]) {
+    this.editableConstruction();
+    const current = this.draft ?? {
+      table: new PatchDraft(this.text),
+      graph: this.state.graph!,
+      steps: [],
+      edits: [],
+      undo: [],
+      redo: [],
+    };
+    if (current.steps.length >= 100)
+      throw new Error('Synchronize or discard this batch before adding more than 100 actions.');
+    const table = current.table.clone();
+    table.apply(sourceActionEdits(table.text, action));
+    const graph = project(parse(table.text), current.graph);
+    const before = this.frame(current);
+    this.draft = {
+      table,
+      graph,
+      steps: [...current.steps, action],
+      edits: [],
+      undo: [...current.undo, before].slice(-50),
+      redo: [],
+    };
+    if (change) this.edits.set(change[0], change[1]);
+    this.place(graph);
+    this.authority = 'graph';
+    this.activity();
+  }
+  circuitAction(action: CircuitAction) {
+    this.editableConstruction();
+    const graph = this.draft?.graph ?? this.state.graph!;
+    const key = (id: string) => {
+      const n = graph.nodes.find((n) => n.id === id);
+      if (!n) throw new Error('Component no longer exists.');
+      return n.key;
+    };
+    let normalized: SourceAction = action;
+    if (action.kind === 'connect')
+      normalized = { ...action, source: key(action.source), target: key(action.target) };
+    else if (action.kind !== 'create') normalized = { ...action, target: key(action.target) };
+    this.draftStep(normalized);
+    return {
+      selectedId:
+        action.kind === 'create'
+          ? (this.draft!.graph.nodes.find((n) => n.assignmentTarget === action.name)?.id ??
+            this.draft!.graph.nodes.find((n) => n.label === action.name)?.id)
+          : undefined,
+    };
+  }
+  constructionHistory(direction: 'undo' | 'redo') {
+    this.editableConstruction();
+    const d = this.draft;
+    if (!d || !d[direction].length) throw new Error(`No pending construction to ${direction}.`);
+    const frame = this.frame(d),
+      stack = [...d[direction]],
+      restore = stack.pop()!;
+    this.draft = {
+      ...restore,
+      table: restore.table.clone(),
+      undo: direction === 'undo' ? stack : [...d.undo, frame],
+      redo: direction === 'redo' ? stack : [...d.redo, frame],
+    };
+    this.edits = new Map(restore.edits);
+    this.place(this.draft.graph);
+    this.authority = 'graph';
+    this.activity();
+  }
+  discardGraphChanges() {
+    if (this.inFlight) throw new Error('Wait for the editor acknowledgment before discarding.');
+    if (this.draft || this.edits.size) this.snapshot('Pending graph changes discarded by user');
+    this.edits.clear();
+    this.clearDraft();
+    this.authority = this.pendingText ? 'text' : undefined;
+    if (this.timer !== undefined) this.time.clear(this.timer);
+    this.timer = undefined;
+    this.state.deadline = undefined;
+    if (this.pendingText) this.activity();
+    else {
+      this.state.status = !this.connected
+        ? 'Disconnected'
+        : this.conflicted
+          ? 'Conflict'
+          : 'Synced';
+      this.emit();
+    }
+  }
   move(id: string, x: number, y: number) {
     if (
-      !this.state.graph?.nodes.some((n) => n.id === id) ||
+      !(this.draft?.graph ?? this.state.graph)?.nodes.some((n) => n.id === id) ||
       !Number.isFinite(x) ||
       !Number.isFinite(y)
     )
@@ -182,19 +349,16 @@ export class Session {
   }
   private commit() {
     const ast = parse(this.text);
-    const graph = project(ast, this.state.graph, this.state.layout.identities);
+    const graph = project(ast, this.draft?.graph ?? this.state.graph, this.state.layout.identities);
     const ids = new Set(graph.nodes.map((n) => n.id));
     this.state.layout.nodes = Object.fromEntries(
       Object.entries(this.state.layout.nodes).filter(([id]) => ids.has(id)),
     );
     this.state.layout.identities = Object.fromEntries(graph.nodes.map((n) => [n.key, n.id]));
-    for (const node of graph.nodes)
-      this.state.layout.nodes[node.id] ??= {
-        x: node.depth * 250,
-        y: node.row * 120,
-        manuallyPlaced: false,
-      };
+    this.place(graph);
     this.state.graph = graph;
+    this.draft = undefined;
+    this.state.previewGraph = undefined;
     this.state.status = 'Synced';
     this.state.diagnostics = [];
     this.pendingText = false;
@@ -205,12 +369,24 @@ export class Session {
     this.state.deadline = undefined;
     if (!this.connected || this.inFlight || this.conflicted) return;
     try {
-      if (this.authority === 'graph' && this.edits.size) {
+      if (this.authority === 'graph' && (this.edits.size || this.draft)) {
         // Reparse the live buffer and match structural keys. Never use stale offsets.
-        const edits = [...this.edits]
-          .map(([id, change]) => graphPatch(this.text, this.state.graph, id, change))
-          .sort((a, b) => b.start - a.start);
-        validateEditableEdits(this.text, edits);
+        const transaction = this.draft?.steps;
+        const edits = this.draft
+          ? this.draft.table.edits()
+          : [...this.edits]
+              .map(([id, change]) => graphPatch(this.text, this.state.graph, id, change))
+              .sort((a, b) => b.start - a.start);
+        if (!edits.length) {
+          this.edits.clear();
+          this.clearDraft();
+          this.authority = undefined;
+          this.state.status = 'Synced';
+          this.emit();
+          return;
+        }
+        if (transaction) validateConstructionProof(this.text, edits, transaction);
+        else validateEditableEdits(this.text, edits);
         let expected = this.text;
         for (const e of edits)
           expected = expected.slice(0, e.start) + e.text + expected.slice(e.end);
@@ -225,6 +401,7 @@ export class Session {
           baseHash: hash(this.text),
           patchId: id,
           edits,
+          transaction,
         });
         this.patchTimer = this.time.set(() => {
           if (this.inFlight?.id === id) {
@@ -288,7 +465,8 @@ export class Session {
     this.connected = false;
     if (this.timer !== undefined) this.time.clear(this.timer);
     if (this.patchTimer !== undefined) this.time.clear(this.patchTimer);
-    if (this.pendingText || this.edits.size || this.inFlight) this.snapshot('Editor disconnected');
+    if (this.pendingText || this.edits.size || this.draft || this.inFlight)
+      this.snapshot('Editor disconnected');
     this.inFlight = undefined;
     this.state.deadline = undefined;
     this.state.status = 'Disconnected';

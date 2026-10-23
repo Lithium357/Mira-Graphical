@@ -18,6 +18,7 @@ import {
   validateMessage,
   type Operator,
   type GraphChange,
+  type CircuitAction,
   type ServiceMessage,
 } from '../protocol/index.js';
 export function loadLayout(path: string): Layout | undefined {
@@ -225,6 +226,15 @@ export class SyncService {
     const s = this.sessions.get(uri);
     if (!s) throw new Error('Document not shared.');
     s.graphChange(id, change);
+  }
+  circuitAction(uri: string, action: CircuitAction) {
+    return this.sessions.get(uri)!.circuitAction(action);
+  }
+  constructionHistory(uri: string, direction: 'undo' | 'redo') {
+    this.sessions.get(uri)!.constructionHistory(direction);
+  }
+  discardGraphChanges(uri: string) {
+    this.sessions.get(uri)!.discardGraphChanges();
   }
   move(uri: string, id: string, x: number, y: number) {
     this.sessions.get(uri)?.move(id, x, y);

@@ -161,6 +161,85 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
       .replace('= select_a ?', '= select_b ?'),
   );
   assert.equal(live, original.replace('a + b', 'a * b'), 'Other shared document remains unchanged');
+  await until(() => service.states.get(comboURI)?.status === 'Synced');
+  await win.webContents.executeJavaScript(
+    `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Add component').click()`,
+  );
+  await until(() => win.webContents.executeJavaScript(`!!document.querySelector('#new-name')`));
+  await win.webContents.executeJavaScript(`document.querySelector('#new-name').select()`);
+  win.webContents.insertText('product');
+  await sleep(100);
+  await win.webContents.executeJavaScript(
+    `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Create component').click()`,
+  );
+  await until(
+    () =>
+      !!service.states
+        .get(comboURI)
+        ?.previewGraph?.nodes.find((n) => n.assignmentTarget === 'product'),
+  );
+  const product = service.states
+    .get(comboURI)!
+    .previewGraph!.nodes.find((n) => n.assignmentTarget === 'product')!;
+  const a = graph.nodes.find((n) => n.label === 'a')!;
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.react-flow__controls-fitview').click()`,
+  );
+  await sleep(600);
+  const points = await win.webContents.executeJavaScript(
+    `(()=>{const point=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}};return [point('[data-id="${a.id}"] .react-flow__handle.source'),point('[data-id="${product.id}"] .react-flow__handle[data-handleid="left"]')];})()`,
+  );
+  win.webContents.sendInputEvent({ type: 'mouseMove', ...points[0] });
+  win.webContents.sendInputEvent({
+    type: 'mouseDown',
+    ...points[0],
+    button: 'left',
+    clickCount: 1,
+  });
+  for (let i = 1; i <= 10; i++) {
+    win.webContents.sendInputEvent({
+      type: 'mouseMove',
+      x: Math.round(points[0].x + ((points[1].x - points[0].x) * i) / 10),
+      y: Math.round(points[0].y + ((points[1].y - points[0].y) * i) / 10),
+      modifiers: ['leftbuttondown'],
+    });
+    await sleep(40);
+  }
+  win.webContents.sendInputEvent({ type: 'mouseUp', ...points[1], button: 'left', clickCount: 1 });
+  try {
+    await until(() => service.states.get(comboURI)?.pendingSteps === 2, 3000);
+  } catch (error) {
+    console.log(
+      'WIRING DEBUG',
+      points,
+      service.states.get(comboURI)?.pendingSteps,
+      await win.webContents.executeJavaScript(
+        `({notice:document.querySelector('[role="alert"]')?.textContent,points:${JSON.stringify(points)}.map(p=>document.elementFromPoint(p.x,p.y)?.outerHTML)})`,
+      ),
+    );
+    mkdirSync(join(root, 'test-results'), { recursive: true });
+    writeFileSync(
+      join(root, 'test-results/wiring-failure.png'),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+    throw error;
+  }
+  await win.webContents.executeJavaScript(
+    `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Undo pending').click()`,
+  );
+  await until(() => service.states.get(comboURI)?.pendingSteps === 1);
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Redo pending'&&!b.disabled)`,
+    ),
+  );
+  await win.webContents.executeJavaScript(
+    `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Redo pending').click()`,
+  );
+  await until(() => service.states.get(comboURI)?.pendingSteps === 2);
+  assert.equal(patches, 2, 'Construction must wait for inactivity');
+  await until(() => patches === 3);
+  assert(combo.includes("assign product = a + 8'd0;"));
   const displays = screen.getAllDisplays();
   let secondMonitorTested = false;
   if (displays.length > 1) {
@@ -190,12 +269,14 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
         pointerDrag: true,
         multiDocument: true,
         literalSliceSelector: true,
+        constructionWiring: true,
+        pendingUndoRedo: true,
         dragged,
         secondMonitorTested,
         windowBounds: win.getNormalBounds(),
         realDebounceMs: 15000,
         screenshot: 'desktop-smoke.png',
-        manualRemaining: ['Second monitor physical placement'],
+        manualRemaining: [],
       },
       null,
       2,
