@@ -793,6 +793,17 @@ dl,
 .diagnostic-list button {
   font-size: 14px;
 }
+.palette button span {
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+.edit-form input,
+.wiring-form input {
+  font: inherit;
+}
+.undriven {
+  font-size: 14px;
+}
 .inspector-bottom {
   display: none;
 }
