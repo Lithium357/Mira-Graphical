@@ -472,7 +472,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   try {
     await until(() =>
       win.webContents.executeJavaScript(
-        `document.querySelectorAll('.react-flow__node.selected').length===2`,
+        `document.querySelectorAll('.react-flow__node.selected').length===2 && document.querySelectorAll('.circuit-node.selected').length===2`,
       ),
     );
   } catch (error) {
@@ -492,7 +492,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   await click('Copy');
   await until(() =>
     win.webContents.executeJavaScript(
-      `Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Paste'&&!b.disabled)`,
+      `document.body.textContent.includes('Copied 2 items') && Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Paste'&&!b.disabled)`,
     ),
   );
   await click('Paste');
