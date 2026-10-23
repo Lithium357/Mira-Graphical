@@ -201,8 +201,13 @@ export class SyncService {
       throw new Error('Only local file documents are supported.');
     const path = fileURLToPath(url);
     const rel = relative(this.workspace, path);
-    if (!rel || rel.startsWith('..') || isAbsolute(rel) || extname(path).toLowerCase() !== '.v')
-      throw new Error('Share a .v document inside the selected workspace.');
+    if (
+      !rel ||
+      rel.startsWith('..') ||
+      isAbsolute(rel) ||
+      !['.v', '.sv', '.vhd', '.vhdl'].includes(extname(path).toLowerCase())
+    )
+      throw new Error('Share a .v, .sv, .vhd or .vhdl document inside the selected workspace.');
   }
   private layoutPath(uri: string) {
     return join(this.metadata, `layout-${hash(uri)}.json`);

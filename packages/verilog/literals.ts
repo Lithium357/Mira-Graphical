@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /** Deliberately excludes signed, unknown (x/z), unsized based and four-state literals. */
 export function literalWidth(text: string): number {
+  if (/^'[01]$/.test(text)) return 1;
   const sized = /^([0-9][0-9_]*)'([bBoOdDhH])([0-9a-fA-F][0-9a-fA-F_]*)$/.exec(text);
   if (!sized) {
     if (!/^[0-9][0-9_]*$/.test(text) || BigInt(text.replaceAll('_', '')) > 2147483647n)

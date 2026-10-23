@@ -245,7 +245,7 @@ export function WiringInspector({
         ? ['select', 'left', 'right']
         : node.kind === 'instance' || node.kind === 'concat'
           ? (node.inputPorts?.map((p) => p.name as InputPort) ?? [])
-          : ['wire', 'output', 'slice'].includes(node.kind)
+          : ['wire', 'output', 'slice', 'convert'].includes(node.kind)
             ? ['left']
             : [];
   return (
@@ -273,10 +273,12 @@ export function WiringInspector({
               onClick={() => onAction({ kind: 'connect', source, target: node.id, port })}
             >
               Connect{' '}
-              {port === 'left' && ['wire', 'output', 'slice'].includes(node.kind) ? 'driver' : port}
+              {port === 'left' && ['wire', 'output', 'slice', 'convert'].includes(node.kind)
+                ? 'driver'
+                : port}
             </button>
           ))}
-          {['op', 'mux', 'instance', 'concat'].includes(node.kind) &&
+          {['op', 'mux', 'instance', 'concat', 'convert'].includes(node.kind) &&
             ports.map((port) => (
               <button
                 key={`zero-${port}`}

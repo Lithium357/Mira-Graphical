@@ -14,14 +14,19 @@ const workspace = join(output, `smoke-workspace-${stamp}`);
 mkdirSync(workspace);
 for (const name of ['adder', 'combinational', 'hierarchy'])
   writeFileSync(join(workspace, `${name}.v`), readFileSync(`fixtures/${name}.v`));
+for (const ext of ['sv', 'vhd', 'vhdl'])
+  writeFileSync(
+    join(workspace, `hierarchy.${ext}`),
+    readFileSync(`fixtures/hierarchy.${ext === 'vhdl' ? 'vhd' : ext}`),
+  );
 const electron = createRequire(import.meta.url)('electron') as string;
 async function launch(exe: string, args: string[], env = process.env) {
   return await new Promise<void>((ok, fail) => {
     const child = spawn(exe, args, { cwd: root, env, stdio: 'inherit', windowsHide: true });
     const timer = setTimeout(() => {
       child.kill();
-      fail(new Error('Smoke process exceeded 180 seconds'));
-    }, 180000);
+      fail(new Error('Smoke process exceeded 300 seconds'));
+    }, 300000);
     child.on('error', (e) => {
       clearTimeout(timer);
       fail(e);
@@ -76,11 +81,31 @@ let restoredOperatorId: string | undefined;
 for (let pass = 0; pass < 2; pass++) {
   const service = new SyncService(workspace);
   await service.ready();
+  const languageEdited = new Set<string>();
   let edited = false,
     comboEdited = false,
     hierarchyEdited = false;
   service.subscribe((states) => {
     for (const s of states) {
+      if (
+        /hierarchy\.(sv|vhd|vhdl)$/.test(s.uri) &&
+        !languageEdited.has(s.uri) &&
+        s.status === 'Synced' &&
+        s.graph
+      ) {
+        languageEdited.add(s.uri);
+        service.selectModule(s.uri, 'arithmetic');
+        const graph = service.states.get(s.uri)!.graph!;
+        service.graphEdit(s.uri, graph.nodes.find((n) => n.kind === 'op')!.id, '-');
+        service.circuitAction(s.uri, {
+          kind: 'create',
+          component: 'concat',
+          name: 'pair',
+          width: 16,
+          parts: ['a', 'b'],
+        });
+        assert.equal(service.simulate(s.uri, { a: '9', b: '3' }).signals.result.value, '0x06');
+      }
       if (s.uri.endsWith('adder.v')) {
         writeFileSync(
           join(workspace, '.hdlgraph', 'smoke-state.json'),

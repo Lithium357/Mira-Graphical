@@ -1,8 +1,8 @@
 {
   "name": "mira-graphical",
   "displayName": "Mira Graphical",
-  "description": "Local bidirectional Verilog graph companion",
-  "version": "0.4.0",
+  "description": "Local bidirectional Verilog, SystemVerilog and VHDL graph companion",
+  "version": "0.5.0",
   "publisher": "mira-graphical",
   "license": "GPL-3.0-only",
   "engines": {
@@ -14,7 +14,9 @@
   "type": "module",
   "main": "./dist/extension.cjs",
   "activationEvents": [
-    "onLanguage:verilog"
+    "onLanguage:verilog",
+    "onLanguage:systemverilog",
+    "onLanguage:vhdl"
   ],
   "contributes": {
     "commands": [
@@ -35,7 +37,7 @@
       "editor/context": [
         {
           "command": "mira.open",
-          "when": "resourceExtname == .v",
+          "when": "resourceExtname =~ /\\.(v|sv|vhd|vhdl)$/i",
           "group": "navigation"
         }
       ]
@@ -48,6 +50,25 @@
         ],
         "aliases": [
           "Verilog"
+        ]
+      },
+      {
+        "id": "systemverilog",
+        "extensions": [
+          ".sv"
+        ],
+        "aliases": [
+          "SystemVerilog"
+        ]
+      },
+      {
+        "id": "vhdl",
+        "extensions": [
+          ".vhd",
+          ".vhdl"
+        ],
+        "aliases": [
+          "VHDL"
         ]
       }
     ]

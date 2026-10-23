@@ -1,5 +1,11 @@
 # Architecture and safety boundaries
 
+## Native HDL frontends
+
+`packages/verilog` handles the documented Verilog/SystemVerilog subset; `packages/vhdl` tokenizes and parses native VHDL into the shared expression/hierarchy model with explicit native types, widths and conversion nodes. VHDL uses its own arithmetic sizing and source emitter. Common projection, layout, hierarchy, simulation and synchronization operate on that model. Source content selects the frontend, while the adapter accepts `.v`, `.sv`, `.vhd` and `.vhdl` documents.
+
+Construction proofs replay native source actions in the editor's bundled parser before applying a patch. VHDL declarations and architecture statements use separate insertion anchors; entity export includes its IEEE context. Clipboard/import actions reject mixed HDL families. Unsupported syntax is refused before a new graph is committed. Neither frontend claims full language-standard coverage.
+
 `packages/protocol` defines version 1 messages, validators and UTF-16 offset edits. `packages/core` owns one Session per explicit document URI, a clock-injected 15,000 ms scheduler, graph identities, layout and recoverable conflict checkpoints. It imports no editor or UI APIs. Its `EditorAdapter` send contract and transport-independent hooks allow future editors. `packages/verilog` translates source into a deliberately limited AST and deterministic RTL graph projection. `packages/core/service.ts` hosts the authenticated loopback WebSocket link. Electron owns this service; shutting down its separate window disconnects the editor.
 
 The renderer has no filesystem, process, WebSocket or Node access. Its preload exposes only state subscription and checked graph commands. Navigation and additional windows are blocked. The service listens on an OS-assigned port on 127.0.0.1; `.hdlgraph/connection.json` contains a random per-session credential. Browser Origin requests, invalid versions, unshared documents, out-of-workspace URIs, oversized messages and unsolicited sync-origin claims are rejected. One VS Code adapter can connect at once; multiple explicitly shared documents have independent sessions. This is a same-user local application, not a defense against another process already able to read your workspace.

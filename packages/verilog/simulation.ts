@@ -130,20 +130,28 @@ export function simulate(
       return result;
     };
     const width = (e: Expr): number =>
-      e.kind === 'ref'
-        ? ast.nets.find((n) => n.name === e.value)!.width
-        : e.kind === 'slice'
-          ? Math.abs(e.msb - e.lsb) + 1
-          : e.kind === 'literal'
-            ? literalWidth(e.value)
-            : e.kind === 'concat'
-              ? e.parts.reduce((sum, p) => sum + width(p), 0)
-              : e.kind === 'mux'
-                ? Math.max(width(e.truthy), width(e.falsy))
-                : Math.max(width(e.left), width(e.right));
+      e.kind === 'convert'
+        ? (e.resultWidth ?? width(e.value))
+        : (e.nativeWidth ??
+          (e.kind === 'ref'
+            ? ast.nets.find((n) => n.name === e.value)!.width
+            : e.kind === 'slice'
+              ? Math.abs(e.msb - e.lsb) + 1
+              : e.kind === 'literal'
+                ? literalWidth(e.value)
+                : e.kind === 'concat'
+                  ? e.parts.reduce((sum, p) => sum + width(p), 0)
+                  : e.kind === 'mux'
+                    ? Math.max(width(e.truthy), width(e.falsy))
+                    : Math.max(width(e.left), width(e.right))));
     function expression(e: Expr, context = 0): Bits {
+      if (ast.language === 'vhdl') context = 0;
+      if (e.kind === 'convert') return resize(expression(e.value), width(e));
       if (e.kind === 'ref') return net(e.value);
-      if (e.kind === 'literal') return literal(e.value);
+      if (e.kind === 'literal')
+        return /^'[01]$/.test(e.value)
+          ? known(Math.max(1, context), e.value === "'1" ? mask(Math.max(1, context)) : 0n)
+          : literal(e.value);
       if (e.kind === 'slice') {
         const declaration = ast.nets.find((n) => n.name === e.value)!,
           base = net(e.value),

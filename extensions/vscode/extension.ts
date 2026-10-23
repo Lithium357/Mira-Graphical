@@ -160,7 +160,8 @@ export function activate(context: vscode.ExtensionContext) {
       safely(async () => {
         if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before connecting.');
         const doc = vscode.window.activeTextEditor?.document;
-        if (!doc || !doc.uri.path.endsWith('.v')) throw new Error('Open a .v document first.');
+        if (!doc || !/\.(?:v|sv|vhd|vhdl)$/i.test(doc.uri.path))
+          throw new Error('Open a .v, .sv, .vhd or .vhdl document first.');
         const folder = vscode.workspace.getWorkspaceFolder(doc.uri);
         if (!folder) throw new Error('Open the containing workspace folder first.');
         if (socket?.readyState !== WebSocket.OPEN || connectedWorkspace !== folder.uri.toString())

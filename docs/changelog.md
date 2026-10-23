@@ -1,6 +1,12 @@
 # Changelog
 
-## Workspace refinement (unreleased)
+## 0.5.0
+
+- Added native SystemVerilog support for logic declarations, fill literals and bounded complete `always_comb` blocks.
+- Added native VHDL support for entities/architectures, typed unsigned arithmetic, conversions, resize, joins, slices, conditional assignments, complete `process(all)` blocks and named entity instances.
+- Added native VHDL construction, wiring, clipboard and definition imports with independent editor proof replay and source-span preservation.
+- Added `.sv`, `.vhd` and `.vhdl` editor activation and language-aware graph labels.
+- Compared 4,608 generated output values against GHDL and Icarus, including construction and clipboard paths.
 
 - Fixed existing nodes disappearing after construction/status refreshes by retaining canvas measurements.
 - Replaced the fixed inspector and oversized toolbar with a canvas-first workspace, collapsible inspector, contextual clipboard actions, and Edit/View menus.

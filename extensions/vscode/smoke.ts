@@ -104,6 +104,33 @@ export async function run() {
   );
   assert.equal(combo.getText(), comboOriginal);
   assert.equal(doc.getText(), unsaved);
+  for (const ext of ['sv', 'vhd', 'vhdl']) {
+    const nativeUri = vscode.Uri.joinPath(folder.uri, `hierarchy.${ext}`);
+    const native = await vscode.workspace.openTextDocument(nativeUri);
+    const diskSource = native.getText();
+    await vscode.window.showTextDocument(native);
+    const prefix = `${ext === 'sv' ? '//' : '--'} unsaved native HDL checkpoint 🧪\n`;
+    const prefixEdit = new vscode.WorkspaceEdit();
+    prefixEdit.insert(nativeUri, new vscode.Position(0, 0), prefix);
+    await vscode.workspace.applyEdit(prefixEdit);
+    const liveSource = native.getText();
+    await vscode.commands.executeCommand('mira.open');
+    const nativeStart = Date.now();
+    while (Date.now() - nativeStart < 45000 && !native.getText().includes('a - b'))
+      await sleep(100);
+    assert(native.getText().startsWith(prefix.trimEnd()), `${ext} preserves the unsaved comment`);
+    assert(native.getText().includes('a - b'), `${ext} native operator patch`);
+    assert(
+      native.getText().includes(ext === 'sv' ? 'assign pair = {a, b};' : 'pair <= a & b;'),
+      `${ext} native construction`,
+    );
+    assert.equal(
+      Buffer.from(await vscode.workspace.fs.readFile(nativeUri)).toString('utf8'),
+      diskSource,
+    );
+    await vscode.commands.executeCommand('undo');
+    assert.equal(native.getText(), liveSource, `${ext} entire batch uses one native undo`);
+  }
   await vscode.workspace.fs.writeFile(
     vscode.Uri.joinPath(folder.uri, '.hdlgraph', 'vscode-smoke-result.json'),
     Buffer.from(
@@ -119,6 +146,7 @@ export async function run() {
           literalSliceSelector: true,
           constructionWiring: true,
           hierarchyBusesDuplicate: true,
+          nativeLanguages: ['systemverilog', 'vhd', 'vhdl'],
           realDebounceMs: 15000,
         },
         null,

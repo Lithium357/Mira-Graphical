@@ -32,6 +32,8 @@ export type CreateComponent = {
 };
 /** UI actions address node IDs; transaction proofs use structural source keys instead. */
 export type ClipboardItem = {
+  language?: 'vhdl' | 'verilog' | 'systemverilog';
+  nativeType?: 'std_logic' | 'std_logic_vector' | 'unsigned';
   name: string;
   width: number;
   netRange?: string;

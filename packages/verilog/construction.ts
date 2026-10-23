@@ -21,6 +21,8 @@ import {
 } from './index.js';
 import { literalWidth } from './literals.js';
 import { PatchDraft } from './patches.js';
+import { isVhdl } from '../vhdl/index.js';
+import { vhdlActionEdits, copyVhdl } from '../vhdl/construction.js';
 const zero = (width: number) => `${width}'d0`;
 const netKind = (node: Node) => ['input', 'output', 'wire'].includes(node.kind);
 function declarationWidth(width: number, range?: string) {
@@ -180,6 +182,7 @@ function operand(e: Expr, port: InputPort): Expr {
   throw new Error('That component has no matching input socket.');
 }
 function references(e: Expr, name: string): boolean {
+  if (e.kind === 'convert') return references(e.value, name);
   if (e.kind === 'ref' || e.kind === 'slice') return e.value === name;
   if (e.kind === 'concat') return e.parts.some((p) => references(p, name));
   if (e.kind === 'op') return references(e.left, name) || references(e.right, name);
@@ -188,6 +191,7 @@ function references(e: Expr, name: string): boolean {
 }
 /** Every operation is planned from AST spans. No formatting pass or whole-file rewrite is used. */
 export function sourceActionEdits(source: string, action: SourceAction): Edit[] {
+  if (isVhdl(source)) return vhdlActionEdits(source, action);
   if (!action || typeof action !== 'object') throw new Error('Invalid construction action.');
   const ast = parse(source, action.scope),
     graph = project(ast);
@@ -203,6 +207,10 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
     )
       throw new Error('Invalid module import.');
     const imported = parse(action.definitions.join('\n'));
+    if (imported.language === 'vhdl')
+      throw new Error(
+        'Import entities into a VHDL document. Mixed-language elaboration is unsupported.',
+      );
     for (const name of Object.keys(imported.library))
       if (ast.library[name])
         throw new Error(`Module ${name} already exists. Rename it before importing.`);
@@ -276,7 +284,12 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
         );
       if (driver)
         return checked(source, [
-          withoutComments(source, { ...expressionSpan(driver.expr), text: replacement }),
+          withoutComments(
+            source,
+            /^if\b/.test(source.slice(driver.start))
+              ? { start: driver.start, end: driver.end, text: `${driver.target} = ${replacement};` }
+              : { ...expressionSpan(driver.expr), text: replacement },
+          ),
         ]);
       return checked(source, [
         bodyInsertion(source, ast, [`assign ${target.label} = ${replacement};`]),
@@ -320,7 +333,12 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
         ? 1
         : (target.inputPorts?.find((p) => p.name === action.port)?.width ?? target.width ?? 1);
     return checked(source, [
-      withoutComments(source, { ...expressionSpan(selected), text: zero(key) }),
+      withoutComments(
+        source,
+        selected === driver?.expr && /^if\b/.test(source.slice(driver.start))
+          ? { start: driver.start, end: driver.end, text: `${driver.target} = ${zero(key)};` }
+          : { ...expressionSpan(selected), text: zero(key) },
+      ),
     ]);
   }
   if (action.kind === 'remove') {
@@ -396,6 +414,7 @@ export function copyComponents(
   graph: ReturnType<typeof project>,
   ids: string[],
 ): ClipboardItem[] {
+  if (isVhdl(source)) return copyVhdl(source, graph, ids);
   if (!Array.isArray(ids) || !ids.length || ids.length > 50)
     throw new Error('Select 1–50 components to copy.');
   const ast = parse(source, graph.module),
@@ -430,9 +449,7 @@ export function copyComponents(
       ...(net.direction === 'wire' || !ports.has(name) ? {} : { direction: net.direction }),
       ...(driver
         ? {
-            expression: source
-              .slice(expressionSpan(driver.expr).start, expressionSpan(driver.expr).end)
-              .replace(/\/\/[^\r\n]*|\/\*[\s\S]*?\*\//g, ' '),
+            expression: copyExpression(source, driver.expr),
           }
         : {}),
     };
@@ -464,6 +481,8 @@ function paste(source: string, ast: Module, items: ClipboardItem[]): Edit[] {
   const occupied = new Set([...ast.nets.map((n) => n.name), ...ast.instances.map((i) => i.name)]),
     mapping = new Map<string, string>();
   for (const item of items) {
+    if (item.language === 'vhdl')
+      throw new Error('Clipboard expressions must come from the same HDL family.');
     assertIdentifier(item.name);
     if (
       mapping.has(item.name) ||
@@ -522,4 +541,26 @@ function paste(source: string, ast: Module, items: ClipboardItem[]): Edit[] {
   // Every fragment is confined to one expression; the document parser validates names and drivers.
   project(parse(draft.text, ast.name));
   return draft.edits();
+}
+
+function copyExpression(source: string, e: Expr): string {
+  const text = source
+    .slice(expressionSpan(e).start, expressionSpan(e).end)
+    .replace(/\/\/[^\r\n]*|\/\*[\s\S]*?\*\//g, ' ');
+  if (!text.includes(';')) return text;
+  const render = (e: Expr): string =>
+    e.kind === 'ref' || e.kind === 'literal'
+      ? e.value
+      : e.kind === 'slice'
+        ? `${e.value}[${e.bit ? e.msb : `${e.msb}:${e.lsb}`}]`
+        : e.kind === 'concat'
+          ? `{${e.parts.map(render).join(', ')}}`
+          : e.kind === 'mux'
+            ? `(${render(e.condition)} ? ${render(e.truthy)} : ${render(e.falsy)})`
+            : e.kind === 'op'
+              ? `(${render(e.left)} ${e.op} ${render(e.right)})`
+              : (() => {
+                  throw new Error('Unsupported cross-language expression.');
+                })();
+  return render(e);
 }

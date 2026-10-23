@@ -3,6 +3,13 @@ import { Lexer, createToken, type IToken } from 'chevrotain';
 import { randomUUID } from 'node:crypto';
 import { operators, type Operator, type Edit, type GraphChange } from '../protocol/index.js';
 import { literalWidth } from './literals.js';
+import {
+  parseVhdl,
+  isVhdl,
+  vhdlOperator,
+  vhdlTokenEdit,
+  validateVhdlEdits,
+} from '../vhdl/index.js';
 const WS = createToken({
   name: 'Whitespace',
   pattern: /\s+/,
@@ -16,10 +23,11 @@ const Comment = createToken({
   line_breaks: true,
 });
 const Identifier = createToken({ name: 'Identifier', pattern: /[a-zA-Z_][a-zA-Z0-9_$]*/ });
+const Fill = createToken({ name: 'Fill', pattern: /'[01]/ });
 const Based = createToken({ name: 'Based', pattern: /[0-9][0-9_]*'[bBoOdDhH][0-9a-fA-FxXzZ_]+/ });
 const Integer = createToken({ name: 'Integer', pattern: /[0-9][0-9_]*/ });
 const Symbol = createToken({ name: 'Symbol', pattern: /[{}()[\]:?;,.=+*\-&|^]/ });
-const lexer = new Lexer([WS, Comment, Identifier, Based, Integer, Symbol], {
+const lexer = new Lexer([WS, Comment, Identifier, Fill, Based, Integer, Symbol], {
   ensureOptimizations: false,
 });
 export type Diagnostic = { message: string; start: number; end: number };
@@ -33,6 +41,15 @@ class ParseError extends Error implements Diagnostic {
   }
 }
 export type Expr = (
+  | {
+      kind: 'convert';
+      conversion: 'unsigned' | 'std_logic_vector' | 'resize';
+      value: Expr;
+      resultWidth?: number;
+      qualified?: boolean;
+      start: number;
+      end: number;
+    }
   | { kind: 'concat'; parts: Expr[]; start: number; end: number }
   | { kind: 'ref'; value: string; start: number; end: number }
   | { kind: 'literal'; value: string; start: number; end: number }
@@ -58,17 +75,25 @@ export type Expr = (
       rangeEnd: number;
     }
   | { kind: 'mux'; condition: Expr; truthy: Expr; falsy: Expr; start: number; end: number }
-) & { outerStart?: number; outerEnd?: number };
+) & {
+  outerStart?: number;
+  outerEnd?: number;
+  nativeType?: 'std_logic' | 'std_logic_vector' | 'unsigned';
+  nativeWidth?: number;
+};
 export type Net = {
   name: string;
   direction: 'input' | 'output' | 'wire';
   width: number;
   msb: number;
   lsb: number;
+  nativeType?: 'std_logic' | 'std_logic_vector' | 'unsigned';
+  netType?: string;
   declarationStart?: number;
   declarationEnd?: number;
 };
 export function children(e: Expr): [string, Expr][] {
+  if (e.kind === 'convert') return [['V', e.value]];
   if (e.kind === 'concat') return e.parts.map((p, i) => [`P${i}`, p]);
   return e.kind === 'op'
     ? [
@@ -84,6 +109,16 @@ export function children(e: Expr): [string, Expr][] {
       : [];
 }
 export type Module = {
+  language?: 'verilog' | 'systemverilog' | 'vhdl';
+  vhdl?: {
+    entityStart: number;
+    entityEnd: number;
+    architectureStart: number;
+    architectureEnd: number;
+    entityEndStart: number;
+    declarationsEnd: number;
+    architecture: string;
+  };
   name: string;
   start: number;
   end: number;
@@ -122,6 +157,7 @@ export const expressionSpan = (e: Expr) => ({
 });
 const precedence: Record<string, number> = { '|': 1, '^': 2, '&': 3, '+': 4, '-': 4, '*': 5 };
 export function parse(source: string, selected?: string): Module {
+  if (isVhdl(source)) return parseVhdl(source, selected);
   if (source.length > 1_000_000)
     throw new ParseError('Source exceeds limit (1 million UTF-16 units).', 0, 0);
   const result = lexer.tokenize(source);
@@ -155,6 +191,13 @@ export function parse(source: string, selected?: string): Module {
   }
   if (!Object.keys(library).length)
     throw new ParseError('Expected a module definition.', 0, source.length);
+  return validateLibrary(source, library, selected);
+}
+export function validateLibrary(
+  source: string,
+  library: Record<string, Module>,
+  selected?: string,
+): Module {
   for (const ast of Object.values(library)) ast.library = library;
   for (const ast of Object.values(library)) {
     const driven = new Set(ast.assigns.map((a) => a.target));
@@ -274,7 +317,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
       left = { ...left, outerStart: open.startOffset, outerEnd: close.endOffset! + 1 };
     } else {
       const t = tokens[i];
-      if (t?.tokenType === Integer || t?.tokenType === Based) {
+      if (t?.tokenType === Integer || t?.tokenType === Based || t?.tokenType === Fill) {
         take();
         try {
           literalWidth(t.image);
@@ -343,14 +386,17 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   const nets: Net[] = [];
   let direction: 'input' | 'output' | undefined;
   let portWidth = { width: 1, msb: 0, lsb: 0 };
+  let portType = 'wire';
   while (peek() !== ')') {
     if (peek() === 'input' || peek() === 'output') {
       direction = take().image as 'input' | 'output';
-      if (peek() === 'wire') take();
+      if (['wire', 'logic', 'reg'].includes(peek())) portType = take().image;
+      else portType = 'wire';
+      if (peek() === 'unsigned') take();
       portWidth = width();
     }
     if (!direction) fail('Only ANSI input/output ports are supported.');
-    nets.push({ name: name(), direction: direction!, ...portWidth });
+    nets.push({ name: name(), direction: direction!, netType: portType, ...portWidth });
     if (peek() !== ',') break;
     take(',');
     if (peek() === ')') fail('Trailing port comma.');
@@ -364,12 +410,14 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   const assigns: Module['assigns'] = [];
   const instances: Module['instances'] = [];
   while (peek() !== 'endmodule') {
-    if (peek() === 'wire') {
+    if (['wire', 'logic', 'reg'].includes(peek())) {
       const start = take().startOffset,
         first = nets.length;
+      const netType = tokens[i - 1].image;
+      if (peek() === 'unsigned') take();
       const w = width();
       do {
-        nets.push({ name: name(), direction: 'wire', ...w });
+        nets.push({ name: name(), direction: 'wire', netType, ...w });
         if (peek() !== ',') break;
         take(',');
       } while (true);
@@ -378,6 +426,70 @@ function parseSingle(source: string, tokens: IToken[]): Module {
         net.declarationStart = start;
         net.declarationEnd = end;
       }
+    } else if (peek() === 'always_comb') {
+      take();
+      const block = peek() === 'begin';
+      if (block) take();
+      const process: Module['assigns'] = [];
+      const assignment = () => {
+        const start = tokens[i]?.startOffset ?? source.length,
+          target = name();
+        take('=');
+        const value = expr(),
+          end = take(';').endOffset! + 1;
+        return { target, expr: value, start, end };
+      };
+      do {
+        if (block && peek() === 'end') break;
+        if (peek() === 'if') {
+          const start = take().startOffset;
+          take('(');
+          const condition = expr();
+          take(')');
+          const branch = () => {
+            const wrapped = peek() === 'begin';
+            if (wrapped) take();
+            const a = assignment();
+            if (wrapped) take('end');
+            return a;
+          };
+          const truthy = branch();
+          take('else');
+          const falsy = branch();
+          if (truthy.target !== falsy.target)
+            fail('Combinational branches must drive the same output on both paths.');
+          const end = tokens[i - 1].endOffset! + 1;
+          process.push({
+            target: truthy.target,
+            expr: {
+              kind: 'mux',
+              condition,
+              truthy: truthy.expr,
+              falsy: falsy.expr,
+              start: condition.start,
+              end,
+            },
+            start,
+            end,
+          });
+        } else process.push(assignment());
+        if (!block) break;
+      } while (peek() !== 'end');
+      if (block) take('end');
+      const targets = new Set(process.map((a) => a.target));
+      for (const a of process) {
+        if (!nets.some((n) => n.name === a.target && ['logic', 'reg'].includes(n.netType ?? '')))
+          fail('always_comb targets must be declared logic or reg.');
+        const check = (e: Expr): void => {
+          if ((e.kind === 'ref' || e.kind === 'slice') && targets.has(e.value))
+            fail(
+              'Reads of signals written by the same always_comb block are unsupported; use independent assignments or continuous wiring.',
+            );
+          for (const [, child] of children(e)) check(child);
+        };
+        check(a.expr);
+      }
+      assigns.push(...process);
     } else if (peek() === 'assign') {
       const start = take().startOffset;
       const target = name();
@@ -467,6 +579,9 @@ function parseSingle(source: string, tokens: IToken[]): Module {
     check(a.expr);
   }
   return {
+    language: tokens.some((t) => ['logic', 'always_comb'].includes(t.image) || t.tokenType === Fill)
+      ? 'systemverilog'
+      : 'verilog',
     name: moduleName,
     start: moduleStart,
     end: moduleEnd,
@@ -481,10 +596,21 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   };
 }
 export type Node = {
+  nativeType?: Net['nativeType'];
   id: string;
   key: string;
   label: string;
-  kind: 'input' | 'output' | 'wire' | 'op' | 'literal' | 'slice' | 'mux' | 'concat' | 'instance';
+  kind:
+    | 'input'
+    | 'output'
+    | 'wire'
+    | 'op'
+    | 'literal'
+    | 'slice'
+    | 'mux'
+    | 'concat'
+    | 'instance'
+    | 'convert';
   width?: number;
   op?: Operator;
   operands?: string[];
@@ -503,6 +629,7 @@ export type Node = {
   outputPorts?: { name: string; width: number; signal: string }[];
 };
 export type Circuit = {
+  language?: Module['language'];
   module: string;
   library?: { name: string; ports: { name: string; direction: string; width: number }[] }[];
   issues?: { code: string; message: string; nodeKey: string }[];
@@ -544,6 +671,7 @@ export function project(
       n.name,
       add(`${ast.name}/net/${n.name}`, {
         kind: n.direction,
+        nativeType: n.nativeType,
         label: n.name,
         width: n.width,
         sourceNet: n.name,
@@ -572,25 +700,41 @@ export function project(
       targetHandle: port,
     });
   const widthOf = (e: Expr): number =>
-    e.kind === 'ref'
-      ? nets.get(e.value)!.width!
-      : e.kind === 'slice'
-        ? Math.abs(e.msb - e.lsb) + 1
-        : e.kind === 'literal'
-          ? literalWidth(e.value)
-          : e.kind === 'concat'
-            ? e.parts.reduce((sum, p) => sum + widthOf(p), 0)
-            : e.kind === 'mux'
-              ? Math.max(widthOf(e.truthy), widthOf(e.falsy))
-              : Math.max(widthOf(e.left), widthOf(e.right));
+    e.kind === 'convert'
+      ? (e.resultWidth ?? widthOf(e.value))
+      : (e.nativeWidth ??
+        (e.kind === 'ref'
+          ? nets.get(e.value)!.width!
+          : e.kind === 'slice'
+            ? Math.abs(e.msb - e.lsb) + 1
+            : e.kind === 'literal'
+              ? literalWidth(e.value)
+              : e.kind === 'concat'
+                ? e.parts.reduce((sum, p) => sum + widthOf(p), 0)
+                : e.kind === 'mux'
+                  ? Math.max(widthOf(e.truthy), widthOf(e.falsy))
+                  : Math.max(widthOf(e.left), widthOf(e.right))));
   function visit(e: Expr, key: string, context = 0): Node {
+    if (ast.language === 'vhdl') context = 0;
+    if (e.kind === 'convert') {
+      const child = visit(e.value, `${key}/V`);
+      const node = add(key, {
+        kind: 'convert',
+        label: e.conversion.toUpperCase(),
+        expressionKey: key,
+        width: widthOf(e),
+        operands: [child.label],
+      });
+      connect(child, node, 'left');
+      return node;
+    }
     if (e.kind === 'ref') return nets.get(e.value)!;
     if (e.kind === 'literal')
       return add(`${key}/literal`, {
         kind: 'literal',
         expressionKey: key,
         label: e.value,
-        width: literalWidth(e.value),
+        width: /^'[01]$/.test(e.value) ? Math.max(1, context) : literalWidth(e.value),
       });
     if (e.kind === 'slice') {
       const range = e.bit ? `[${e.msb}]` : `[${e.msb}:${e.lsb}]`;
@@ -751,6 +895,7 @@ export function project(
     }
   }
   return {
+    language: ast.language,
     module: ast.name,
     nodes,
     edges,
@@ -775,7 +920,8 @@ export function expressions(ast: Module) {
       visit(port.expr, `${ast.name}/instance/${inst.name}/port/${port.name}`);
   return all;
 }
-function shape(e: Expr): string {
+export function shape(e: Expr): string {
+  if (e.kind === 'convert') return `${e.conversion}:${e.resultWidth ?? ''}(${shape(e.value)})`;
   if (e.kind === 'concat') return `concat(${e.parts.map(shape).join(',')})`;
   return e.kind === 'mux'
     ? `mux(${shape(e.condition)},${shape(e.truthy)},${shape(e.falsy)})`
@@ -786,6 +932,7 @@ function shape(e: Expr): string {
         : `${e.kind}:${e.value}`;
 }
 function semantic(e: Expr): string {
+  if (e.kind === 'convert') return `${e.conversion}:${e.resultWidth ?? ''}(${semantic(e.value)})`;
   if (e.kind === 'concat') return `concat(${e.parts.map(semantic).join(',')})`;
   return e.kind === 'mux'
     ? `mux(${semantic(e.condition)},${semantic(e.truthy)},${semantic(e.falsy)})`
@@ -811,8 +958,12 @@ export function operatorPatch(
   const current = currentGraph.nodes.find((n) => n.key === node.key);
   if (current?.operandSignature !== node.operandSignature)
     throw new Error('Operands changed in the live buffer. Commit source changes first.');
-  const patch = { start: e.tokenStart, end: e.tokenEnd, text: op };
-  const next = parse(source.slice(0, patch.start) + op + source.slice(patch.end), ast.name);
+  const replacement = ast.language === 'vhdl' ? vhdlOperator(op) : op;
+  const patch = { start: e.tokenStart, end: e.tokenEnd, text: replacement };
+  const next = parse(
+    source.slice(0, patch.start) + replacement + source.slice(patch.end),
+    ast.name,
+  );
   if (
     JSON.stringify(
       Object.values(ast.library).map((m) => [
@@ -845,6 +996,7 @@ export function graphPatch(
   const ast = parse(source, graph?.module);
   const current = project(ast).nodes.find((n) => n.key === node.key);
   const e = expressions(ast).get(node.expressionKey);
+  if (ast.language === 'vhdl') return vhdlTokenEdit(source, ast, node, e, change, current);
   let edit: Edit;
   if (change.kind === 'literal' && e?.kind === 'literal' && node.kind === 'literal') {
     if (e.value !== node.label)
@@ -874,6 +1026,7 @@ export function graphPatch(
 /** Defense in depth in the editor: patches must match supported AST token/selection spans. */
 export function validateEditableEdits(source: string, edits: Edit[]): void {
   const ast = parse(source);
+  if (ast.language === 'vhdl') return validateVhdlEdits(source, edits);
   const allowed: { start: number; end: number; kind: GraphChange['kind']; scalars?: string[] }[] =
     [];
   for (const scope of Object.values(ast.library))

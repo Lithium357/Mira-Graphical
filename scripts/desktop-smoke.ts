@@ -738,5 +738,50 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
       2,
     ),
   );
+  // Render both native languages and exercise their real inspector patch path.
+  const languageDocuments = ['sv', 'vhd'].map((ext) => ({
+    ext,
+    uri: pathToFileURL(join(service.workspace, `hierarchy.${ext}`)).href,
+    text: readFileSync(join(root, `fixtures/hierarchy.${ext}`), 'utf8'),
+  }));
+  for (const doc of languageDocuments)
+    ws.send(JSON.stringify({ type: 'document.open', uri: doc.uri, version: 1, text: doc.text }));
+  await until(() => languageDocuments.every((d) => !!service.states.get(d.uri)?.graph));
+  for (const doc of languageDocuments) {
+    await win.webContents.executeJavaScript(
+      `(()=>{const s=document.querySelector('[aria-label="Shared module"]');s.value=${JSON.stringify(doc.uri)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+    );
+    service.selectModule(doc.uri, 'arithmetic');
+    const operation = service.states.get(doc.uri)!.graph!.nodes.find((n) => n.kind === 'op')!;
+    await until(() =>
+      win.webContents.executeJavaScript(`!!document.querySelector('[data-id="${operation.id}"]')`),
+    );
+    await win.webContents.executeJavaScript(
+      `document.querySelector('[data-id="${operation.id}"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`,
+    );
+    await until(() =>
+      win.webContents.executeJavaScript(
+        `!!document.querySelector('[aria-label="Replace with SUB"]')`,
+      ),
+    );
+    await win.webContents.executeJavaScript(
+      `document.querySelector('[aria-label="Replace with SUB"]').click()`,
+    );
+    await until(
+      () =>
+        service.states.get(doc.uri)?.previewGraph?.nodes.some((n) => n.op === '-') === true ||
+        service.states.get(doc.uri)?.pendingEdits?.[operation.id]?.value === '-',
+    );
+    assert.equal(service.simulate(doc.uri, { a: '9', b: '3' }).signals.result.value, '0x06');
+    await click('Readable zoom');
+    await sleep(250);
+    const text = await win.webContents.executeJavaScript('document.body.innerText');
+    assert(text.includes(doc.ext === 'vhd' ? 'VHDL' : 'SYSTEMVERILOG'));
+    writeFileSync(
+      join(output, `language-${doc.ext}.png`),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+    service.discardGraphChanges(doc.uri);
+  }
   ws.close();
 }

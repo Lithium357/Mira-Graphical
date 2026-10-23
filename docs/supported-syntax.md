@@ -1,4 +1,29 @@
-# Supported Verilog subset (0.4.0)
+# Supported HDL subsets (0.5.0)
+
+Open `.v`, `.sv`, `.vhd` or `.vhdl` documents explicitly through the companion extension. Source content selects the native parser. Files contain their own definitions; imports copy definitions from other explicitly shared documents. Verilog and SystemVerilog share a family; VHDL definitions and clipboard fragments stay within the VHDL family. Mixed-language elaboration is unsupported.
+
+## SystemVerilog
+
+The Verilog subset below also accepts `logic`/`reg` declarations, optional `unsigned`, and context-sized `'0`/`'1` literals. `always_comb` accepts one blocking assignment, a `begin`/`end` block of independent blocking assignments, or one complete `if`/`else` assigning the same target. Branches may use single-statement `begin`/`end`. Every procedural target must be declared `logic`/`reg`. A block cannot read a signal it writes; procedural ordering and latch semantics are refused. Copied procedural muxes become equivalent conditional expressions.
+
+`always_ff`, `always_latch`, general `always`, clocks/events, nonblocking assignments, incomplete conditionals, loops, case statements, packed structures, interfaces, packages, classes, assertions, signed values, parameters and generate remain unsupported. This is combinational RTL support, not the full SystemVerilog design or verification language.
+
+## VHDL
+
+VHDL uses native parsing and native source edits. Supported constructs:
+
+- IEEE `std_logic_1164` and `numeric_std` contexts, case-insensitive basic identifiers, entities with `in`/`out` ports and one architecture per entity. Multiple entity/architecture pairs may share a file; each entity precedes its architecture.
+- Scalar `std_logic`, constrained ascending/descending `std_logic_vector` and `unsigned` signals and ports; fixed bit and part selections.
+- Concurrent assignments, `value when selector = '1' else value`, and unnamed `process(all)` blocks containing independent signal assignments or one complete `if selector = '1' then ... else ... end if` assigning the same target.
+- Bit literals, binary strings, binary/octal/hex bitstrings, bounded `to_unsigned`, `unsigned`/`std_logic_vector` conversions and qualified expressions, and unsigned `resize`.
+- Unsigned `+`, `-`, `*`, matching-type `and`/`or`/`xor`, concatenation with `&`, direct `entity work.name port map (...)` instances with named associations.
+- Native construction, rewiring, tie-offs, removal, ports, entity creation, import, copy/paste and simulation. New vector components use `unsigned`; scalar components use `std_logic`. Scalar arithmetic creation is refused; scalar bitwise operations are supported.
+
+VHDL assignment types and widths must match exactly. Addition/subtraction use the larger operand width; multiplication uses the sum of operand widths. `resize` and conversions are visible graph nodes and are evaluated explicitly. Graph wiring emits conversions/resizes when needed. Graph literal fields accept canonical sized literals or supported native VHDL literal syntax; graph range fields use `[left:right]`, emitted as native `to`/`downto` ranges. Graph editing never translates the document into Verilog.
+
+Generics, packages/custom types, records, arrays beyond the supported vectors, signed arithmetic, clocked processes, sensitivity lists other than `all`, named processes, process variables, incomplete branches, loops/case, delays, attributes, arbitrary functions and component declarations are unsupported. Source `x`/`z` values and extended identifiers are unsupported. Unsupported syntax stops projection and preserves the last valid graph. This subset targets VHDL-2008 syntax, without full standard coverage.
+
+## Verilog and shared limits
 
 | Construct                                                                                                         | Support                                                                                                                                                |
 | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |

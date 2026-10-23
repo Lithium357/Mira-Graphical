@@ -469,7 +469,12 @@ function Diagram({
         <div className="flow-surface">
           {' '}
           <div className="canvas-caption">
-            <span className="live-dot" /> SOURCE LEVEL RTL{' '}
+            <span className="live-dot" />{' '}
+            {graph?.language === 'vhdl'
+              ? 'VHDL'
+              : graph?.language === 'systemverilog' || /\.sv$/i.test(state.uri)
+                ? 'SYSTEMVERILOG'
+                : 'VERILOG'}{' '}
             <span className="caption-count">
               {graph?.nodes.length ?? 0} nodes · {graph?.edges.length ?? 0} connections
             </span>
@@ -718,7 +723,13 @@ function Diagram({
                   >
                     <option value="">Choose shared module</option>
                     {shared
-                      .filter((s) => s.uri !== state.uri && s.canConstruct && !s.pendingSteps)
+                      .filter(
+                        (s) =>
+                          s.uri !== state.uri &&
+                          s.canConstruct &&
+                          !s.pendingSteps &&
+                          (s.graph?.language === 'vhdl') === (graph.language === 'vhdl'),
+                      )
                       .flatMap(
                         (s) =>
                           s.graph?.library?.map((m) => (
@@ -863,7 +874,10 @@ function Diagram({
                       >
                         {graph?.nodes
                           .filter(
-                            (n) => ['input', 'wire', 'output'].includes(n.kind) && n.width === 1,
+                            (n) =>
+                              ['input', 'wire', 'output'].includes(n.kind) &&
+                              n.width === 1 &&
+                              (graph?.language !== 'vhdl' || n.nativeType === 'std_logic'),
                           )
                           .map((n) => (
                             <option key={n.id} value={n.label}>
@@ -911,7 +925,7 @@ function Diagram({
                 <div className="info-card">
                   <span>02</span>
                   <h3>Arrange your view</h3>
-                  <p>Drag nodes freely. Positions are saved independently of Verilog.</p>
+                  <p>Drag nodes freely. Positions are saved independently of source code.</p>
                 </div>
               </>
             )}
@@ -969,10 +983,10 @@ function App() {
         <div className="header-divider" />
         <div className="project-name">
           {workspace.split(/[\\/]/).pop() ?? 'Local workspace'}
-          <span>Verilog graph companion</span>
+          <span>HDL graph companion</span>
         </div>
         <div className="header-right">
-          <span className="version">0.4 · CIRCUIT WORKBENCH</span>
+          <span className="version">0.5 · CIRCUIT WORKBENCH</span>
           <span
             className={`status ${(state?.status ?? 'Disconnected').replaceAll(' ', '-')}`}
             role="status"
@@ -1042,7 +1056,7 @@ function App() {
           <div className="eyebrow">YOUR RTL, CONNECTED</div>
           <h1>A circuit beside your code.</h1>
           <p>
-            Open a Verilog file in VS Code, then run
+            Open a Verilog, SystemVerilog or VHDL file in VS Code, then run
             <br />
             <strong>RTL Graph: Open Current Module</strong>.
           </p>

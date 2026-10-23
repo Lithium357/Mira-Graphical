@@ -1,8 +1,8 @@
 # Mira Graphical
 
-A local, bidirectional Verilog graph companion. Write RTL in VS Code; construct, wire and inspect supported circuits in a separate desktop window. Semantic edits synchronize after **15 seconds of inactivity**. Original code is **GPL-3.0-only**.
+A local, bidirectional Verilog, SystemVerilog and VHDL graph companion. Write RTL in VS Code; construct, wire and inspect supported circuits in a separate desktop window. Semantic edits synchronize after **15 seconds of inactivity**. Original code is **GPL-3.0-only**.
 
-Version 0.4.0 adds bus construction, circuit diagnostics, clipboard tools, sampled simulation and reusable module hierarchy. It is an RTL expression viewer/editor for a documented subset, not a synthesized schematic or general SystemVerilog IDE.
+Version 0.5.0 adds native SystemVerilog and VHDL combinational RTL support and a resizable canvas-first workspace. Each language supports source synchronization, construction, wiring, hierarchy, clipboard actions and local simulation within the [documented subset](docs/supported-syntax.md). Clocked logic, testbenches and full language standards remain outside this version.
 
 ## Install and run
 
@@ -23,12 +23,12 @@ To run the companion extension from source:
 
 1. Open this repository folder in VS Code.
 2. Press **F5**, choosing **Mira: Extension Development Host** if prompted. This loads the built extension in a separate VS Code window.
-3. In that window, open the same project folder selected for the graph app, and open a `.v` file.
+3. In that window, open the same project folder selected for the graph app, and open a `.v`, `.sv`, `.vhd` or `.vhdl` file.
 4. Run **RTL Graph: Open Current Module** from the command palette or editor context menu.
 
 Only explicitly shared documents participate. Use **RTL Graph: Connect/Disconnect** to disconnect; use **RTL Graph: Show Sync Status** for details. After a service restart, reconnect and run Open Current Module again to negotiate the current buffer. One desktop workspace and one VS Code adapter connection are supported at a time, with multiple shared document sessions. No extension marketplace publishing or native desktop installer is provided yet.
 
-To use the packaged companion, run `pnpm package:extension`, then choose **Extensions: Install from VSIX…** in VS Code and select `dist/packages/mira-graphical-0.4.0.vsix`. Keep the desktop app running for the same workspace and share a `.v` file with Open Current Module. The official [VS Code packaging tool](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#packaging-extensions) creates the unsigned VSIX; this does not publish to the Marketplace or create/sign a desktop installer. CI uploads the VSIX with its test artifacts.
+To use the packaged companion, run `pnpm package:extension`, then choose **Extensions: Install from VSIX…** in VS Code and select `dist/packages/mira-graphical-0.5.0.vsix`. Keep the desktop app running for the same workspace and share a `.v`, `.sv`, `.vhd` or `.vhdl` file with Open Current Module. The official [VS Code packaging tool](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#packaging-extensions) creates the unsigned VSIX; this does not publish to the Marketplace or create/sign a desktop installer. CI uploads the VSIX with its test artifacts.
 
 ## Adder demo
 

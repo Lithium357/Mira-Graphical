@@ -9,6 +9,7 @@ import {
   type SourceAction,
   type ClipboardItem,
 } from '../protocol/index.js';
+import { exportVhdlModule } from '../vhdl/index.js';
 import { simulate } from '../verilog/simulation.js';
 import { PatchDraft } from '../verilog/patches.js';
 import {
@@ -290,6 +291,8 @@ export class Session {
   circuitAction(action: CircuitAction) {
     this.editableConstruction();
     const graph = this.draft?.graph ?? this.state.graph!;
+    if (graph.language === 'vhdl' && 'name' in action)
+      action = { ...action, name: action.name.toLowerCase() };
     const key = (id: string) => {
       const n = graph.nodes.find((n) => n.id === id);
       if (!n) throw new Error('Component no longer exists.');
@@ -306,7 +309,14 @@ export class Session {
       selectedIds: this.draft!.graph.nodes.filter((n) => !previousIds.has(n.id)).map((n) => n.id),
       selectedId:
         action.kind === 'create'
-          ? (this.draft!.graph.nodes.find((n) => n.assignmentTarget === action.name)?.id ??
+          ? ((this.draft!.graph.language === 'vhdl' && action.component === 'operation'
+              ? this.draft!.graph.nodes.find(
+                  (n) =>
+                    n.kind === 'op' &&
+                    n.key.startsWith(`${this.state.graph!.module}/assign/${action.name}/expr`),
+                )?.id
+              : undefined) ??
+            this.draft!.graph.nodes.find((n) => n.assignmentTarget === action.name)?.id ??
             this.draft!.graph.nodes.find((n) => n.label === action.name)?.id)
           : this.draft!.graph.nodes.find((n) => !previousIds.has(n.id))?.id,
     };
@@ -324,7 +334,9 @@ export class Session {
     };
     visit(name);
     return [...needed].map((name) =>
-      this.text.slice(ast.library[name].start, ast.library[name].end),
+      ast.language === 'vhdl'
+        ? exportVhdlModule(this.text, ast.library[name])
+        : this.text.slice(ast.library[name].start, ast.library[name].end),
     );
   }
   simulate(inputs: Record<string, string>) {
