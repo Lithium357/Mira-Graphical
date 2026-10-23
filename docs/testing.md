@@ -1,47 +1,46 @@
-# Verification report — 0.3.0
+# Verification report — 0.4.0
 
-Windows verification on 2026-10-22, with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an isolated official VS Code 1.143.1 test runtime. Linux/macOS have not been validated.
+Windows verification with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an isolated official VS Code 1.143.1 runtime. Linux/macOS app releases have not been validated.
 
-## Reproducible checks
+## Automated checks
 
-- `pnpm test`: **53 passed, 0 failed**. Includes parser/patch, fake-clock scheduling, identity/layout, actual authenticated WebSocket protocol, live-buffer guards and monitor-bound restoration tests.
+- `pnpm test`: **74 passed, 0 failed**. Includes parser, scoped patches, buses, hierarchy, diagnostics, clipboard safety, simulation, recovery, fake-clock scheduling, authenticated WebSocket integration and layout persistence.
 - `pnpm lint`, `pnpm build`, `pnpm format:check`: passed.
-- `pnpm run licenses`: **105 installed package versions**, no unresolved license classifications. Use explicit `run`: `pnpm licenses` invokes a different built-in pnpm command. The CI workflow now uses the correct invocation.
-- `pnpm audit --json`: **0 reported advisories**.
-- `pnpm smoke`: desktop/extension round trips passed, including constants, slices, mux selectors, multiple documents, native Undo and disk preservation. The final two-pass editor/service restart test is recorded in `test-results/vscode-smoke.json`.
+- `pnpm run licenses`: **211 installed package versions**, no unclassified licenses. Two exact-version, exact-license-hash Microsoft helpers are development-only exceptions, never runtime/VSIX contents; signing scripts are disabled. See [license scope](licenses.md).
+- `pnpm audit --json`: **0 advisories**.
+- Full `pnpm smoke`: desktop interactions, isolated VSIX installation and both real editor/service passes passed.
+- Icarus Verilog 12.0 differential check: **264 input vectors × 11 outputs = 2904 matching bit-for-bit comparisons**. Covers arithmetic overflow/context, nested arithmetic, muxes, concatenation/slice ordering, named-port hierarchy and selected unknown-bit cases. This is regression evidence, not formal equivalence for arbitrary HDL.
 
-The renderer bundler emits an informational warning about React Flow's `use client` directive. The entire app is client-rendered; no server-component boundary exists, and builds/runtime smoke succeed.
+## Desktop evidence
 
-## Desktop and extension evidence
+The test runs actual 15-second inactivity intervals against three shared documents. It changes operators, constants, slices and mux selectors; drags a node with real Chromium pointer events; reloads and checks persisted coordinates; creates an operation; drags a source into its socket; and exercises pending Undo/Redo.
 
-The desktop test uses actual 15-second timers, a four-node adder and an eleven-node combinational fixture. It selects inspector operations, edits literal/range/selector fields and verifies the exact resulting source. Real Chromium pointer-down/move/up events in a focused window move a node; the persisted position survives a canvas reload without any RTL patch. It verifies two simultaneous modules and records a screenshot in `test-results/desktop-smoke.png`.
+The workbench portion samples two input vectors and checks the resulting on-node values and waveform columns. It navigates into a reusable child and back, verifies an exact child-only source patch, duplicates an instance, creates concat/split results, Shift-drags a real selection box around two input ports, copies/pastes them, and imports a definition from another explicitly shared file. Pending discard actions leave the acknowledged source unchanged. Wire labels are rendered and a final screenshot includes the hierarchy and simulation panel.
 
-The VS Code test runs inside the real extension host. It changes the adder operator in memory without saving, shares the live buffer, receives the graph patch, checks exact source/comment preservation, and verifies native Undo and the reverse graph update after another debounce. It then shares the combinational module, applies three limited edits in one native workspace edit, and confirms that Undo reverses them together and that neither source file on disk was changed. The first module remains untouched while editing the second.
+`test-results/desktop-smoke.json` records each path, including `boxSelection`, `copyPasteDuplicate`, `simulationWaveforms`, `moduleImport`, `hierarchy` and `busConstruction`. The image is `test-results/desktop-smoke.png`.
 
-The two-pass runner closes and recreates both the synchronization service and extension-host process using the same metadata directory. The second pass checks the original operation ID and custom coordinates before applying further edits. It uses a fresh editor profile and a new connection token; pending patches are never replayed. `restartedEditorAndService` in the final JSON distinguishes this check from a renderer-only reload.
+## VS Code and VSIX evidence
 
-Native Windows automation also exercised the visible desktop app's module picker, operation inspector, keyboard movement and a full graph process quit/restart. The saved position and operator remained, while the other document retained its independent ADD operation. A disposable mock editor supplied the source for this particular native window test; the extension-host test separately verifies the real editor adapter.
+The official packager checks an exact five-source-file allowlist: manifest, README, GPL license, third-party notices and bundled extension runtime. The generated VSIX additionally contains the standard VSIX metadata. It excludes node_modules, signing helpers, test code and source maps.
 
-The construction desktop smoke creates an operation through the form, wires an input through Chromium pointer events, exercises pending Undo/Redo, and verifies the delayed exact source insertion. Both real VS Code passes combine token changes with operation creation and two input connections, checking that native Undo reverses the whole batch without saving to disk. Unit tests also cover component kinds, deletion/disconnection, comment loss refusal, draft recovery, ACK identity/placement and forged transaction rejection.
+The smoke runner installs this VSIX into isolated extension/profile directories and verifies its installed ID/version. The first editor pass runs the source-built adapter; the second runs the installed VSIX runtime as the development extension. Neither pass modifies personal editor profiles or extensions.
 
-## Safety regressions
+Both passes edit an unsaved adder buffer, apply a guarded graph patch, verify native Undo and its reverse graph update, then patch literal/slice/selector and new-operation wiring in a second document. A third document applies an operator change, concat creation and copied-result construction inside a child module as one native WorkspaceEdit. Undo restores the complete child batch. Parent source, unrelated documents and all files on disk remain unchanged. The restarted service/editor checks stable identity and manual coordinates. Results include `hierarchyBusesDuplicate`, `installedVsix` and `restartedEditorAndService`.
 
-- Movement cannot cancel a patch acknowledgment timeout or clear a conflict.
-- Late acknowledgments cannot overwrite a newer user buffer.
-- Nested operand changes cannot match merely because their display labels are identical.
-- Replacing an operation with a literal, committing, then recreating it gets a new entity ID.
-- Invalid/unsupported source retains the last valid graph and never causes source replacement.
-- Malformed metadata cannot supply invalid coordinates or zoom to the canvas.
-- Literal overflow/base errors, invalid or reversed slices, unsafe operator regrouping, undeclared names, cycles, stale hashes/revisions, overlapping patches and whole-document rewrites are refused.
+## Independent simulator check
 
-## Monitor and accessibility limits
+`pnpm test:reference` requires Icarus Verilog (`iverilog`, `vvp`) in PATH. `MIRA_IVERILOG` and `MIRA_VVP` can point to compatible executables. It generates deterministic test vectors and a testbench, compiles/runs the reference and compares all output bits against Mira. Outputs remain in ignored `test-results/reference/`.
 
-Only one physical display is currently exposed to the test process, so moving the app onto an actual second monitor cannot be verified here. Automated geometry tests cover a connected second monitor and recovery when that monitor is removed. The smoke runner will also test a real second display when one is available and records `secondMonitorTested`.
+The local Windows verification used Icarus extracted into that test directory and run through WSL, without a system-wide installation. To reproduce with another compiler setup, generate with `pnpm test:reference --generate`, compile `test-results/reference/reference.v` with top `tb` and Verilog-2005 mode, write simulator output to `test-results/reference/reference.log`, then run `pnpm test:reference --verify`. CI does not require this optional external compiler.
 
-Keyboard node movement and module selection were exercised. Screen-reader behavior, touch/pen interaction, non-Windows releases, signed installers and arbitrary Verilog construction remain unverified or outside this version's scope. Recovery restore is still manual. See `supported-syntax.md` for precise syntax/edit boundaries.
+## Bounds and remaining validation
+
+Unsigned zero-delay combinational simulation is covered; sequential timing, signedness, source x/z literals, parameters and general SystemVerilog remain unsupported. Undriven signals use x, without a separate z state. Instance dependency checks are conservative. See [exact syntax and limits](supported-syntax.md).
+
+Monitor geometry/restoration has automated coverage; the app is a separate movable Windows window. Screen-reader behavior, touch/pen interaction, other operating systems, live cross-file elaboration and automatic recovery restore remain unverified or outside this version. Desktop installers/signing are deliberately deferred.
 
 ## Running again
 
-Run `pnpm install`, `pnpm run licenses`, `pnpm build`, `pnpm test`, then `pnpm smoke`. Allow roughly five minutes for real debounce intervals and the two editor passes, plus first-run downloads. A graphical desktop and loopback sockets are required. Test workspaces/profiles/logs remain under ignored `test-results/`; the isolated editor runtime lives in `.vscode-test/`. No personal source documents or installed editor settings are modified.
+Run `pnpm install`, `pnpm run licenses`, `pnpm build`, `pnpm test`, then `pnpm smoke`. Allow roughly six to eight minutes for real debounce intervals, isolated VSIX installation and two editor passes, plus first-run downloads. A graphical desktop and loopback sockets are required. Workspaces/profiles/logs remain under ignored `test-results/`; the isolated editor runtime is in `.vscode-test/`.
 
-`pnpm qa:native` opens two disposable modules for an interactive desktop check and restarts the graph once after it is closed. Make edits/move nodes in the first run, inspect restoration in the second, then close again. This script requires a person or desktop automation to operate the window; it is not part of unattended CI. CI uses the fully automated smoke runner instead.
+The bundler reports React Flow's `use client` directive as informational in this entirely client-rendered app. The official VS Code test CLI can report Node's shell-spawn deprecation warning; all arguments are fixed test flags or internally generated workspace/package paths. The checks verify native installation and editing regardless of those warnings.

@@ -14,9 +14,9 @@ export function ConstructionForm({
 }: {
   graph: Circuit;
   disabled: boolean;
-  onCreate: (a: CreateComponent) => void;
+  onCreate: (a: CircuitAction) => void;
 }) {
-  const [component, setComponent] = useState<CreateComponent['component']>('operation');
+  const [component, setComponent] = useState<CreateComponent['component'] | 'module'>('operation');
   const [name, setName] = useState(() => {
     let index = 1;
     while (graph.nodes.some((n) => n.label === `component_${index}`)) index++;
@@ -28,26 +28,101 @@ export function ConstructionForm({
   const nets = graph.nodes.filter((n) => ['input', 'output', 'wire'].includes(n.kind));
   const [source, setSource] = useState(nets[0]?.label ?? '');
   const [range, setRange] = useState('[0]');
+  const [parts, setParts] = useState(
+    nets
+      .slice(0, 2)
+      .map((n) => n.label)
+      .join(', '),
+  );
+  const [moduleName, setModuleName] = useState(
+    graph.library?.find((m) => m.name !== graph.module)?.name ?? '',
+  );
+  const [search, setSearch] = useState('');
+  const types = [
+    'operation',
+    'mux',
+    'constant',
+    'slice',
+    'split',
+    'concat',
+    'wire',
+    'input',
+    'output',
+    'instance',
+    'module',
+  ] as const;
   return (
     <form
       className="edit-form"
       onSubmit={(e) => {
         e.preventDefault();
-        onCreate({ kind: 'create', component, name, width, operator, value, source, range });
+        if (component === 'module') onCreate({ kind: 'module', name });
+        else
+          onCreate({
+            kind: 'create',
+            component,
+            name,
+            width,
+            operator,
+            value,
+            source,
+            range,
+            parts: parts.split(',').map((p) => p.trim()),
+            moduleName,
+          });
       }}
     >
       <h2>Add component</h2>
+      <label htmlFor="palette-search">Search palette</label>
+      <input
+        id="palette-search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="mux, bus, port, module…"
+      />
+      {search && (
+        <div className="palette-results">
+          {types
+            .filter((k) =>
+              (
+                k +
+                ' ' +
+                (
+                  {
+                    concat: 'bus join',
+                    split: 'bus bits',
+                    input: 'port',
+                    output: 'port',
+                    instance: 'module',
+                  } as Record<string, string>
+                )[k]
+              ).includes(search.toLowerCase()),
+            )
+            .map((k) => (
+              <button
+                type="button"
+                key={k}
+                onClick={() => {
+                  setComponent(k);
+                  setSearch('');
+                }}
+              >
+                {k}
+              </button>
+            ))}
+        </div>
+      )}
       <label htmlFor="new-kind">Component type</label>
       <select
         id="new-kind"
         value={component}
-        onChange={(e) => setComponent(e.target.value as CreateComponent['component'])}
+        onChange={(e) => setComponent(e.target.value as CreateComponent['component'] | 'module')}
       >
-        {['operation', 'mux', 'constant', 'slice', 'wire', 'input', 'output'].map((k) => (
+        {types.map((k) => (
           <option key={k}>{k}</option>
         ))}
       </select>
-      <label htmlFor="new-name">Signal name</label>
+      <label htmlFor="new-name">Signal / instance / module name</label>
       <input
         id="new-name"
         value={name}
@@ -86,7 +161,7 @@ export function ConstructionForm({
           <input id="new-value" value={value} onChange={(e) => setValue(e.target.value)} required />
         </>
       )}
-      {component === 'slice' && (
+      {(component === 'slice' || component === 'split') && (
         <>
           <label htmlFor="new-source">Source signal</label>
           <select id="new-source" value={source} onChange={(e) => setSource(e.target.value)}>
@@ -94,8 +169,50 @@ export function ConstructionForm({
               <option key={n.id}>{n.label}</option>
             ))}
           </select>
-          <label htmlFor="new-range">Slice range</label>
-          <input id="new-range" value={range} onChange={(e) => setRange(e.target.value)} required />
+          {component === 'slice' && (
+            <>
+              <label htmlFor="new-range">Slice range</label>
+              <input
+                id="new-range"
+                value={range}
+                onChange={(e) => setRange(e.target.value)}
+                required
+              />
+            </>
+          )}
+        </>
+      )}
+      {component === 'concat' && (
+        <>
+          <label htmlFor="join-parts">Signals to join (MSB first)</label>
+          <input
+            id="join-parts"
+            value={parts}
+            onChange={(e) => setParts(e.target.value)}
+            placeholder="high, low"
+            required
+          />
+        </>
+      )}
+      {component === 'split' && (
+        <p className="hint">
+          Bit width is the chunk size. Results are named _0, _1… from least to most significant.
+        </p>
+      )}
+      {component === 'instance' && (
+        <>
+          <label htmlFor="instance-module">Module definition</label>
+          <select
+            id="instance-module"
+            value={moduleName}
+            onChange={(e) => setModuleName(e.target.value)}
+          >
+            {graph.library
+              ?.filter((m) => m.name !== graph.module)
+              .map((m) => (
+                <option key={m.name}>{m.name}</option>
+              ))}
+          </select>
         </>
       )}
       <button disabled={disabled}>Create component</button>
@@ -126,9 +243,11 @@ export function WiringInspector({
       ? ['left', 'right']
       : node.kind === 'mux'
         ? ['select', 'left', 'right']
-        : ['wire', 'output', 'slice'].includes(node.kind)
-          ? ['left']
-          : [];
+        : node.kind === 'instance' || node.kind === 'concat'
+          ? (node.inputPorts?.map((p) => p.name as InputPort) ?? [])
+          : ['wire', 'output', 'slice'].includes(node.kind)
+            ? ['left']
+            : [];
   return (
     <div className="wiring-form">
       <h3>Wiring</h3>
@@ -157,7 +276,7 @@ export function WiringInspector({
               {port === 'left' && ['wire', 'output', 'slice'].includes(node.kind) ? 'driver' : port}
             </button>
           ))}
-          {['op', 'mux'].includes(node.kind) &&
+          {['op', 'mux', 'instance', 'concat'].includes(node.kind) &&
             ports.map((port) => (
               <button
                 key={`zero-${port}`}
@@ -178,12 +297,12 @@ export function WiringInspector({
           Disconnect driver
         </button>
       )}
-      {(node.kind === 'wire' || node.assignmentTarget) && (
+      {(node.kind === 'wire' || node.kind === 'instance' || node.assignmentTarget) && (
         <button disabled={disabled} onClick={() => onAction({ kind: 'remove', target: node.id })}>
           Remove component
         </button>
       )}
-      {!['input', 'wire', 'output'].includes(node.kind) && (
+      {!['input', 'wire', 'output', 'instance'].includes(node.kind) && (
         <button disabled={disabled} onClick={() => onAction({ kind: 'zero', target: node.id })}>
           Replace component with zero
         </button>

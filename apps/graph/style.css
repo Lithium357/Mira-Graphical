@@ -542,3 +542,112 @@ button:disabled {
   color: #9dd8cc;
   margin-top: 6px;
 }
+.flow-surface {
+  top: 140px;
+}
+.construction-toolbar {
+  right: 16px;
+  top: 46px;
+  align-items: center;
+}
+.construction-toolbar label {
+  font-size: 11px;
+  color: #adc6d0;
+  white-space: nowrap;
+}
+.canvas-caption .caption-count {
+  display: inline;
+  margin-left: 16px;
+}
+.simulation-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 300px;
+  z-index: 5;
+  background: #101d2e;
+  border-top: 1px solid #426478;
+  padding: 12px;
+  overflow: auto;
+}
+.simulation-heading,
+.simulation-inputs,
+.trace-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.simulation-heading span,
+.simulation-inputs span {
+  color: #92adc5;
+}
+.simulation-panel button,
+.simulation-panel select,
+.simulation-panel input,
+.inspector > button {
+  background: #172b40;
+  color: #d4eced;
+  border: 1px solid #456177;
+  padding: 6px;
+  border-radius: 4px;
+}
+.simulation-inputs label {
+  display: grid;
+  gap: 4px;
+}
+.simulation-inputs input {
+  width: 95px;
+}
+.waveform-scroll {
+  overflow: auto;
+  max-height: 175px;
+}
+.waveform-scroll table {
+  font-size: 10px;
+  border-collapse: collapse;
+}
+.waveform-scroll td,
+.waveform-scroll th {
+  padding: 5px;
+  border: 1px solid #345268;
+  max-width: 120px;
+  overflow-wrap: anywhere;
+}
+.node-simulation {
+  font-size: 11px;
+  color: #77ffbd;
+  background: #102d28;
+  padding: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+.circuit-node.instance,
+.circuit-node.concat {
+  border-color: #a386c5;
+  min-height: 100px;
+}
+.diagnostic-list {
+  margin-top: 14px;
+  color: #ffce7d;
+  font-size: 11px;
+}
+.diagnostic-list button {
+  display: block;
+  text-align: left;
+  color: #ebc58d;
+  background: #30291e;
+  border: 0;
+  margin: 6px 0;
+  padding: 6px;
+  width: 100%;
+  font-size: 11px;
+}
+.palette-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}

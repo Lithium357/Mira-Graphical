@@ -363,3 +363,70 @@ test('disconnect saves a structural-only draft for recovery without replaying a 
   assert(recovery.at(-1)!.previewText!.includes('offline'));
   assert.equal(s.state.canConstruct, false);
 });
+
+test('module navigation preserves identities, placement and scoped patches without changing source', () => {
+  const text = readFileSync('fixtures/hierarchy.v', 'utf8'),
+    time = new FakeClock(),
+    patches: any[] = [];
+  const s = new Session(
+    'file:///hierarchy.v',
+    1,
+    text,
+    { publish() {}, patch: (p) => patches.push(p), recover() {}, persist() {} },
+    time,
+  );
+  time.tick(15000);
+  const top = s.state.graph!.nodes.find((n) => n.kind === 'instance')!;
+  s.move(top.id, 123, 456);
+  s.selectModule('arithmetic');
+  const op = s.state.graph!.nodes.find((n) => n.kind === 'op')!;
+  s.move(op.id, 800, 300);
+  s.selectModule('workbench');
+  assert.equal(s.state.graph!.nodes.find((n) => n.kind === 'instance')!.id, top.id);
+  assert.equal(s.state.layout.nodes[top.id].x, 123);
+  s.selectModule('arithmetic');
+  assert.equal(s.state.graph!.nodes.find((n) => n.kind === 'op')!.id, op.id);
+  assert.equal(s.state.layout.nodes[op.id].x, 800);
+  s.graphEdit(op.id, '*');
+  assert.throws(() => s.selectModule('workbench'), /pending/);
+  time.tick(15000);
+  const patch = patches[0];
+  assert.equal(patch.transaction[0].scope, 'arithmetic');
+  let next = text;
+  for (const e of patch.edits) next = next.slice(0, e.start) + e.text + next.slice(e.end);
+  assert.equal(next, text.replace('a + b', 'a * b'));
+  assert(s.patchResult(patch.patchId, true, 2, next));
+  assert.equal(s.state.graph!.module, 'arithmetic');
+});
+test('simulation and copy are read-only while duplicate batches remain reversible', () => {
+  const { s, time, patches, op } = setup();
+  time.tick(15000);
+  assert.equal(s.simulate({ a: '10', b: '20' }).signals.sum.value, '0x1e');
+  const items = s.copy([op().id]);
+  assert.equal(items.length, 1);
+  assert.equal(patches.length, 0);
+  s.circuitAction({ kind: 'paste', items });
+  assert(s.state.previewGraph!.nodes.some((n) => n.label === 'sum_copy1'));
+  s.constructionHistory('undo');
+  time.tick(15000);
+  assert.equal(patches.length, 0);
+  assert.equal(s.text, source);
+});
+test('exporting and importing explicit shared definitions produces a self-contained guarded patch', () => {
+  const text = readFileSync('fixtures/hierarchy.v', 'utf8'),
+    time = new FakeClock(),
+    patches: any[] = [];
+  const hooks = { publish() {}, patch: (p: any) => patches.push(p), recover() {}, persist() {} };
+  const from = new Session('file:///hierarchy.v', 1, text, hooks, time),
+    to = new Session('file:///target.v', 1, 'module target();endmodule', hooks, time);
+  time.tick(15000);
+  const definitions = from.exportModules('workbench');
+  assert.equal(definitions.length, 2);
+  to.circuitAction({ kind: 'import', definitions });
+  assert(to.state.previewGraph!.library!.some((m) => m.name === 'arithmetic'));
+  time.tick(15000);
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0].transaction[0].kind, 'import');
+  from.userText(2, text + '\n');
+  assert.throws(() => from.exportModules('workbench'), /Wait/);
+});

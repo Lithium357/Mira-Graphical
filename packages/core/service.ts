@@ -32,7 +32,7 @@ export function loadLayout(path: string): Layout | undefined {
     v.schemaVersion !== 1 ||
     !record(v.nodes) ||
     !record(v.identities) ||
-    Object.keys(v.nodes).length > 4096
+    Object.keys(v.nodes).length > 32768
   )
     throw new Error('Unsupported layout schema.');
   for (const p of Object.values(v.nodes))
@@ -53,6 +53,13 @@ export function loadLayout(path: string): Layout | undefined {
       v.viewport.zoom > 2)
   )
     throw new Error('Invalid stored viewport.');
+  if (v.viewports) {
+    if (!record(v.viewports) || Object.keys(v.viewports).length > 64)
+      throw new Error('Invalid module viewports.');
+    for (const p of Object.values(v.viewports))
+      if (!record(p) || ![p.x, p.y, p.zoom].every(Number.isFinite) || p.zoom < 0.25 || p.zoom > 2)
+        throw new Error('Invalid module viewport.');
+  }
   return v;
 }
 export class SyncService {
@@ -226,6 +233,21 @@ export class SyncService {
     const s = this.sessions.get(uri);
     if (!s) throw new Error('Document not shared.');
     s.graphChange(id, change);
+  }
+  importModule(uri: string, fromUri: string, name: string) {
+    const from = this.sessions.get(fromUri),
+      target = this.sessions.get(uri);
+    if (!from || !target) throw new Error('Both documents must be explicitly shared.');
+    return target.circuitAction({ kind: 'import', definitions: from.exportModules(name) });
+  }
+  selectModule(uri: string, name: string) {
+    this.sessions.get(uri)!.selectModule(name);
+  }
+  copy(uri: string, ids: string[]) {
+    return this.sessions.get(uri)!.copy(ids);
+  }
+  simulate(uri: string, inputs: Record<string, string>) {
+    return this.sessions.get(uri)!.simulate(inputs);
   }
   circuitAction(uri: string, action: CircuitAction) {
     return this.sessions.get(uri)!.circuitAction(action);

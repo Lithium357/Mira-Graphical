@@ -15,6 +15,9 @@ import {
 import '@xyflow/react/dist/style.css';
 import './style.css';
 import type { State } from '../../packages/core/index.js';
+import { SimulationPanel } from './simulation-panel.js';
+import type { Simulation } from '../../packages/verilog/simulation.js';
+import type { ClipboardItem, InputPort } from '../../packages/protocol/index.js';
 import { ConstructionForm, WiringInspector } from './construction-form.js';
 import type { CircuitAction } from '../../packages/protocol/index.js';
 import type { Operator } from '../../packages/protocol/index.js';
@@ -38,8 +41,25 @@ const names: Record<Operator, string> = {
 type Data = { label: string; kind: string; width?: number; op?: Operator; [key: string]: unknown };
 function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
   return (
-    <div className={`circuit-node ${data.kind} ${data.inspected ? 'selected' : ''}`}>
-      {data.kind !== 'input' && data.kind !== 'literal' && (
+    <div
+      className={`circuit-node ${data.kind} ${data.inspected ? 'selected' : ''}`}
+      style={
+        ['instance', 'concat'].includes(data.kind)
+          ? {
+              minHeight: Math.max(
+                110,
+                Math.max(
+                  (data.inputPorts as unknown[] | undefined)?.length ?? 0,
+                  (data.outputPorts as unknown[] | undefined)?.length ?? 0,
+                ) *
+                  26 +
+                  50,
+              ),
+            }
+          : undefined
+      }
+    >
+      {!['input', 'literal', 'instance', 'concat'].includes(data.kind) && (
         <Handle
           type="target"
           position={Position.Left}
@@ -50,6 +70,25 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
       {['op', 'mux'].includes(data.kind) && (
         <Handle type="target" position={Position.Left} id="right" style={{ top: '72%' }} />
       )}
+      {(data.inputPorts as { name: string; width: number }[] | undefined)?.map((p, i, ports) => (
+        <Handle
+          key={p.name}
+          type="target"
+          position={Position.Left}
+          id={p.name}
+          style={{ top: `${((i + 1) * 100) / (ports.length + 1)}%` }}
+        />
+      ))}
+      {(data.outputPorts as { name: string }[] | undefined)?.map((p, i, ports) => (
+        <Handle
+          key={p.name}
+          type="source"
+          position={Position.Right}
+          id={`out:${p.name}`}
+          isConnectableStart={false}
+          style={{ top: `${((i + 1) * 100) / (ports.length + 1)}%` }}
+        />
+      ))}
       {data.kind === 'mux' && <Handle type="target" position={Position.Top} id="select" />}
       <div className="node-kind">
         {['op', 'literal', 'slice'].includes(data.kind)
@@ -73,19 +112,42 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
       {data.assignmentTarget ? (
         <div className="node-result">→ {String(data.assignmentTarget)}</div>
       ) : null}
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectableStart={!!data.sourceNet && !!data.connectable}
-      />
+      {data.kind !== 'instance' && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          isConnectableStart={!!data.sourceNet && !!data.connectable}
+        />
+      )}
+      {data.simulation ? (
+        <div className="node-simulation" title={String(data.simulation)}>
+          {String(data.simulation).slice(0, 26)}
+        </div>
+      ) : null}
+      {data.warning ? <div className="undriven">⚠ {String(data.warning)}</div> : null}
       {data.undriven ? <div className="undriven">UNDRIVEN</div> : null}
     </div>
   );
 }
 const nodeTypes = { circuit: CircuitNode };
-function Diagram({ state, onError }: { state: State; onError: (s: string) => void }) {
+function Diagram({
+  state,
+  shared,
+  onError,
+}: {
+  state: State;
+  shared: State[];
+  onError: (s: string) => void;
+}) {
   const graph = state.previewGraph ?? state.graph;
   const [adding, setAdding] = useState(false);
+  const [selection, setSelection] = useState<string[]>([]);
+  const [clipboard, setClipboard] = useState<ClipboardItem[]>([]);
+  const [importChoice, setImportChoice] = useState('');
+  const [copyNote, setCopyNote] = useState('');
+  const [wireLabels, setWireLabels] = useState(false);
+  const [simulationOpen, setSimulationOpen] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>({});
   const inspector = useRef<HTMLElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode<Data>>([]);
   const [selected, setSelected] = useState<string>();
@@ -117,9 +179,32 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
   const command = (c: Command) => window.mira.command(c).catch((e: Error) => onError(e.message));
   const action = async (action: CircuitAction) => {
     const result = await command({ type: 'circuit', uri: state.uri, action });
+    if (result?.createdModule) {
+      setAdding(false);
+      setCopyNote('Module queued. Choose it in the module picker after synchronization.');
+    }
     if (result?.selectedId) {
       setSelected(result.selectedId);
       setAdding(false);
+    }
+  };
+  const copy = async (duplicate = false) => {
+    const items = await command({
+      type: 'copy',
+      uri: state.uri,
+      ids:
+        selected && !selection.includes(selected)
+          ? [selected]
+          : selection.length
+            ? selection
+            : selected
+              ? [selected]
+              : [],
+    });
+    if (items) {
+      setClipboard(items);
+      setCopyNote(`Copied ${items.length} items`);
+      if (duplicate) await action({ kind: 'paste', items });
     }
   };
   const change = async (op: Operator) => {
@@ -133,12 +218,33 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
     () =>
       nodes.map((n) => {
         const p = pending[n.id];
-        if (!p) return { ...n, data: { ...n.data, inspected: n.id === selected } };
+        if (!p)
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              inspected: selection.includes(selected ?? '')
+                ? selection.includes(n.id)
+                : n.id === selected,
+              simulation: values[n.data.key as string],
+              warning: graph?.issues
+                ?.filter((i) => i.nodeKey === n.data.key)
+                .map((i) => i.code)
+                .join(', '),
+            },
+          };
         return {
           ...n,
           data: {
             ...n.data,
-            inspected: n.id === selected,
+            inspected: selection.includes(selected ?? '')
+              ? selection.includes(n.id)
+              : n.id === selected,
+            simulation: values[n.data.key as string],
+            warning: graph?.issues
+              ?.filter((i) => i.nodeKey === n.data.key)
+              .map((i) => i.code)
+              .join(', '),
             ...(p.kind === 'operator'
               ? { op: p.value as Operator }
               : p.kind === 'literal'
@@ -149,7 +255,7 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
           },
         };
       }),
-    [nodes, pending, selected],
+    [nodes, pending, selected, selection, values, graph],
   );
   return (
     <div className="workspace">
@@ -157,6 +263,27 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
         className="canvas"
         aria-label="Circuit graph"
         onKeyDownCapture={(e) => {
+          if (
+            !(e.target as HTMLElement).closest('input,select,textarea,button') &&
+            (e.ctrlKey || e.metaKey)
+          ) {
+            if (e.key.toLowerCase() === 'c') {
+              e.preventDefault();
+              void copy();
+            }
+            if (e.key.toLowerCase() === 'v' && clipboard.length) {
+              e.preventDefault();
+              void action({ kind: 'paste', items: clipboard });
+            }
+            if (e.key.toLowerCase() === 'd') {
+              e.preventDefault();
+              void copy(true);
+            }
+            if (e.key.toLowerCase() === 'k') {
+              e.preventDefault();
+              setAdding(true);
+            }
+          }
           keyboardMove.current =
             ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) &&
             !!(e.target as HTMLElement).closest('.react-flow__node');
@@ -196,11 +323,50 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
           >
             Discard pending
           </button>
+          <button
+            disabled={!state.canConstruct || (!selection.length && !selected)}
+            onClick={() => void copy()}
+          >
+            Copy
+          </button>
+          <button
+            disabled={!state.canConstruct || !clipboard.length}
+            onClick={() => void action({ kind: 'paste', items: clipboard })}
+          >
+            Paste
+          </button>
+          <button
+            disabled={!state.canConstruct || (!selection.length && !selected)}
+            onClick={() => void copy(true)}
+          >
+            Duplicate
+          </button>
+          <button onClick={() => setSimulationOpen((open) => !open)} aria-pressed={simulationOpen}>
+            Simulation
+          </button>
+          <label>
+            <input
+              type="checkbox"
+              checked={wireLabels}
+              onChange={(e) => setWireLabels(e.target.checked)}
+            />{' '}
+            Wire labels
+          </label>
         </div>
-        <div className="flow-surface">
+        <div className="flow-surface" style={{ bottom: simulationOpen ? 300 : 0 }}>
           <ReactFlow
+            selectionOnDrag
+            panOnDrag={[1, 2]}
+            multiSelectionKeyCode={['Meta', 'Control']}
             nodes={displayNodes}
-            edges={graph?.edges ?? []}
+            edges={(graph?.edges ?? []).map((e) => ({
+              ...e,
+              label: wireLabels
+                ? `${graph?.nodes.find((n) => n.id === e.source)?.sourceNet ?? graph?.nodes.find((n) => n.id === e.source)?.label} · ${graph?.nodes.find((n) => n.id === e.source)?.width ?? '?'}b`
+                : undefined,
+              labelStyle: { fill: '#b7dccf', fontSize: 10 },
+              labelBgStyle: { fill: '#0c1827' },
+            }))}
             nodeTypes={nodeTypes}
             onNodesChange={(changes) => {
               for (const c of changes)
@@ -224,10 +390,10 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
               setAdding(false);
             }}
             onPaneClick={() => setSelected(undefined)}
-            onSelectionChange={useCallback(
-              ({ nodes }: { nodes: FlowNode[] }) => setSelected(nodes[0]?.id),
-              [],
-            )}
+            onSelectionChange={useCallback(({ nodes }: { nodes: FlowNode[] }) => {
+              setSelected(nodes[0]?.id);
+              setSelection(nodes.map((n) => n.id));
+            }, [])}
             onNodeDragStart={() => {
               dragging.current = true;
             }}
@@ -246,14 +412,15 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
             isValidConnection={(c) =>
               !!graph?.nodes.find((n) => n.id === c.source)?.sourceNet &&
               c.source !== c.target &&
-              ['left', 'right', 'select'].includes(c.targetHandle ?? '')
+              (['left', 'right', 'select'].includes(c.targetHandle ?? '') ||
+                /^(part:[0-9]+|port:[A-Za-z_][A-Za-z0-9_$]*)$/.test(c.targetHandle ?? ''))
             }
             onConnect={(c) =>
               void action({
                 kind: 'connect',
                 source: c.source,
                 target: c.target,
-                port: c.targetHandle as 'left' | 'right' | 'select',
+                port: c.targetHandle as InputPort,
               })
             }
             deleteKeyCode={null}
@@ -275,6 +442,22 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
             />
           </ReactFlow>
         </div>
+        {simulationOpen && graph && (
+          <SimulationPanel
+            graph={graph}
+            revision={`${state.version}:${state.pendingSteps}`}
+            disabled={!state.canConstruct}
+            run={(inputs) =>
+              window.mira.command({
+                type: 'simulate',
+                uri: state.uri,
+                inputs,
+              }) as Promise<Simulation>
+            }
+            onValues={setValues}
+            onError={onError}
+          />
+        )}
         {!graph && (
           <div className="empty">
             <div className="empty-symbol">⌘</div>
@@ -288,12 +471,73 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
       </section>
       <aside className="inspector" ref={inspector}>
         <div className="eyebrow">COMPONENT INSPECTOR</div>
+        {copyNote && (
+          <p className="hint" role="status">
+            {copyNote}
+          </p>
+        )}
+        {!!graph?.issues?.length && (
+          <details className="diagnostic-list">
+            <summary>{graph.issues.length} circuit warnings</summary>
+            {graph.issues.map((issue, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setSelected(graph.nodes.find((n) => n.key === issue.nodeKey)?.id);
+                  setAdding(false);
+                }}
+              >
+                {issue.message}
+              </button>
+            ))}
+          </details>
+        )}
         {adding && graph ? (
-          <ConstructionForm
-            graph={graph}
-            disabled={!state.canConstruct}
-            onCreate={(a) => void action(a)}
-          />
+          <>
+            <div className="edit-form import-form">
+              <label htmlFor="import-module">Import from another shared file</label>
+              <select
+                id="import-module"
+                value={importChoice}
+                onChange={(e) => setImportChoice(e.target.value)}
+              >
+                <option value="">Choose shared module</option>
+                {shared
+                  .filter((s) => s.uri !== state.uri && s.canConstruct && !s.pendingSteps)
+                  .flatMap(
+                    (s) =>
+                      s.graph?.library?.map((m) => (
+                        <option key={s.uri + m.name} value={JSON.stringify([s.uri, m.name])}>
+                          {m.name} · {decodeURIComponent(s.uri.split('/').pop()!)}
+                        </option>
+                      )) ?? [],
+                  )}
+              </select>
+              <button
+                disabled={!state.canConstruct || !importChoice}
+                onClick={() => {
+                  const [fromUri, name] = JSON.parse(importChoice);
+                  void command({ type: 'importModule', uri: state.uri, fromUri, name }).then(
+                    (result) => {
+                      if (result) {
+                        setAdding(false);
+                        setCopyNote(
+                          'Definitions imported as a local copy. Choose them after synchronization.',
+                        );
+                      }
+                    },
+                  );
+                }}
+              >
+                Import module
+              </button>
+            </div>
+            <ConstructionForm
+              graph={graph}
+              disabled={!state.canConstruct}
+              onCreate={(a) => void action(a)}
+            />
+          </>
         ) : node ? (
           <>
             <h2>
@@ -316,6 +560,24 @@ function Diagram({ state, onError }: { state: State; onError: (s: string) => voi
                 disabled={!state.canConstruct}
                 onAction={(a) => void action(a)}
               />
+            )}
+            {node.childModule && (
+              <>
+                <p>Module: {node.childModule}</p>
+                <button
+                  disabled={!state.canConstruct || !!state.pendingSteps}
+                  onClick={() =>
+                    void command({ type: 'module', uri: state.uri, name: node.childModule })
+                  }
+                >
+                  Open module
+                </button>
+                {node.outputPorts?.map((p) => (
+                  <p className="hint" key={p.name}>
+                    {p.name} → {p.signal} ({p.width} bits)
+                  </p>
+                ))}
+              </>
             )}
             <dl>
               <dt>Width</dt>
@@ -486,7 +748,7 @@ function App() {
           <span>Verilog graph companion</span>
         </div>
         <div className="header-right">
-          <span className="version">0.3 · CONSTRUCTION</span>
+          <span className="version">0.4 · CIRCUIT WORKBENCH</span>
           <span
             className={`status ${(state?.status ?? 'Disconnected').replaceAll(' ', '-')}`}
             role="status"
@@ -514,6 +776,22 @@ function App() {
         ) : (
           <span>No shared documents</span>
         )}
+        {state?.graph?.library && (
+          <select
+            aria-label="Module definition"
+            value={state.graph.module}
+            disabled={!state.canConstruct || !!state.pendingSteps}
+            onChange={(e) =>
+              void window.mira
+                .command({ type: 'module', uri: state.uri, name: e.target.value })
+                .catch((e) => setError(String(e)))
+            }
+          >
+            {state.graph.library.map((m) => (
+              <option key={m.name}>{m.name}</option>
+            ))}
+          </select>
+        )}
         <span className="nav-note">RTL STRUCTURE · VERILOG-2005 SUBSET</span>
       </nav>
       {error || state?.diagnostics.length || state?.detail ? (
@@ -529,7 +807,12 @@ function App() {
         </div>
       ) : null}
       {state ? (
-        <Diagram key={state.uri} state={state} onError={setError} />
+        <Diagram
+          key={`${state.uri}:${state.graph?.module}`}
+          state={state}
+          shared={states}
+          onError={setError}
+        />
       ) : (
         <div className="welcome">
           <div className="eyebrow">YOUR RTL, CONNECTED</div>

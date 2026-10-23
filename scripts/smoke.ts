@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, createWriteStream } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, createWriteStream, readdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { runTests } from '@vscode/test-electron';
+import { runTests, runVSCodeCommand } from '@vscode/test-electron';
 import { createRequire } from 'node:module';
 import { SyncService } from '../packages/core/service.js';
 const root = process.cwd();
@@ -12,7 +12,7 @@ mkdirSync(output, { recursive: true });
 const stamp = Date.now();
 const workspace = join(output, `smoke-workspace-${stamp}`);
 mkdirSync(workspace);
-for (const name of ['adder', 'combinational'])
+for (const name of ['adder', 'combinational', 'hierarchy'])
   writeFileSync(join(workspace, `${name}.v`), readFileSync(`fixtures/${name}.v`));
 const electron = createRequire(import.meta.url)('electron') as string;
 async function launch(exe: string, args: string[], env = process.env) {
@@ -20,8 +20,8 @@ async function launch(exe: string, args: string[], env = process.env) {
     const child = spawn(exe, args, { cwd: root, env, stdio: 'inherit', windowsHide: true });
     const timer = setTimeout(() => {
       child.kill();
-      fail(new Error('Smoke process exceeded 120 seconds'));
-    }, 120000);
+      fail(new Error('Smoke process exceeded 180 seconds'));
+    }, 180000);
     child.on('error', (e) => {
       clearTimeout(timer);
       fail(e);
@@ -34,13 +34,51 @@ async function launch(exe: string, args: string[], env = process.env) {
 }
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
+await launch(process.execPath, ['scripts/package-extension.mjs'], env);
 await launch(electron, ['.', '--smoke', `--workspace=${workspace}`], env);
+const installed = join(output, `vsix-installed-${stamp}`),
+  profile = join(output, `vsix-profile-${stamp}`);
+const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+await runVSCodeCommand(
+  [
+    '--install-extension',
+    join(root, `dist/packages/mira-graphical-${version}.vsix`),
+    '--extensions-dir',
+    installed,
+    '--user-data-dir',
+    profile,
+    '--force',
+  ],
+  { spawn: { env, windowsHide: true } },
+);
+const listed = await runVSCodeCommand(
+  [
+    '--list-extensions',
+    '--show-versions',
+    '--extensions-dir',
+    installed,
+    '--user-data-dir',
+    profile,
+  ],
+  { spawn: { env, windowsHide: true } },
+);
+assert(
+  listed.stdout.includes(`mira-graphical.mira-graphical@${version}`),
+  'VSIX must install in isolated VS Code',
+);
+const packageDirectory = join(
+  installed,
+  readdirSync(installed, { withFileTypes: true }).find(
+    (d) => d.isDirectory() && d.name.startsWith('mira-graphical.mira-graphical-'),
+  )!.name,
+);
 let restoredOperatorId: string | undefined;
 for (let pass = 0; pass < 2; pass++) {
   const service = new SyncService(workspace);
   await service.ready();
   let edited = false,
-    comboEdited = false;
+    comboEdited = false,
+    hierarchyEdited = false;
   service.subscribe((states) => {
     for (const s of states) {
       if (s.uri.endsWith('adder.v')) {
@@ -73,7 +111,12 @@ for (let pass = 0; pass < 2; pass++) {
           service.move(s.uri, op.id, 430, 180);
           service.graphEdit(s.uri, op.id, '*');
         }
-      } else if (!comboEdited && s.status === 'Synced' && s.graph) {
+      } else if (
+        s.uri.endsWith('combinational.v') &&
+        !comboEdited &&
+        s.status === 'Synced' &&
+        s.graph
+      ) {
         comboEdited = true;
         for (const [kind, value] of [
           ['literal', "8'h2A"],
@@ -100,6 +143,26 @@ for (let pass = 0; pass < 2; pass++) {
             target: product,
             port,
           });
+      } else if (
+        s.uri.endsWith('hierarchy.v') &&
+        !hierarchyEdited &&
+        s.status === 'Synced' &&
+        s.graph
+      ) {
+        hierarchyEdited = true;
+        service.selectModule(s.uri, 'arithmetic');
+        const graph = service.states.get(s.uri)!.graph!,
+          op = graph.nodes.find((n) => n.kind === 'op')!;
+        service.graphEdit(s.uri, op.id, '*');
+        service.circuitAction(s.uri, {
+          kind: 'create',
+          component: 'concat',
+          name: 'pair',
+          width: 16,
+          parts: ['a', 'b'],
+        });
+        service.circuitAction(s.uri, { kind: 'paste', items: service.copy(s.uri, [op.id]) });
+        assert.equal(service.simulate(s.uri, { a: '2', b: '3' }).signals.result.value, '0x06');
       }
     }
   });
@@ -119,7 +182,7 @@ for (let pass = 0; pass < 2; pass++) {
     try {
       await runTests({
         vscodeExecutablePath: process.env.MIRA_CODE_EXE,
-        extensionDevelopmentPath: join(root, 'extensions/vscode'),
+        extensionDevelopmentPath: pass === 1 ? packageDirectory : join(root, 'extensions/vscode'),
         extensionTestsPath: join(root, 'extensions/vscode/dist/smoke.cjs'),
         extensionTestsEnv: { ...env, MIRA_SMOKE_PASS: String(pass) },
         stdout: log,
@@ -145,7 +208,11 @@ for (let pass = 0; pass < 2; pass++) {
     assert.equal(result.pass, String(pass));
     writeFileSync(
       join(output, 'vscode-smoke.json'),
-      JSON.stringify({ ...result, restartedEditorAndService: pass === 1 }, null, 2),
+      JSON.stringify(
+        { ...result, restartedEditorAndService: pass === 1, installedVsix: pass === 1 },
+        null,
+        2,
+      ),
     );
     console.log(
       `VS CODE SMOKE PASS ${pass + 1}: unsaved buffer, minimal patches, native undo, disk unchanged${pass ? ' · restart and persisted identity verified' : ''}.`,

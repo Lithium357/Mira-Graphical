@@ -18,7 +18,7 @@ const Comment = createToken({
 const Identifier = createToken({ name: 'Identifier', pattern: /[a-zA-Z_][a-zA-Z0-9_$]*/ });
 const Based = createToken({ name: 'Based', pattern: /[0-9][0-9_]*'[bBoOdDhH][0-9a-fA-FxXzZ_]+/ });
 const Integer = createToken({ name: 'Integer', pattern: /[0-9][0-9_]*/ });
-const Symbol = createToken({ name: 'Symbol', pattern: /[()[\]:?;,=+*\-&|^]/ });
+const Symbol = createToken({ name: 'Symbol', pattern: /[{}()[\]:?;,.=+*\-&|^]/ });
 const lexer = new Lexer([WS, Comment, Identifier, Based, Integer, Symbol], {
   ensureOptimizations: false,
 });
@@ -33,6 +33,7 @@ class ParseError extends Error implements Diagnostic {
   }
 }
 export type Expr = (
+  | { kind: 'concat'; parts: Expr[]; start: number; end: number }
   | { kind: 'ref'; value: string; start: number; end: number }
   | { kind: 'literal'; value: string; start: number; end: number }
   | {
@@ -67,7 +68,8 @@ export type Net = {
   declarationStart?: number;
   declarationEnd?: number;
 };
-function children(e: Expr): [string, Expr][] {
+export function children(e: Expr): [string, Expr][] {
+  if (e.kind === 'concat') return e.parts.map((p, i) => [`P${i}`, p]);
   return e.kind === 'op'
     ? [
         ['L', e.left],
@@ -83,6 +85,16 @@ function children(e: Expr): [string, Expr][] {
 }
 export type Module = {
   name: string;
+  start: number;
+  end: number;
+  instances: {
+    name: string;
+    module: string;
+    start: number;
+    end: number;
+    ports: { name: string; expr: Expr }[];
+  }[];
+  library: Record<string, Module>;
   nets: Net[];
   assigns: { target: string; expr: Expr; start: number; end: number }[];
   portClose: number;
@@ -109,15 +121,94 @@ export const expressionSpan = (e: Expr) => ({
   end: e.outerEnd ?? e.end,
 });
 const precedence: Record<string, number> = { '|': 1, '^': 2, '&': 3, '+': 4, '-': 4, '*': 5 };
-export function parse(source: string): Module {
+export function parse(source: string, selected?: string): Module {
   if (source.length > 1_000_000)
-    throw new ParseError('Source exceeds MVP limit (1 million UTF-16 units).', 0, 0);
+    throw new ParseError('Source exceeds limit (1 million UTF-16 units).', 0, 0);
   const result = lexer.tokenize(source);
   if (result.errors.length) {
     const e = result.errors[0];
     throw new ParseError(`Unsupported token: ${e.message}`, e.offset, e.offset + e.length);
   }
-  const tokens = result.tokens;
+  if (result.tokens.length > 32768)
+    throw new ParseError('Document exceeds 32768 tokens.', 0, source.length);
+  const library: Record<string, Module> = Object.create(null);
+  let start = 0;
+  while (start < result.tokens.length) {
+    if (result.tokens[start].image !== 'module')
+      throw new ParseError(
+        'Expected a module definition.',
+        result.tokens[start].startOffset,
+        result.tokens[start].endOffset! + 1,
+      );
+    let end = start + 1;
+    while (end < result.tokens.length && result.tokens[end].image !== 'endmodule') end++;
+    const ast = parseSingle(source, result.tokens.slice(start, end + 1));
+    if (library[ast.name])
+      throw new ParseError(
+        `Duplicate module ${ast.name}.`,
+        result.tokens[start].startOffset,
+        ast.endmoduleStart,
+      );
+    library[ast.name] = ast;
+    start = end + 1;
+    if (Object.keys(library).length > 64) throw new Error('Limit: 64 modules per document.');
+  }
+  if (!Object.keys(library).length)
+    throw new ParseError('Expected a module definition.', 0, source.length);
+  for (const ast of Object.values(library)) ast.library = library;
+  for (const ast of Object.values(library)) {
+    const driven = new Set(ast.assigns.map((a) => a.target));
+    for (const inst of ast.instances) {
+      const child = library[inst.module];
+      if (!child)
+        throw new ParseError(
+          `Unknown module ${inst.module}. Include its definition in this shared document.`,
+          inst.start,
+          inst.end,
+        );
+      const ports = child.nets.filter((n) => n.direction !== 'wire');
+      if (
+        inst.ports.length !== ports.length ||
+        new Set(inst.ports.map((p) => p.name)).size !== ports.length ||
+        inst.ports.some((p) => !ports.some((n) => n.name === p.name))
+      )
+        throw new ParseError(
+          `Instance ${inst.name} must connect each named port exactly once.`,
+          inst.start,
+          inst.end,
+        );
+      for (const port of ports.filter((n) => n.direction === 'output')) {
+        const e = inst.ports.find((p) => p.name === port.name)!.expr;
+        if (
+          e.kind !== 'ref' ||
+          !ast.nets.some((n) => n.name === e.value && n.direction !== 'input') ||
+          driven.has(e.value)
+        )
+          throw new ParseError(
+            'Instance outputs need distinct, declared, non-input signal drivers.',
+            e.start,
+            e.end,
+          );
+        driven.add(e.value);
+      }
+    }
+  }
+  for (const ast of Object.values(library)) {
+    let count = 0;
+    const walk = (m: Module, path: string[]) => {
+      if (path.includes(m.name) || path.length >= 32)
+        throw new ParseError('Recursive or excessively deep module hierarchy.', 0, source.length);
+      if (++count > 256) throw new Error('Expanded hierarchy exceeds 256 module instances.');
+      for (const inst of m.instances) walk(library[inst.module], [...path, m.name]);
+    };
+    walk(ast, []);
+    project(ast);
+  }
+  const ast = selected ? library[selected] : Object.values(library)[0];
+  if (!ast) throw new Error(`Module ${selected} no longer exists.`);
+  return ast;
+}
+function parseSingle(source: string, tokens: IToken[]): Module {
   let i = 0;
   let recursion = 0;
   if (tokens.length > 4096)
@@ -165,7 +256,18 @@ export function parse(source: string): Module {
   function expr(min = 0): Expr {
     if (++recursion > 128) fail('Expression nesting exceeds 128 levels.');
     let left: Expr;
-    if (peek() === '(') {
+    if (peek() === '{') {
+      const open = take('{');
+      const parts: Expr[] = [];
+      do {
+        parts.push(expr());
+        if (peek() !== ',') break;
+        take(',');
+      } while (true);
+      const end = take('}').endOffset! + 1;
+      if (parts.length < 1 || parts.length > 64) fail('Concatenation needs 1–64 parts.');
+      left = { kind: 'concat', parts, start: open.startOffset, end };
+    } else if (peek() === '(') {
       const open = take('(');
       left = expr();
       const close = take(')');
@@ -235,7 +337,7 @@ export function parse(source: string): Module {
     recursion--;
     return left;
   }
-  take('module');
+  const moduleStart = take('module').startOffset;
   const moduleName = name();
   take('(');
   const nets: Net[] = [];
@@ -260,6 +362,7 @@ export function parse(source: string): Module {
   take(')');
   take(';');
   const assigns: Module['assigns'] = [];
+  const instances: Module['instances'] = [];
   while (peek() !== 'endmodule') {
     if (peek() === 'wire') {
       const start = take().startOffset,
@@ -282,29 +385,71 @@ export function parse(source: string): Module {
       const expression = expr();
       const end = take(';').endOffset! + 1;
       assigns.push({ target, expr: expression, start, end });
+    } else if (tokens[i]?.tokenType === Identifier && !keywords.has(peek())) {
+      const start = tokens[i].startOffset,
+        module = name(),
+        instanceName = name();
+      take('(');
+      const ports: Module['instances'][number]['ports'] = [];
+      while (peek() !== ')') {
+        take('.');
+        const port = name();
+        take('(');
+        const expression = expr();
+        take(')');
+        ports.push({ name: port, expr: expression });
+        if (peek() !== ',') break;
+        take(',');
+      }
+      take(')');
+      const end = take(';').endOffset! + 1;
+      instances.push({ name: instanceName, module, ports, start, end });
     } else
       fail(`Unsupported construct ${peek() ?? '(incomplete module)'}. Last valid graph retained.`);
   }
-  const endmoduleStart = take('endmodule').startOffset;
-  if (i !== tokens.length) fail('Only one module per shared document is supported.');
+  const closing = take('endmodule'),
+    endmoduleStart = closing.startOffset,
+    moduleEnd = closing.endOffset! + 1;
+  if (i !== tokens.length) fail('Unexpected text after module.');
+  if (
+    new Set(instances.map((n) => n.name)).size !== instances.length ||
+    instances.some((n) => nets.some((net) => net.name === n.name))
+  )
+    fail('Duplicate instance or signal name.');
   const declared = new Map<string, Net>();
   for (const net of nets) {
     if (declared.has(net.name)) fail(`Duplicate declaration ${net.name}.`);
     declared.set(net.name, net);
   }
   const driven = new Set<string>();
-  for (const a of assigns) {
+  for (const a of [
+    ...assigns,
+    ...instances.flatMap((inst) => inst.ports.map((p) => ({ target: undefined, expr: p.expr }))),
+  ]) {
     if (
-      !declared.has(a.target) ||
-      declared.get(a.target)?.direction === 'input' ||
-      driven.has(a.target)
+      a.target !== undefined &&
+      (!declared.has(a.target) ||
+        declared.get(a.target)?.direction === 'input' ||
+        driven.has(a.target))
     )
       fail(`Invalid or multiply driven assignment target ${a.target}.`);
-    driven.add(a.target);
+    if (a.target !== undefined) driven.add(a.target);
     const check = (e: Expr): void => {
       for (const [, c] of children(e)) check(c);
       if ((e.kind === 'ref' || e.kind === 'slice') && !declared.has(e.value))
         throw new ParseError(`Undeclared identifier ${e.value}.`, e.start, e.end);
+      if (e.kind === 'concat') {
+        const sized = (part: Expr): void => {
+          if (part.kind === 'literal' && !part.value.includes("'"))
+            throw new ParseError(
+              'Concatenations require explicitly sized literals.',
+              part.start,
+              part.end,
+            );
+          for (const [, child] of children(part)) sized(child);
+        };
+        e.parts.forEach(sized);
+      }
       if (e.kind === 'slice') {
         const n = declared.get(e.value)!;
         if (
@@ -321,13 +466,25 @@ export function parse(source: string): Module {
     };
     check(a.expr);
   }
-  return { name: moduleName, nets, assigns, portClose, lastPortEnd, portCount, endmoduleStart };
+  return {
+    name: moduleName,
+    start: moduleStart,
+    end: moduleEnd,
+    nets,
+    assigns,
+    instances,
+    library: {},
+    portClose,
+    lastPortEnd,
+    portCount,
+    endmoduleStart,
+  };
 }
 export type Node = {
   id: string;
   key: string;
   label: string;
-  kind: 'input' | 'output' | 'wire' | 'op' | 'literal' | 'slice' | 'mux';
+  kind: 'input' | 'output' | 'wire' | 'op' | 'literal' | 'slice' | 'mux' | 'concat' | 'instance';
   width?: number;
   op?: Operator;
   operands?: string[];
@@ -341,11 +498,22 @@ export type Node = {
   assignmentTarget?: string;
   undriven?: boolean;
   netRange?: string;
+  childModule?: string;
+  inputPorts?: { name: string; width: number }[];
+  outputPorts?: { name: string; width: number; signal: string }[];
 };
 export type Circuit = {
   module: string;
+  library?: { name: string; ports: { name: string; direction: string; width: number }[] }[];
+  issues?: { code: string; message: string; nodeKey: string }[];
   nodes: Node[];
-  edges: { id: string; source: string; target: string; targetHandle: string }[];
+  edges: {
+    id: string;
+    source: string;
+    target: string;
+    targetHandle: string;
+    sourceHandle?: string;
+  }[];
 };
 export const opNames: Record<Operator, string> = {
   '+': 'ADD',
@@ -360,7 +528,10 @@ export function project(
   previous?: Circuit,
   saved: Record<string, string> = {},
 ): Circuit {
-  const old = new Map(previous?.nodes.map((n) => [n.key, n.id]) ?? Object.entries(saved));
+  const old = new Map([
+    ...Object.entries(saved),
+    ...(previous?.nodes.map((n) => [n.key, n.id] as [string, string]) ?? []),
+  ]);
   const nodes: Node[] = [];
   const edges: Circuit['edges'] = [];
   const add = (key: string, data: Omit<Node, 'key' | 'id' | 'row' | 'depth'>) => {
@@ -377,7 +548,19 @@ export function project(
         width: n.width,
         sourceNet: n.name,
         netRange: n.width === 1 ? '[0]' : `[${n.msb}:${n.lsb}]`,
-        undriven: n.direction !== 'input' && !ast.assigns.some((a) => a.target === n.name),
+        undriven:
+          n.direction !== 'input' &&
+          !ast.assigns.some((a) => a.target === n.name) &&
+          !ast.instances.some((inst) =>
+            inst.ports.some(
+              (p) =>
+                p.expr.kind === 'ref' &&
+                p.expr.value === n.name &&
+                ast.library[inst.module]?.nets.some(
+                  (port) => port.name === p.name && port.direction === 'output',
+                ),
+            ),
+          ),
       }),
     ]),
   );
@@ -388,7 +571,19 @@ export function project(
       target: target.id,
       targetHandle: port,
     });
-  function visit(e: Expr, key: string): Node {
+  const widthOf = (e: Expr): number =>
+    e.kind === 'ref'
+      ? nets.get(e.value)!.width!
+      : e.kind === 'slice'
+        ? Math.abs(e.msb - e.lsb) + 1
+        : e.kind === 'literal'
+          ? literalWidth(e.value)
+          : e.kind === 'concat'
+            ? e.parts.reduce((sum, p) => sum + widthOf(p), 0)
+            : e.kind === 'mux'
+              ? Math.max(widthOf(e.truthy), widthOf(e.falsy))
+              : Math.max(widthOf(e.left), widthOf(e.right));
+  function visit(e: Expr, key: string, context = 0): Node {
     if (e.kind === 'ref') return nets.get(e.value)!;
     if (e.kind === 'literal')
       return add(`${key}/literal`, {
@@ -409,10 +604,24 @@ export function project(
       connect(nets.get(e.value)!, n, 'left');
       return n;
     }
+    if (e.kind === 'concat') {
+      const parts = e.parts.map((p, i) => visit(p, `${key}/P${i}`));
+      const node = add(`${key}/concat`, {
+        kind: 'concat',
+        label: 'JOIN',
+        expressionKey: key,
+        operands: parts.map((p) => p.label),
+        width: parts.reduce((w, p) => w + p.width!, 0),
+        inputPorts: parts.map((p, i) => ({ name: `part:${i}`, width: p.width! })),
+      });
+      parts.forEach((p, i) => connect(p, node, `part:${i}`));
+      return node;
+    }
     if (e.kind === 'mux') {
+      const w = Math.max(context, widthOf(e));
       const c = visit(e.condition, `${key}/C`),
-        t = visit(e.truthy, `${key}/T`),
-        f = visit(e.falsy, `${key}/F`);
+        t = visit(e.truthy, `${key}/T`, w),
+        f = visit(e.falsy, `${key}/F`, w);
       const n = add(`${key}/mux`, {
         kind: 'mux',
         label: 'MUX',
@@ -420,15 +629,16 @@ export function project(
         selector: e.condition.kind === 'ref' ? e.condition.value : undefined,
         operandSignature: JSON.stringify([semantic(e.truthy), semantic(e.falsy)]),
         operands: [c.label, t.label, f.label],
-        width: Math.max(t.width ?? 1, f.width ?? 1),
+        width: w,
       });
       connect(c, n, 'select');
       connect(t, n, 'left');
       connect(f, n, 'right');
       return n;
     }
-    const l = visit(e.left, `${key}/L`);
-    const r = visit(e.right, `${key}/R`);
+    const w = Math.max(context, widthOf(e));
+    const l = visit(e.left, `${key}/L`, w);
+    const r = visit(e.right, `${key}/R`, w);
     const n = add(key, {
       kind: 'op',
       expressionKey: key,
@@ -436,14 +646,43 @@ export function project(
       op: e.op,
       operands: [l.label, r.label],
       operandSignature: JSON.stringify([semantic(e.left), semantic(e.right)]),
-      width: Math.max(l.width ?? 1, r.width ?? 1),
+      width: w,
     });
     connect(l, n, 'left');
     connect(r, n, 'right');
     return n;
   }
+  for (const inst of ast.instances) {
+    const child = ast.library[inst.module],
+      inputs = child.nets.filter((n) => n.direction === 'input'),
+      outputs = child.nets.filter((n) => n.direction === 'output');
+    const node = add(`${ast.name}/instance/${inst.name}`, {
+      kind: 'instance',
+      label: inst.name,
+      childModule: inst.module,
+      inputPorts: inputs.map((p) => ({ name: `port:${p.name}`, width: p.width })),
+      outputPorts: outputs.map((p) => ({
+        name: p.name,
+        width: p.width,
+        signal: (inst.ports.find((b) => b.name === p.name)!.expr as Extract<Expr, { kind: 'ref' }>)
+          .value,
+      })),
+    });
+    for (const port of inputs) {
+      const e = inst.ports.find((p) => p.name === port.name)!.expr;
+      connect(
+        visit(e, `${ast.name}/instance/${inst.name}/port/${port.name}`, port.width),
+        node,
+        `port:${port.name}`,
+      );
+    }
+    for (const port of node.outputPorts!) {
+      connect(node, nets.get(port.signal)!, 'left');
+      edges.at(-1)!.sourceHandle = `out:${port.name}`;
+    }
+  }
   for (const a of ast.assigns) {
-    const root = visit(a.expr, `${ast.name}/assign/${a.target}/expr`);
+    const root = visit(a.expr, `${ast.name}/assign/${a.target}/expr`, nets.get(a.target)!.width);
     if (!['input', 'output', 'wire'].includes(root.kind)) {
       root.sourceNet = a.target;
       root.assignmentTarget = a.target;
@@ -470,7 +709,59 @@ export function project(
     n.row = rows.get(n.depth) ?? 0;
     rows.set(n.depth, n.row + 1);
   }
-  return { module: ast.name, nodes, edges };
+  const issues: NonNullable<Circuit['issues']> = [];
+  const warn = (node: Node, code: string, message: string) =>
+    issues.push({ nodeKey: node.key, code, message });
+  for (const node of nodes) {
+    if (node.undriven) warn(node, 'undriven', `${node.label} has no driver.`);
+    if (['wire', 'input'].includes(node.kind) && !edges.some((e) => e.source === node.id))
+      warn(node, 'unused', `${node.label} is unused.`);
+    for (const edge of edges.filter((e) => e.target === node.id)) {
+      const from = nodes.find((n) => n.id === edge.source)!;
+      const expected =
+        node.kind === 'mux' && edge.targetHandle === 'select'
+          ? 1
+          : node.kind === 'instance' || node.kind === 'concat'
+            ? node.inputPorts?.find((p) => p.name === edge.targetHandle)?.width
+            : node.width;
+      const actual =
+        from.kind === 'instance'
+          ? from.outputPorts?.find((p) => `out:${p.name}` === edge.sourceHandle)?.width
+          : from.width;
+      if (node.kind === 'mux' && edge.targetHandle === 'select' && actual && actual !== 1) {
+        warn(
+          node,
+          'selector-width',
+          `${actual}-bit selector is tested for nonzero; graph wiring requires a scalar.`,
+        );
+        continue;
+      }
+      if (
+        actual &&
+        expected &&
+        actual !== expected &&
+        node.kind !== 'slice' &&
+        node.kind !== 'concat'
+      )
+        warn(
+          node,
+          actual > expected ? 'truncation' : 'extension',
+          `${from.sourceNet ?? from.label}: ${actual} -> ${expected} bits at ${node.label} (${actual > expected ? 'high bits discarded' : 'zero extended'}).`,
+        );
+    }
+  }
+  return {
+    module: ast.name,
+    nodes,
+    edges,
+    issues,
+    library: Object.values(ast.library).map((m) => ({
+      name: m.name,
+      ports: m.nets
+        .filter((n) => n.direction !== 'wire')
+        .map((n) => ({ name: n.name, direction: n.direction, width: n.width })),
+    })),
+  };
 }
 export function expressions(ast: Module) {
   const all = new Map<string, Expr>();
@@ -479,9 +770,13 @@ export function expressions(ast: Module) {
     for (const [segment, c] of children(e)) visit(c, `${k}/${segment}`);
   };
   for (const a of ast.assigns) visit(a.expr, `${ast.name}/assign/${a.target}/expr`);
+  for (const inst of ast.instances)
+    for (const port of inst.ports)
+      visit(port.expr, `${ast.name}/instance/${inst.name}/port/${port.name}`);
   return all;
 }
 function shape(e: Expr): string {
+  if (e.kind === 'concat') return `concat(${e.parts.map(shape).join(',')})`;
   return e.kind === 'mux'
     ? `mux(${shape(e.condition)},${shape(e.truthy)},${shape(e.falsy)})`
     : e.kind === 'op'
@@ -491,6 +786,7 @@ function shape(e: Expr): string {
         : `${e.kind}:${e.value}`;
 }
 function semantic(e: Expr): string {
+  if (e.kind === 'concat') return `concat(${e.parts.map(semantic).join(',')})`;
   return e.kind === 'mux'
     ? `mux(${semantic(e.condition)},${semantic(e.truthy)},${semantic(e.falsy)})`
     : e.kind === 'op'
@@ -506,7 +802,7 @@ export function operatorPatch(
   if (!operators.includes(op)) throw new Error('Unsupported operator.');
   const node = graph?.nodes.find((n) => n.id === id && n.kind === 'op');
   if (!node) throw new Error('Select an editable operation.');
-  const ast = parse(source);
+  const ast = parse(source, graph?.module);
   project(ast);
   const all = expressions(ast);
   const e = all.get(node.key);
@@ -516,10 +812,20 @@ export function operatorPatch(
   if (current?.operandSignature !== node.operandSignature)
     throw new Error('Operands changed in the live buffer. Commit source changes first.');
   const patch = { start: e.tokenStart, end: e.tokenEnd, text: op };
-  const next = parse(source.slice(0, patch.start) + op + source.slice(patch.end));
+  const next = parse(source.slice(0, patch.start) + op + source.slice(patch.end), ast.name);
   if (
-    JSON.stringify(ast.assigns.map((a) => shape(a.expr))) !==
-    JSON.stringify(next.assigns.map((a) => shape(a.expr)))
+    JSON.stringify(
+      Object.values(ast.library).map((m) => [
+        m.assigns.map((a) => shape(a.expr)),
+        m.instances.map((i) => i.ports.map((p) => shape(p.expr))),
+      ]),
+    ) !==
+    JSON.stringify(
+      Object.values(next.library).map((m) => [
+        m.assigns.map((a) => shape(a.expr)),
+        m.instances.map((i) => i.ports.map((p) => shape(p.expr))),
+      ]),
+    )
   )
     throw new Error(
       'This operator changes precedence grouping. Add parentheses in the source first.',
@@ -536,7 +842,7 @@ export function graphPatch(
   const node = graph?.nodes.find((n) => n.id === id);
   if (!node?.expressionKey)
     throw new Error('Select an editable literal, slice or simple mux selector.');
-  const ast = parse(source);
+  const ast = parse(source, graph?.module);
   const current = project(ast).nodes.find((n) => n.key === node.key);
   const e = expressions(ast).get(node.expressionKey);
   let edit: Edit;
@@ -568,14 +874,21 @@ export function graphPatch(
 /** Defense in depth in the editor: patches must match supported AST token/selection spans. */
 export function validateEditableEdits(source: string, edits: Edit[]): void {
   const ast = parse(source);
-  const allowed: { start: number; end: number; kind: GraphChange['kind'] }[] = [];
-  for (const e of expressions(ast).values()) {
-    if (e.kind === 'op') allowed.push({ start: e.tokenStart, end: e.tokenEnd, kind: 'operator' });
-    if (e.kind === 'literal') allowed.push({ start: e.start, end: e.end, kind: 'literal' });
-    if (e.kind === 'slice') allowed.push({ start: e.rangeStart, end: e.rangeEnd, kind: 'slice' });
-    if (e.kind === 'mux' && e.condition.kind === 'ref')
-      allowed.push({ start: e.condition.start, end: e.condition.end, kind: 'selector' });
-  }
+  const allowed: { start: number; end: number; kind: GraphChange['kind']; scalars?: string[] }[] =
+    [];
+  for (const scope of Object.values(ast.library))
+    for (const e of expressions(scope).values()) {
+      if (e.kind === 'op') allowed.push({ start: e.tokenStart, end: e.tokenEnd, kind: 'operator' });
+      if (e.kind === 'literal') allowed.push({ start: e.start, end: e.end, kind: 'literal' });
+      if (e.kind === 'slice') allowed.push({ start: e.rangeStart, end: e.rangeEnd, kind: 'slice' });
+      if (e.kind === 'mux' && e.condition.kind === 'ref')
+        allowed.push({
+          start: e.condition.start,
+          end: e.condition.end,
+          kind: 'selector',
+          scalars: scope.nets.filter((n) => n.width === 1).map((n) => n.name),
+        });
+    }
   let operatorOnly = source;
   for (const edit of [...edits].sort((a, b) => b.start - a.start)) {
     const span = allowed.find((s) => s.start === edit.start && s.end === edit.end);
@@ -586,15 +899,22 @@ export function validateEditableEdits(source: string, edits: Edit[]): void {
     } else if (span.kind === 'literal') literalWidth(edit.text);
     else if (span.kind === 'slice' && !/^\[[0-9]+(?::[0-9]+)?\]$/.test(edit.text))
       throw new Error('Invalid slice range.');
-    else if (
-      span.kind === 'selector' &&
-      !ast.nets.some((n) => n.name === edit.text && n.width === 1)
-    )
+    else if (span.kind === 'selector' && !span.scalars?.includes(edit.text))
       throw new Error('Invalid scalar selector.');
   }
   if (
-    JSON.stringify(ast.assigns.map((a) => shape(a.expr))) !==
-    JSON.stringify(parse(operatorOnly).assigns.map((a) => shape(a.expr)))
+    JSON.stringify(
+      Object.values(ast.library).map((m) => [
+        m.assigns.map((a) => shape(a.expr)),
+        m.instances.map((i) => i.ports.map((p) => shape(p.expr))),
+      ]),
+    ) !==
+    JSON.stringify(
+      Object.values(parse(operatorOnly).library).map((m) => [
+        m.assigns.map((a) => shape(a.expr)),
+        m.instances.map((i) => i.ports.map((p) => shape(p.expr))),
+      ]),
+    )
   )
     throw new Error('Operator changes precedence grouping.');
   let next = source;

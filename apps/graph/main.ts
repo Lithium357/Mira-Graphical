@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import { app, BrowserWindow, ipcMain, dialog, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, screen, clipboard } from 'electron';
 import { readFileSync, writeFileSync, renameSync, existsSync, lstatSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
@@ -79,6 +79,10 @@ else {
           throw new Error('Unauthorized renderer.');
         if (!command || typeof command !== 'object') throw new Error('Invalid command.');
         const c = command as Record<string, unknown>;
+        if (c.type === 'copyText' && typeof c.text === 'string' && c.text.length <= 1_000_000) {
+          clipboard.writeText(c.text);
+          return;
+        }
         if (c.type === 'snapshot') return { workspace, states: [...service!.states.values()] };
         if (typeof c.uri !== 'string' || !service!.sessions.has(c.uri))
           throw new Error('Document not shared.');
@@ -113,6 +117,22 @@ else {
           return service!.circuitAction(c.uri, c.action as CircuitAction);
         else if (c.type === 'history' && (c.direction === 'undo' || c.direction === 'redo'))
           service!.constructionHistory(c.uri, c.direction);
+        else if (
+          c.type === 'importModule' &&
+          typeof c.fromUri === 'string' &&
+          typeof c.name === 'string'
+        )
+          return service!.importModule(c.uri, c.fromUri, c.name);
+        else if (c.type === 'module' && typeof c.name === 'string')
+          service!.selectModule(c.uri, c.name);
+        else if (
+          c.type === 'copy' &&
+          Array.isArray(c.ids) &&
+          c.ids.every((id) => typeof id === 'string')
+        )
+          return service!.copy(c.uri, c.ids);
+        else if (c.type === 'simulate' && c.inputs && typeof c.inputs === 'object')
+          return service!.simulate(c.uri, c.inputs as Record<string, string>);
         else if (c.type === 'discard') service!.discardGraphChanges(c.uri);
         else throw new Error('Unsupported graph command.');
       });

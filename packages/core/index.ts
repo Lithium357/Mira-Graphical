@@ -7,9 +7,15 @@ import {
   type GraphChange,
   type CircuitAction,
   type SourceAction,
+  type ClipboardItem,
 } from '../protocol/index.js';
+import { simulate } from '../verilog/simulation.js';
 import { PatchDraft } from '../verilog/patches.js';
-import { sourceActionEdits, validateConstructionProof } from '../verilog/construction.js';
+import {
+  sourceActionEdits,
+  validateConstructionProof,
+  copyComponents,
+} from '../verilog/construction.js';
 import {
   parse,
   project,
@@ -26,6 +32,7 @@ export type Layout = {
   nodes: Record<string, Position>;
   identities: Record<string, string>;
   viewport?: Viewport;
+  viewports?: Record<string, Viewport>;
 };
 export type Recovery = {
   at: string;
@@ -40,6 +47,7 @@ export type Recovery = {
 export type State = {
   uri: string;
   version: number;
+  activeModule?: string;
   status: string;
   detail?: string;
   graph?: Circuit;
@@ -232,7 +240,12 @@ export class Session {
     this.draft = undefined;
     this.state.previewGraph = undefined;
     if (this.state.graph) {
-      const ids = new Set(this.state.graph.nodes.map((n) => n.id));
+      const ids = new Set([
+        ...this.state.graph.nodes.map((n) => n.id),
+        ...Object.entries(this.state.layout.identities)
+          .filter(([key]) => !key.startsWith(`${this.state.graph!.module}/`))
+          .map(([, id]) => id),
+      ]);
       this.state.layout.nodes = Object.fromEntries(
         Object.entries(this.state.layout.nodes).filter(([id]) => ids.has(id)),
       );
@@ -252,8 +265,9 @@ export class Session {
     if (current.steps.length >= 100)
       throw new Error('Synchronize or discard this batch before adding more than 100 actions.');
     const table = current.table.clone();
+    action = { ...action, scope: this.state.graph!.module };
     table.apply(sourceActionEdits(table.text, action));
-    const graph = project(parse(table.text), current.graph);
+    const graph = project(parse(table.text, this.state.graph!.module), current.graph);
     const before = this.frame(current);
     this.draft = {
       table,
@@ -279,15 +293,63 @@ export class Session {
     let normalized: SourceAction = action;
     if (action.kind === 'connect')
       normalized = { ...action, source: key(action.source), target: key(action.target) };
-    else if (action.kind !== 'create') normalized = { ...action, target: key(action.target) };
+    else if ('target' in action) normalized = { ...action, target: key(action.target) };
+    const previousIds = new Set(graph.nodes.map((n) => n.id));
     this.draftStep(normalized);
     return {
+      createdModule: action.kind === 'module' ? action.name : undefined,
+      selectedIds: this.draft!.graph.nodes.filter((n) => !previousIds.has(n.id)).map((n) => n.id),
       selectedId:
         action.kind === 'create'
           ? (this.draft!.graph.nodes.find((n) => n.assignmentTarget === action.name)?.id ??
             this.draft!.graph.nodes.find((n) => n.label === action.name)?.id)
-          : undefined,
+          : this.draft!.graph.nodes.find((n) => !previousIds.has(n.id))?.id,
     };
+  }
+  exportModules(name: string): string[] {
+    this.editableConstruction();
+    if (this.draft?.table.edits().length)
+      throw new Error('Synchronize the source module before importing it.');
+    const ast = parse(this.text, name),
+      needed = new Set<string>();
+    const visit = (name: string) => {
+      if (needed.has(name)) return;
+      needed.add(name);
+      for (const inst of ast.library[name].instances) visit(inst.module);
+    };
+    visit(name);
+    return [...needed].map((name) =>
+      this.text.slice(ast.library[name].start, ast.library[name].end),
+    );
+  }
+  simulate(inputs: Record<string, string>) {
+    this.editableConstruction();
+    return simulate(this.draft?.table.text ?? this.text, this.state.graph!.module, inputs);
+  }
+  copy(ids: string[]): ClipboardItem[] {
+    this.editableConstruction();
+    return copyComponents(
+      this.draft?.table.text ?? this.text,
+      this.draft?.graph ?? this.state.graph!,
+      ids,
+    );
+  }
+  selectModule(name: string) {
+    this.editableConstruction();
+    if (this.draft?.table.edits().length || this.edits.size)
+      throw new Error('Synchronize or discard pending edits before navigating modules.');
+    parse(this.text, name);
+    this.clearDraft();
+    if (this.timer !== undefined) this.time.clear(this.timer);
+    this.timer = undefined;
+    this.state.deadline = undefined;
+    const views = (this.state.layout.viewports ??= Object.create(null));
+    if (this.state.graph && this.state.layout.viewport)
+      views[this.state.graph.module] = this.state.layout.viewport;
+    this.state.layout.viewport = Object.hasOwn(views, name) ? views[name] : undefined;
+    this.state.activeModule = name;
+    this.commit();
+    this.emit();
   }
   constructionHistory(direction: 'undo' | 'redo') {
     this.editableConstruction();
@@ -348,13 +410,25 @@ export class Session {
     this.hooks.persist(this.state.uri, this.state.layout);
   }
   private commit() {
-    const ast = parse(this.text);
+    const first = parse(this.text);
+    const ast = first.library[this.state.activeModule ?? ''] ?? first;
+    this.state.activeModule = ast.name;
     const graph = project(ast, this.draft?.graph ?? this.state.graph, this.state.layout.identities);
-    const ids = new Set(graph.nodes.map((n) => n.id));
+    const ids = new Set([
+      ...graph.nodes.map((n) => n.id),
+      ...Object.entries(this.state.layout.identities)
+        .filter(([key]) => !key.startsWith(`${ast.name}/`))
+        .map(([, id]) => id),
+    ]);
     this.state.layout.nodes = Object.fromEntries(
       Object.entries(this.state.layout.nodes).filter(([id]) => ids.has(id)),
     );
-    this.state.layout.identities = Object.fromEntries(graph.nodes.map((n) => [n.key, n.id]));
+    this.state.layout.identities = Object.fromEntries([
+      ...Object.entries(this.state.layout.identities).filter(
+        ([key]) => !key.startsWith(`${ast.name}/`) && Object.hasOwn(ast.library, key.split('/')[0]),
+      ),
+      ...graph.nodes.map((n) => [n.key, n.id]),
+    ]);
     this.place(graph);
     this.state.graph = graph;
     this.draft = undefined;

@@ -1,8 +1,8 @@
 # Mira Graphical
 
-A local, bidirectional Verilog graph companion. Write RTL in VS Code; inspect and change supported operators in a separate desktop window. Semantic edits synchronize after **15 seconds of inactivity**. Original code is **GPL-3.0-only**.
+A local, bidirectional Verilog graph companion. Write RTL in VS Code; construct, wire and inspect supported circuits in a separate desktop window. Semantic edits synchronize after **15 seconds of inactivity**. Original code is **GPL-3.0-only**.
 
-Version 0.3.0 adds circuit construction and wiring to the combinational editor. It is an RTL expression viewer/editor for a documented subset, not a synthesized schematic or general SystemVerilog IDE.
+Version 0.4.0 adds bus construction, circuit diagnostics, clipboard tools, sampled simulation and reusable module hierarchy. It is an RTL expression viewer/editor for a documented subset, not a synthesized schematic or general SystemVerilog IDE.
 
 ## Install and run
 
@@ -28,6 +28,8 @@ To run the companion extension from source:
 
 Only explicitly shared documents participate. Use **RTL Graph: Connect/Disconnect** to disconnect; use **RTL Graph: Show Sync Status** for details. After a service restart, reconnect and run Open Current Module again to negotiate the current buffer. One desktop workspace and one VS Code adapter connection are supported at a time, with multiple shared document sessions. No extension marketplace publishing or native desktop installer is provided yet.
 
+To use the packaged companion, run `pnpm package:extension`, then choose **Extensions: Install from VSIX…** in VS Code and select `dist/packages/mira-graphical-0.4.0.vsix`. Keep the desktop app running for the same workspace and share a `.v` file with Open Current Module. The official [VS Code packaging tool](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#packaging-extensions) creates the unsigned VSIX; this does not publish to the Marketplace or create/sign a desktop installer. CI uploads the VSIX with its test artifacts.
+
 ## Adder demo
 
 1. Start the app in this repository and open `fixtures/adder.v` in the Extension Development Host.
@@ -49,6 +51,26 @@ Changes preview immediately and synchronize as one native VS Code edit after 15 
 
 The inspector can disconnect a named driver, remove an unused component, or explicitly replace an expression with zero. Undriven wires and outputs are visibly marked. Removing a result still used elsewhere is refused; disconnect consumers first. Ports stay in the module interface, shared wire declarations must be split in VS Code before deletion, and edits that would delete comments are refused. Widths remain Verilog widths: assignment extension/truncation is not an inserted conversion component.
 
+## Buses, diagnostics and faster editing
+
+Use **concat** to join a comma-separated list of signals in most-significant-first order. Use **split** with a source bus and chunk width to create named slice results, `_0` starting at the least-significant end. Ascending declarations are respected. A fixed slice such as `[3]` selects one bit. Each concatenation part has its own wiring socket.
+
+The canvas flags undriven and unused signals, width extension, truncation and vector selectors. Expand **circuit warnings** in the inspector to select the relevant component. Widths follow unsigned Verilog context rules; a wider arithmetic destination can preserve carry/product bits. Diagnostics describe width conversions rather than inserting conversion hardware.
+
+Search the component palette by name or by “bus”/“port”. Drag a selection box on empty canvas, or hold Shift while dragging; Ctrl/Meta-click adds nodes. Use **Copy**, **Paste**, **Duplicate**, or Ctrl/Meta+C/V/D while the canvas is focused. Ctrl/Meta+K opens the palette. The clipboard stays inside Mira. Named subgraphs preserve internal connections, create unique names and retain external references only when those signals exist in the destination. Select a root expression to duplicate its result as a wire; selecting a port explicitly duplicates that interface port, which can be refused if it would invalidate existing instances. **Wire labels** shows signal names and widths.
+
+## Simulation and waveforms
+
+Open **Simulation**, set top-level inputs using decimal, `0x` hex, `0b` binary or `x`, then click **Sample inputs**. Values appear on nodes and in the waveform panel. Each click records an input vector, not a timed clock cycle. Choose up to 16 traces, inspect the latest 64 samples, or copy the trace as CSV. Samples reset when source/draft semantics change or modules change; layout-only movement preserves them.
+
+The built-in evaluator supports this unsigned combinational subset, including concatenations, ascending/descending slices, muxes and nested module instances. It retains unknown bits: bitwise operations and unknown-selector muxes can resolve known bits; arithmetic involving unknown operands is pessimistic. Undriven nets display `x` (the viewer does not distinguish high impedance). No sequential/event-driven timing, clocks, testbench language or synthesis is implemented. Simulation is local and never edits source. It is bounded to 4096-bit values and 512 expanded signals.
+
+## Reusable modules
+
+Try `fixtures/hierarchy.v`. Select the `add_stage` instance and choose **Open module**, or use the **Module definition** picker. Child edits target the child definition and affect every instance after synchronization. Node identities, manual positions and module viewports survive navigation. Synchronize or discard a pending batch before switching modules.
+
+Choose **module** in the palette to add an empty definition, then select it after synchronization and construct its interface/body. Choose **instance** to place an existing definition: inputs start tied to zero and outputs get named wires. Wire each named input socket; result wires can feed other components. For definitions in another file, explicitly share that file and use **Import from another shared file** in the construction panel. Mira copies the selected definition and its dependencies into the target document; it does not create a live cross-file link. Duplicate module names are refused. All instance definitions must be present in the resulting document, with each named port connected exactly once. Recursive, parameterized, positional and black-box instances are unsupported. Removing an instance leaves its result wires visibly undriven.
+
 ## Commands and tests
 
 ```powershell
@@ -56,7 +78,9 @@ pnpm lint       # strict TypeScript check
 pnpm test       # unit + authenticated localhost protocol integration
 pnpm run licenses # locked installed dependency licenses + full notices
 pnpm build      # desktop UI, core and bundled VS Code extension
-pnpm smoke      # real Electron window + official VS Code extension host
+pnpm smoke      # desktop + isolated VSIX install + two real editor passes
+pnpm package:extension # build an unsigned installable VSIX
+pnpm test:reference # optional differential test; requires Icarus Verilog in PATH
 pnpm audit      # online dependency vulnerability check
 pnpm format:check # consistent source and documentation formatting
 ```
@@ -65,13 +89,13 @@ The smoke runner uses actual 15-second timers, writes to isolated test workspace
 
 ## Supported scope and limitations
 
-Supports one combinational ANSI-style module per file; scalar/vector input and output ports; internal wires; continuous assignments; unsigned decimal and sized binary/octal/decimal/hex constants; fixed bit/part selections; parentheses; binary `+`, `-`, `*`, `&`, `|`, `^`; and ternary mux expressions. The inspector can change operators, literal tokens, slice ranges, and simple scalar mux selectors. See the [exact syntax matrix](docs/supported-syntax.md).
+Supports up to 64 combinational ANSI-style module definitions per file, named-port instances, concatenations; scalar/vector input and output ports; internal wires; continuous assignments; unsigned decimal and sized binary/octal/decimal/hex constants; fixed bit/part selections; parentheses; binary `+`, `-`, `*`, `&`, `|`, `^`; and ternary mux expressions. The inspector can change operators, literal tokens, slice ranges, and simple scalar mux selectors. See the [exact syntax matrix](docs/supported-syntax.md).
 
 Try `fixtures/combinational.v`: select `8'h0F` and queue `8'h2A`, select `a[7:0]` and queue `[3:0]`, or select MUX and choose `select_b`. Each change stays within its exact source span after 15 quiet seconds. Invalid digits, overflowing constants, out-of-bounds slices, cycles and unsafe precedence changes are rejected.
 
 Keyboard arrow keys move selected nodes and save their positions. Newly shared modules open automatically in the module picker. Window bounds are saved on close and restored on a connected monitor; unplugged-monitor bounds are clamped back on screen.
 
-Unsupported constructs reject the projection rather than silently disappearing. Layout and graph identities are independent of source formatting and operator spelling. New nodes receive left-to-right dependency placement; a committed removal discards their old position. Renames and structural expression rewrites may create new identities. Recovery restore is manual. Simulation, synthesis, multi-workspace window management and arbitrary Verilog support remain outside this version.
+Unsupported constructs reject the projection rather than silently disappearing. Layout and graph identities are independent of source formatting and operator spelling. New nodes receive left-to-right dependency placement; a committed removal discards their old position. Renames and structural expression rewrites may create new identities. Recovery restore is manual. Sequential simulation, synthesis, multi-workspace window management and arbitrary Verilog support remain outside this version.
 
 ## Repository map
 
@@ -85,4 +109,4 @@ Unsupported constructs reject the projection rather than silently disappearing. 
 
 Dependency licenses are audited from the actual installed dependency closure. Generated notices retain MIT/BSD/ISC/Apache/MPL terms; dual licenses use their permissive option. Electron's binary also ships Chromium notices in `node_modules/electron/dist/LICENSES.chromium.html`, which must accompany any future packaged desktop distribution. See [license audit notes](docs/licenses.md).
 
-The remaining Milestone 2 work is concatenation, richer expression construction, safe node insertion/removal and connection editing. No graph construction or rewiring is advertised yet.
+Desktop installation/signing is deferred. Further work includes sequential logic, broader Verilog syntax, live cross-file elaboration and richer routing/layout.

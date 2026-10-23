@@ -18,7 +18,7 @@ Evaluated the installed Chevrotain toolkit's tokenization API and position track
 
 ## Layout decision
 
-Electron + React + React Flow provide independent desktop UI, keyboard selection/movement, dragging, pan and zoom. The canvas holds local drag state during a gesture instead of resetting it from service snapshots. The smoke test feeds Chromium real pointer-down/move/up events in a focused window and verifies persisted movement. A small deterministic dependency-depth layout replaces ELK. It is not a crossing-minimizing layout engine. No connectivity is inferred from coordinates. Window bounds are saved on close, checked against connected displays and clamped on-screen when a monitor disappears. Node insertion, deletion, connection editing, synthesis and simulation remain unavailable.
+Electron + React + React Flow provide independent desktop UI, keyboard selection/movement, dragging, pan and zoom. The canvas holds local drag state during a gesture instead of resetting it from service snapshots. The smoke test feeds Chromium real pointer-down/move/up events in a focused window and verifies persisted movement. A small deterministic dependency-depth layout replaces ELK. It is not a crossing-minimizing layout engine. No connectivity is inferred from coordinates. Window bounds are saved on close, checked against connected displays and clamped on-screen when a monitor disappears. Construction and connection actions use the guarded transaction layer below. Synthesis and sequential simulation remain unavailable.
 
 ## Construction transactions
 
@@ -27,3 +27,19 @@ The desktop projects a separate pending graph while the committed graph remains 
 Structural patches include their ordered source actions. After checking the exact live version and SHA, the VS Code adapter independently replays the actions through the parser/projector and compares the resulting composed edits before one WorkspaceEdit. Parsing alone is not sufficient authorization for a structural rewrite. Comment deletion, cycles and ambiguous shared-declaration removal are refused.
 
 Newer source text supersedes pending structure and saves the complete preview and action log to recovery. Invalid source keeps the last committed graph visible; construction waits for a valid synchronized source. ACK/conflict locks apply to history as well as circuit changes. Commit transfers preview identities and retains manually placed coordinates. Native editor Undo reverses the entire committed batch.
+
+## Module libraries and editing tools
+
+The lexer partitions a shared document into complete module definitions and retains absolute source spans. Named-port instance interfaces are resolved against the document library; recursion, incomplete bindings, conflicting output drivers and conservative instance feedback cycles are rejected. The active definition is session state. Every transaction carries its module scope; the editor independently resolves the same scope while replaying it. Identity/layout storage retains keys from inactive definitions and module-specific viewports. Navigation is read-only and requires pending edits to synchronize or be discarded.
+
+Explicit import reads another already-shared session's acknowledged in-memory snapshot, extracts the selected definition and its transitive dependencies and appends a validated copied library. It never opens arbitrary files or changes the source session. Imported modules are local copies; duplicate names are refused. A pending source/draft cannot be exported.
+
+Clipboard payloads contain bounded declarations, supported expression fragments and named instance bindings. Paste creates unique names and remaps selected internal references, preserving valid external dependencies. The planner rejects statement/comment/dotted-name injection and reparses the entire result. Selecting an expression copies its result as a wire; selecting a port explicitly preserves its direction. Paste is one pending history action and one composed native source transaction.
+
+## Diagnostics and simulation
+
+Projection emits warnings independently of parse failures. Arithmetic and mux nodes inherit unsigned destination context; concat parts and slices remain self-determined. Driver widths and socket widths generate extension/truncation warnings, while multi-bit selectors report nonzero truth rather than pretending to truncate the condition.
+
+The evaluator runs in the core with no renderer execution or source writes. Values contain a BigInt value, known-bit mask and bounded width. Input vectors are validated; arithmetic is masked at its context width, and unknown arithmetic is pessimistic. Bitwise operations and conditional merging retain resolvable bits. Declared ascending slices use distance from the declared least-significant index. Each instance is evaluated with its named inputs, caches its output map and exposes hierarchical signal paths for traces. Unknown undriven nets are modeled as x, not as a separate high-impedance state. Width/signal/expansion bounds prevent unbounded masks or elaboration.
+
+The renderer stores at most 64 sampled vectors for 16 watched signals and overlays the latest node values. Source/draft revisions or semantic structure changes invalidate pending evaluation results and reset traces. Viewport/layout-only updates preserve them. CSV export is an explicit clipboard command; no source data is sent over the network. Official VSIX packaging is a separate development script with a five-source-file allowlist; signing and Marketplace publishing are not performed.

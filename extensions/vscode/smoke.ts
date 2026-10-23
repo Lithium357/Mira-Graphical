@@ -72,6 +72,38 @@ export async function run() {
     'All three changes undo as one native workspace edit',
   );
   assert.equal(doc.getText(), unsaved, 'Editing the second module must not change the first');
+  const hierarchyURI = vscode.Uri.joinPath(folder.uri, 'hierarchy.v');
+  const hierarchy = await vscode.workspace.openTextDocument(hierarchyURI),
+    hierarchyOriginal = hierarchy.getText();
+  await vscode.window.showTextDocument(hierarchy);
+  await vscode.commands.executeCommand('mira.open');
+  const hierarchyStart = Date.now();
+  while (
+    Date.now() - hierarchyStart < 40000 &&
+    !hierarchy.getText().includes('assign result_copy1 = a * b;')
+  )
+    await sleep(100);
+  const changed = hierarchyOriginal.replace('a + b', 'a * b'),
+    last = changed.lastIndexOf('endmodule');
+  assert.equal(
+    hierarchy.getText(),
+    changed.slice(0, last) +
+      '    wire [15:0] pair;\n    assign pair = {a, b};\n    wire [7:0] result_copy1;\n    assign result_copy1 = a * b;\n' +
+      changed.slice(last),
+    'Scoped hierarchy, bus and duplicate changes must remain exact',
+  );
+  assert.equal(
+    Buffer.from(await vscode.workspace.fs.readFile(hierarchyURI)).toString('utf8'),
+    hierarchyOriginal,
+  );
+  await vscode.commands.executeCommand('undo');
+  assert.equal(
+    hierarchy.getText(),
+    hierarchyOriginal,
+    'A native Undo restores the complete child-module construction batch',
+  );
+  assert.equal(combo.getText(), comboOriginal);
+  assert.equal(doc.getText(), unsaved);
   await vscode.workspace.fs.writeFile(
     vscode.Uri.joinPath(folder.uri, '.hdlgraph', 'vscode-smoke-result.json'),
     Buffer.from(
@@ -86,6 +118,7 @@ export async function run() {
           multiDocument: true,
           literalSliceSelector: true,
           constructionWiring: true,
+          hierarchyBusesDuplicate: true,
           realDebounceMs: 15000,
         },
         null,

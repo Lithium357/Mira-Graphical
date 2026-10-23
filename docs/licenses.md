@@ -9,3 +9,9 @@ Reviewed families: MIT, ISC, BSD-2-Clause, BSD-3-Clause, 0BSD, Unlicense, CC0-1.
 The React Flow attribution remains visible. The extension build copies GPL LICENSE and the generated notices beside its bundle. Electron binaries include additional Chromium and other embedded third-party components: a future desktop packager must retain Electron's LICENSE and `LICENSES.chromium.html`, alongside the source and applicable GPL obligations. The current deliverable runs from source and is not a signed or published binary distribution.
 
 The security audit (`pnpm audit`) is a separate online check. It is not a license audit or a permanent guarantee. The lockfile fixes the tested versions; review updates and rerun tests before release.
+
+## VSIX development tools
+
+The locked official VSIX packager adds Artistic-2.0 and BlueOak-1.0.0 dependency notices; the [Blue Oak license](https://blueoakcouncil.org/license/1.0.0) permits reuse with its notice. All installed package metadata and full notice texts remain in the audit output, with a runtime/development flag.
+
+The packager also depends on `@vscode/vsce-sign` 2.1.0 and its platform helper 2.0.6, under Microsoft VSCE-SIGN terms. These are development-only tools for VS Code development/testing, not GPL runtime components and not part of the VSIX or app bundle. Their signing/postinstall script is explicitly disabled. The audit accepts only these exact helper versions, only outside the runtime dependency closure, and only with the reviewed LICENSE.txt SHA-256 `80780388a077c74609a5fc7ee1cc3d382740a5e48d87f7aac5a20cbddef3e91c`. Other custom licenses or changed terms still fail review. The package script verifies an exact runtime/document/license file allowlist before producing a VSIX; it never packages node_modules or the signing helpers. No signing certificates, credentials or publishing are used.

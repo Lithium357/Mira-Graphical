@@ -2,7 +2,7 @@
   "name": "mira-graphical",
   "displayName": "Mira Graphical",
   "description": "Local bidirectional Verilog graph companion",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "mira-graphical",
   "license": "GPL-3.0-only",
   "engines": {
@@ -51,5 +51,9 @@
         ]
       }
     ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lithium357/Mira-Graphical.git"
   }
 }

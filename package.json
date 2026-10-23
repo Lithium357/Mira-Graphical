@@ -1,6 +1,6 @@
 {
   "name": "mira-graphical",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "license": "GPL-3.0-only",
@@ -14,7 +14,9 @@
     "licenses": "node scripts/licenses.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "qa:native": "tsx scripts/qa-session.ts"
+    "qa:native": "tsx scripts/qa-session.ts",
+    "package:extension": "pnpm build && node scripts/package-extension.mjs",
+    "test:reference": "tsx scripts/reference.ts"
   },
   "dependencies": {
     "@xyflow/react": "12.12.0",
@@ -30,6 +32,7 @@
     "@types/vscode": "1.96.0",
     "@types/ws": "8.18.1",
     "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "4.0.0",
     "electron": "45.0.0",
     "esbuild": "0.28.2",
     "prettier": "3.9.10",

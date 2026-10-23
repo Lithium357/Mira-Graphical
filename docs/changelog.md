@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- Added concatenation and equal-width bus splitting, including ascending bus order and individually wired join sockets.
+- Added canvas/inspector diagnostics for undriven/unused signals, width conversions and multi-bit selectors.
+- Added box selection, copy/paste/duplicate, keyboard shortcuts, searchable palette and optional wire labels.
+- Added local unsigned combinational simulation, on-node values, sampled waveform history and CSV clipboard export.
+- Added reusable named-port modules, instance construction and navigation, per-module layout retention and explicit cross-file definition import.
+- Added module-scoped proof validation and atomic native Undo for child-module, bus and clipboard batches.
+- Added an unsigned VSIX build with an explicit file allowlist, isolated installation testing and CI artifact output. Desktop installer/signing remains deferred.
+- Added differential checks against Icarus Verilog for 264 vectors and 2904 output comparisons.
+
 ## 0.3.0
 
 - Added construction of operations, muxes, constants, slices, wires and ANSI input/output ports.

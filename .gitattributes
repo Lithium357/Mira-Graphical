@@ -3,3 +3,4 @@
 *.jpg binary
 *.zip binary
 *.vsix binary
+docs/THIRD_PARTY_NOTICES.txt -whitespace

@@ -27,3 +27,7 @@ jobs:
             test-results/desktop-smoke.png
             test-results/desktop-smoke.json
             test-results/vscode-smoke.json
+            test-results/vscode-smoke-*.log
+            test-results/*-failure.png
+            dist/packages/*.vsix
+            dist/packages/manifest.json

@@ -7,6 +7,7 @@ import {
   realpathSync,
   mkdirSync,
 } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, relative, dirname, resolve } from 'node:path';
 const seen = new Set();
 const packages = [];
@@ -20,7 +21,7 @@ function find(name, from) {
     dir = up;
   }
 }
-function visit(path) {
+function visit(path, runtime = false) {
   const actual = realpathSync(path);
   if (seen.has(actual)) return;
   seen.add(actual);
@@ -31,6 +32,7 @@ function visit(path) {
   const license = typeof pkg.license === 'string' ? pkg.license : (pkg.license?.type ?? 'UNKNOWN');
   const files = readdirSync(actual).filter((n) => /^(licen[cs]e|copying|notice)(\.|$)/i.test(n));
   packages.push({
+    runtime,
     name: pkg.name,
     version: pkg.version,
     license,
@@ -38,16 +40,22 @@ function visit(path) {
   });
   for (const name of Object.keys({ ...pkg.dependencies, ...pkg.optionalDependencies })) {
     const dep = find(name, actual);
-    if (dep) visit(dep);
+    if (dep) visit(dep, runtime);
   }
 }
 const root = JSON.parse(readFileSync('package.json', 'utf8'));
-for (const name of Object.keys({ ...root.dependencies, ...root.devDependencies })) {
+for (const name of Object.keys(root.dependencies ?? {})) {
   const path = find(name, resolve('.'));
-  if (path) visit(path);
+  if (path) visit(path, true);
+}
+for (const name of Object.keys(root.devDependencies ?? {})) {
+  const path = find(name, resolve('.'));
+  if (path) visit(path, false);
 }
 packages.sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
 const permitted = new Set([
+  'Artistic-2.0',
+  'BlueOak-1.0.0',
   'MIT',
   'ISC',
   'BSD-2-Clause',
@@ -63,7 +71,20 @@ const permitted = new Set([
   '(MIT OR GPL-3.0-or-later)',
   '(MIT OR CC0-1.0)',
 ]);
-const unknown = packages.filter((p) => !permitted.has(p.license));
+// The official VSIX packager brings a Microsoft-licensed helper. It is not a runtime
+// dependency, is never shipped in the VSIX/app, and its build/signing script is disabled.
+// Pin the exact reviewed license text; never treat arbitrary custom licenses as permitted.
+const developmentHelper = (p) =>
+  !p.runtime &&
+  p.license === 'SEE LICENSE IN LICENSE.txt' &&
+  ((p.name === '@vscode/vsce-sign' && p.version === '2.1.0') ||
+    (/^@vscode\/vsce-sign-(?:win32|darwin|linux|alpine)-/.test(p.name) && p.version === '2.0.6')) &&
+  p.files.some(
+    (file) =>
+      createHash('sha256').update(readFileSync(file)).digest('hex') ===
+      '80780388a077c74609a5fc7ee1cc3d382740a5e48d87f7aac5a20cbddef3e91c',
+  );
+const unknown = packages.filter((p) => !permitted.has(p.license) && !developmentHelper(p));
 mkdirSync('docs', { recursive: true });
 writeFileSync(
   'docs/third-party-licenses.json',
@@ -87,7 +108,7 @@ for (const p of packages) {
 }
 writeFileSync('docs/THIRD_PARTY_NOTICES.txt', notices);
 console.log(
-  `${packages.length} installed package versions audited; ${unknown.length} licenses need review.`,
+  `${packages.length} installed package versions audited; ${unknown.length} licenses need review; ${packages.filter(developmentHelper).length} reviewed development-only Microsoft helpers (not distributed).`,
 );
 if (unknown.length) {
   console.error(unknown.map((p) => `${p.name}: ${p.license}`).join('\n'));

@@ -3,5 +3,6 @@ packages:
   - extensions/*
   - packages/*
 allowBuilds:
+  '@vscode/vsce-sign': false
   electron: true
   esbuild: true
