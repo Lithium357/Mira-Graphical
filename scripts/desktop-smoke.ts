@@ -192,6 +192,11 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     .get(comboURI)!
     .previewGraph!.nodes.find((n) => n.assignmentTarget === 'product')!;
   const a = graph.nodes.find((n) => n.label === 'a')!;
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `!!document.querySelector('[data-id="${product.id}"] .react-flow__handle.target.connectable')`,
+    ),
+  );
   await win.webContents.executeJavaScript(
     `document.querySelector('.react-flow__controls-fitview').click()`,
   );
@@ -199,6 +204,13 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   const points = await win.webContents.executeJavaScript(
     `(()=>{const point=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}};return [point('[data-id="${a.id}"] .react-flow__handle.source'),point('[data-id="${product.id}"] .react-flow__handle[data-handleid="left"]')];})()`,
   );
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `${JSON.stringify(points)}.every((p,i)=>document.elementFromPoint(p.x,p.y)?.matches(i===0?'.react-flow__handle.source.connectablestart':'.react-flow__handle.target.connectable'))`,
+    ),
+  );
+  win.focus();
+  win.webContents.focus();
   win.webContents.sendInputEvent({ type: 'mouseMove', ...points[0] });
   win.webContents.sendInputEvent({
     type: 'mouseDown',
@@ -206,6 +218,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     button: 'left',
     clickCount: 1,
   });
+  await sleep(100);
   for (let i = 1; i <= 10; i++) {
     win.webContents.sendInputEvent({
       type: 'mouseMove',
