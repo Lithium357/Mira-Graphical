@@ -13,6 +13,7 @@ import {
 import { resolve, relative, isAbsolute, join, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Session, hash, type State, type Layout, type Clock, type Viewport } from './index.js';
+import { RecoveryStore, recoveryFingerprint } from './recovery.js';
 import {
   MAX_MESSAGE_BYTES,
   validateMessage,
@@ -68,8 +69,10 @@ export class SyncService {
   readonly token = randomBytes(32).toString('hex');
   readonly workspace: string;
   readonly metadata: string;
+  readonly recovery: RecoveryStore;
   readonly server: WebSocketServer;
   private editor?: WebSocket;
+  private editorRecovery = false;
   private owners = new Map<string, WebSocket>();
   private listeners = new Set<(states: State[]) => void>();
   private descriptor?: string;
@@ -82,6 +85,7 @@ export class SyncService {
     if (existsSync(this.metadata) && lstatSync(this.metadata).isSymbolicLink())
       throw new Error('.hdlgraph must not be a symbolic link.');
     mkdirSync(this.metadata, { recursive: true });
+    this.recovery = new RecoveryStore(this.metadata, this.workspace);
     this.server = new WebSocketServer({
       host: '127.0.0.1',
       port: 0,
@@ -111,6 +115,7 @@ export class SyncService {
             authenticated = true;
             clearTimeout(timeout);
             this.editor = socket;
+            this.editorRecovery = msg.capabilities?.includes('recovery-review') ?? false;
             this.send(socket, { type: 'hello.ok', protocolVersion: 1 });
             return;
           }
@@ -130,6 +135,7 @@ export class SyncService {
               msg.version,
               msg.text,
               {
+                checkpoint: (r) => this.recovery.checkpoint(r),
                 publish: (state) => {
                   this.states.set(state.uri, state);
                   this.send(socket, {
@@ -144,11 +150,9 @@ export class SyncService {
                   if (socket.readyState !== WebSocket.OPEN) throw new Error('Editor disconnected');
                   this.send(socket, { type: 'document.applyPatch', ...patch });
                 },
-                recover: (r) =>
-                  this.atomic(
-                    join(this.metadata, `recovery-${Date.now()}-${randomUUID()}.json`),
-                    r,
-                  ),
+                recover: (r) => {
+                  this.recovery.archive(r);
+                },
                 persist: (uri, l) => this.atomic(this.layoutPath(uri), l),
               },
               this.clock,
@@ -181,7 +185,10 @@ export class SyncService {
       });
       socket.on('close', () => {
         clearTimeout(timeout);
-        if (this.editor === socket) this.editor = undefined;
+        if (this.editor === socket) {
+          this.editor = undefined;
+          this.editorRecovery = false;
+        }
         for (const [uri, owner] of this.owners)
           if (owner === socket) {
             this.sessions.get(uri)?.disconnect();
@@ -228,6 +235,31 @@ export class SyncService {
   subscribe(f: (states: State[]) => void) {
     this.listeners.add(f);
     return () => this.listeners.delete(f);
+  }
+  openRecovery(id: string, preview: boolean, compare: boolean, expectedHash?: string) {
+    if (!this.editor || this.editor.readyState !== WebSocket.OPEN)
+      throw new Error('Connect VS Code to open a recovered copy. You can also copy the text here.');
+    if (!this.editorRecovery)
+      throw new Error(
+        'Update the Mira companion extension to 0.6.0 or newer to open recovery. Copy text is still available.',
+      );
+    const saved = this.recovery.read(id);
+    if (expectedHash !== undefined && recoveryFingerprint(saved) !== expectedHash)
+      throw new Error('This snapshot changed after you previewed it. Refresh and select it again.');
+    if (compare && this.owners.get(saved.uri) !== this.editor)
+      throw new Error('Share the current source document before comparing it with recovery.');
+    if (preview && saved.previewText === undefined)
+      throw new Error('This snapshot has no graph preview.');
+    const message: ServiceMessage = {
+      type: 'recovery.open',
+      uri: saved.uri,
+      text: preview ? saved.previewText! : saved.text,
+      compare,
+      title: preview ? 'Recovered graph preview' : 'Recovered source buffer',
+    };
+    if (Buffer.byteLength(JSON.stringify(message)) > MAX_MESSAGE_BYTES)
+      throw new Error('This recovery is too large for the editor link. Use Copy text instead.');
+    this.send(this.editor, message);
   }
   graphEdit(uri: string, id: string, op: Operator) {
     const s = this.sessions.get(uri);

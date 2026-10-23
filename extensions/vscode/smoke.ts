@@ -131,6 +131,67 @@ export async function run() {
     await vscode.commands.executeCommand('undo');
     assert.equal(native.getText(), liveSource, `${ext} entire batch uses one native undo`);
   }
+  const recoveryUri = vscode.Uri.joinPath(folder.uri, 'hierarchy.vhdl');
+  const recoveryCurrent = await vscode.workspace.openTextDocument(recoveryUri);
+  const recoveryOriginal = recoveryCurrent.getText();
+  const recoveryDisk = Buffer.from(await vscode.workspace.fs.readFile(recoveryUri)).toString(
+    'utf8',
+  );
+  const recovered = '-- recovery copy smoke\n' + recoveryOriginal;
+  const preview = '-- recovery preview smoke\n' + recoveryOriginal;
+  const requestUri = vscode.Uri.joinPath(
+    folder.uri,
+    '.hdlgraph',
+    `recovery-request-${process.env.MIRA_SMOKE_PASS}.json`,
+  );
+  await vscode.workspace.fs.writeFile(
+    requestUri,
+    Buffer.from(
+      JSON.stringify({ phase: 'copy', uri: recoveryUri.toString(), text: recovered, preview }),
+    ),
+  );
+  const copyStart = Date.now();
+  while (
+    Date.now() - copyStart < 15000 &&
+    !vscode.window.activeTextEditor?.document.getText().startsWith('-- recovery copy smoke')
+  )
+    await sleep(50);
+  const copy = vscode.window.activeTextEditor!.document;
+  assert(copy.isUntitled, 'Recovered source must open as a separate untitled copy');
+  assert.equal(copy.getText().replaceAll('\r\n', '\n'), recovered.replaceAll('\r\n', '\n'));
+  assert.equal(copy.languageId, 'vhdl');
+  await vscode.workspace.fs.writeFile(
+    requestUri,
+    Buffer.from(
+      JSON.stringify({ phase: 'compare', uri: recoveryUri.toString(), text: recovered, preview }),
+    ),
+  );
+  const diffStart = Date.now();
+  const recoveryDiff = () =>
+    vscode.window.tabGroups.all
+      .flatMap((g) => g.tabs)
+      .some(
+        (tab) =>
+          tab.input instanceof vscode.TabInputTextDiff &&
+          tab.input.modified.toString() === recoveryUri.toString() &&
+          tab.input.original.scheme === 'untitled',
+      );
+  while (Date.now() - diffStart < 15000 && !recoveryDiff()) await sleep(50);
+  assert(recoveryDiff(), 'Recovery preview must open in the native diff editor');
+  assert(
+    vscode.workspace.textDocuments.some(
+      (d) => d.isUntitled && d.getText().startsWith('-- recovery preview smoke'),
+    ),
+  );
+  assert.equal(
+    recoveryCurrent.getText(),
+    recoveryOriginal,
+    'Recovery review must not overwrite unsaved current work',
+  );
+  assert.equal(
+    Buffer.from(await vscode.workspace.fs.readFile(recoveryUri)).toString('utf8'),
+    recoveryDisk,
+  );
   await vscode.workspace.fs.writeFile(
     vscode.Uri.joinPath(folder.uri, '.hdlgraph', 'vscode-smoke-result.json'),
     Buffer.from(
@@ -147,6 +208,7 @@ export async function run() {
           constructionWiring: true,
           hierarchyBusesDuplicate: true,
           nativeLanguages: ['systemverilog', 'vhd', 'vhdl'],
+          recoveryReviewCopy: true,
           realDebounceMs: 15000,
         },
         null,

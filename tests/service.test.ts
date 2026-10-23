@@ -55,7 +55,7 @@ test('authenticated protocol: shared buffer → graph → patch ACK, scope and o
   const send = (m: unknown) => ws.send(JSON.stringify(m));
   try {
     await new Promise((r) => ws.once('open', r));
-    send({ type: 'hello', ...config, editor: 'vscode' });
+    send({ type: 'hello', ...config, editor: 'vscode', capabilities: ['recovery-review'] });
     await wait(() => messages.some((m) => m.type === 'hello.ok'));
     const uri = pathToFileURL(join(root, 'adder.v')).href;
     const text = readFileSync('fixtures/adder.v', 'utf8');
@@ -83,6 +83,53 @@ test('authenticated protocol: shared buffer → graph → patch ACK, scope and o
     });
     await wait(() => service.states.get(uri)?.version === 2);
     assert.equal(service.states.get(uri)?.status, 'Synced');
+    const journal = service.recovery.list().find((e) => e.checkpoint)!;
+    assert.equal(service.recovery.read(journal.id).text, text.replace('a + b', 'a * b'));
+    const recoveryId = service.recovery.archive({
+      at: new Date().toISOString(),
+      reason: 'Recovery review test',
+      uri,
+      version: 1,
+      text,
+      previewText: '// recovered draft\n' + text,
+      graphEdits: [],
+    });
+    service.openRecovery(recoveryId, true, true);
+    await wait(() => messages.some((m) => m.type === 'recovery.open'));
+    assert.equal(
+      messages.find((m) => m.type === 'recovery.open').text,
+      '// recovered draft\n' + text,
+    );
+    assert.equal(
+      service.sessions.get(uri)!.text,
+      text.replace('a + b', 'a * b'),
+      'Review never mutates the current buffer',
+    );
+    const other = service.recovery.archive({
+      at: new Date().toISOString(),
+      reason: 'Other source',
+      uri: pathToFileURL(join(root, 'other.v')).href,
+      version: 1,
+      text,
+      graphEdits: [],
+    });
+    const inspected = service.recovery.inspect(recoveryId);
+    writeFileSync(
+      join(service.metadata, recoveryId),
+      JSON.stringify({ ...service.recovery.read(recoveryId), text: 'changed after preview' }),
+    );
+    assert.throws(
+      () => service.openRecovery(recoveryId, false, false, inspected.snapshotHash),
+      /changed after/,
+    );
+    assert.throws(() => service.openRecovery(other, false, true), /Share/);
+    assert.throws(() => service.openRecovery(other, true, false), /no graph preview/);
+    service.openRecovery(other, false, false);
+    assert.equal(
+      service.sessions.size,
+      1,
+      'Opening a copy does not share or restore the old document',
+    );
     service.move(uri, op.id, 315, 172);
     const file = readdirSync(join(root, '.hdlgraph')).find((n) => n.startsWith('layout-'))!;
     const stored = loadLayout(join(root, '.hdlgraph', file))!;
@@ -118,6 +165,33 @@ test('wrong authentication and malformed messages never open sessions', async ()
     assert.equal(s.sessions.size, 0);
   } finally {
     await s.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('older companions keep the basic connection but receive an actionable recovery capability error', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'mira-old-editor-'));
+  const service = new SyncService(root),
+    config = await service.ready();
+  const ws = new WebSocket(`ws://127.0.0.1:${config.port}`);
+  try {
+    await new Promise((r) => ws.once('open', r));
+    const hello = new Promise<void>((r) => ws.once('message', () => r()));
+    ws.send(JSON.stringify({ type: 'hello', ...config, editor: 'vscode' }));
+    await hello;
+    const id = service.recovery.archive({
+      at: new Date().toISOString(),
+      reason: 'Older companion test',
+      uri: pathToFileURL(join(root, 'adder.v')).href,
+      version: 1,
+      text: 'module m();endmodule',
+      graphEdits: [],
+    });
+    assert.throws(() => service.openRecovery(id, false, false), /Update.*0\.6\.0/);
+    assert.equal(service.sessions.size, 0);
+  } finally {
+    ws.terminate();
+    await service.close();
     rmSync(root, { recursive: true, force: true });
   }
 });

@@ -31,6 +31,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   const config = await service.ready();
   const ws = new WebSocket(`ws://127.0.0.1:${config.port}`);
   let patches = 0;
+  const recoveryRequests: { text: string; compare: boolean }[] = [];
   const original = readFileSync(join(root, 'fixtures/adder.v'), 'utf8');
   let live = original;
   let version = 1;
@@ -45,6 +46,10 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     hierarchyVersion = 1;
   ws.on('message', (b) => {
     const m = JSON.parse(b.toString());
+    if (m.type === 'recovery.open') {
+      recoveryRequests.push(m);
+      return;
+    }
     if (m.type === 'document.applyPatch') {
       if (m.uri === uri) {
         assert.equal(m.baseVersion, version);
@@ -79,7 +84,14 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     }
   });
   await new Promise((r) => ws.once('open', r));
-  ws.send(JSON.stringify({ type: 'hello', ...config, editor: 'vscode' }));
+  ws.send(
+    JSON.stringify({
+      type: 'hello',
+      ...config,
+      editor: 'vscode',
+      capabilities: ['recovery-review'],
+    }),
+  );
   await sleep(100);
   ws.send(JSON.stringify({ type: 'document.open', uri, version, text: live }));
   await sleep(1000);
@@ -783,5 +795,77 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     );
     service.discardGraphChanges(doc.uri);
   }
+  const recoveryId = service.recovery.archive({
+    at: new Date().toISOString(),
+    reason: 'Desktop recovery smoke',
+    uri: hierarchyURI,
+    version: hierarchyVersion,
+    text: hierarchy,
+    previewText: '// recovered smoke preview\n' + hierarchy,
+    graphEdits: [],
+  });
+  await click('Recovery');
+  await until(() =>
+    win.webContents.executeJavaScript(`!!document.querySelector('.recovery-dialog[open]')`),
+  );
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `Array.from(document.querySelectorAll('.recovery-list button')).some(b=>b.innerText.includes('Desktop recovery smoke'))`,
+    ),
+  );
+  await win.webContents.executeJavaScript(
+    `Array.from(document.querySelectorAll('.recovery-list button')).find(b=>b.innerText.includes('Desktop recovery smoke')).click()`,
+  );
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('[aria-label="Recovered source"]')?.textContent.startsWith('// recovered smoke preview')`,
+    ),
+  );
+  await click('Copy text');
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('.recovery-dialog [role="status"]')?.textContent==='Recovery text copied.'`,
+    ),
+  );
+  const { clipboard } = await import('electron');
+  assert.equal(await clipboard.readText(), service.recovery.read(recoveryId).previewText);
+  await win.webContents.executeJavaScript(
+    `new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`,
+  );
+  writeFileSync(join(output, 'recovery-smoke.png'), (await win.webContents.capturePage()).toPNG());
+  await win.webContents.executeJavaScript(
+    `document.querySelector('.recovery-preview input').click()`,
+  );
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('[aria-label="Recovered source"]')?.textContent===${JSON.stringify(hierarchy)}`,
+    ),
+  );
+  const recoveryMetrics = await win.webContents.executeJavaScript(
+    `(()=>{const d=document.querySelector('.recovery-dialog').getBoundingClientRect();return {width:d.width,height:d.height,x:d.x,y:d.y,innerWidth,innerHeight}})()`,
+  );
+  assert(
+    recoveryMetrics.x >= 0 &&
+      recoveryMetrics.y >= 0 &&
+      recoveryMetrics.x + recoveryMetrics.width <= recoveryMetrics.innerWidth + 1 &&
+      recoveryMetrics.y + recoveryMetrics.height <= recoveryMetrics.innerHeight + 1,
+    JSON.stringify(recoveryMetrics),
+  );
+  await click('Compare in VS Code');
+  await until(() => recoveryRequests.length === 1);
+  assert.deepEqual(
+    recoveryRequests.map((r) => ({ text: r.text, compare: r.compare })),
+    [{ text: hierarchy, compare: true }],
+  );
+  await click('Open recovered copy');
+  await until(() => recoveryRequests.length === 2);
+  assert.equal(recoveryRequests[1].compare, false);
+  assert.equal(recoveryRequests[1].text, hierarchy);
+  assert.equal(service.sessions.get(hierarchyURI)!.text, hierarchy);
+  win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+  win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+  await until(() =>
+    win.webContents.executeJavaScript(`!document.querySelector('.recovery-dialog')`),
+  );
   ws.close();
 }

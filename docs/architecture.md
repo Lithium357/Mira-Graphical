@@ -42,6 +42,16 @@ Explicit import reads another already-shared session's acknowledged in-memory sn
 
 Clipboard payloads contain bounded declarations, supported expression fragments and named instance bindings. Paste creates unique names and remaps selected internal references, preserving valid external dependencies. The planner rejects statement/comment/dotted-name injection and reparses the entire result. Selecting an expression copies its result as a wire; selecting a port explicitly preserves its direction. Paste is one pending history action and one composed native source transaction.
 
+## Durable recovery
+
+Every semantic buffer/draft change checkpoints the live source, version, graph preview and inert action data before publishing state. Layout-only movement does not rewrite the journal. Checkpoints use per-document SHA-256 filenames and atomic UTF-8 temporary-file replacement. Opening a different buffer in a new service session archives its previous checkpoint first. Explicit conflict/discard/disconnect snapshots remain separate history files. A failed checkpoint produces a visible warning without disabling live editing; a corrupt previous checkpoint is left intact rather than silently replaced.
+
+`RecoveryStore` bounds snapshot sizes, validates source workspace membership, rejects path traversal and symbolic links, and lists at most 100 recent files. List descriptions have an aggregate 8 MB read budget; selecting a file validates it independently. The UI truncates only its on-screen preview at 100,000 characters; copy/open uses the complete bounded text. Snapshots are never automatically deleted or executed. These are application-crash checkpoints, not a power-loss or disk-failure guarantee.
+
+Recovery IPC accepts an opaque file identifier, never an arbitrary filesystem path. Open/compare requests carry the selected snapshot's SHA-256 fingerprint; a live checkpoint that changed after preview must be selected again. The authenticated editor link can request a separate untitled document or a native diff; comparisons require the current source to be explicitly shared. The extension does not apply a WorkspaceEdit, save a source file, or share the recovered document. Invalid/unsupported HDL can therefore still be inspected and recovered. The renderer can also copy recovery text through the existing clipboard capability without an editor connection.
+
+The companion advertises a bounded `recovery-review` capability in its existing protocol-v1 handshake. Older adapters can still share/edit ordinary documents; recovery-open requests give an explicit upgrade error rather than disappearing silently. Clipboard commands await the native clipboard operation before reporting completion.
+
 ## Diagnostics and simulation
 
 Projection emits warnings independently of parse failures. Arithmetic and mux nodes inherit unsigned destination context; concat parts and slices remain self-determined. Driver widths and socket widths generate extension/truncation warnings, while multi-bit selectors report nonzero truth rather than pretending to truncate the condition.

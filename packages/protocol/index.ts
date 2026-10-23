@@ -53,7 +53,14 @@ export type SourceAction = (
   CircuitAction | { kind: 'change'; target: string; change: GraphChange }
 ) & { scope?: string };
 export type EditorMessage =
-  | { type: 'hello'; protocolVersion: 1; token: string; editor: 'vscode'; workspace: string }
+  | {
+      type: 'hello';
+      protocolVersion: 1;
+      token: string;
+      editor: 'vscode';
+      workspace: string;
+      capabilities?: string[];
+    }
   | { type: 'document.open'; uri: string; version: number; text: string }
   | {
       type: 'document.change';
@@ -74,6 +81,7 @@ export type EditorMessage =
       error?: string;
     };
 export type ServiceMessage =
+  | { type: 'recovery.open'; uri: string; text: string; compare: boolean; title: string }
   | { type: 'hello.ok'; protocolVersion: 1 }
   | {
       type: 'document.applyPatch';
@@ -99,7 +107,11 @@ export function validateMessage(v: unknown): v is EditorMessage {
       v.editor === 'vscode' &&
       typeof v.token === 'string' &&
       v.token.length <= 256 &&
-      typeof v.workspace === 'string'
+      typeof v.workspace === 'string' &&
+      (v.capabilities === undefined ||
+        (Array.isArray(v.capabilities) &&
+          v.capabilities.length <= 16 &&
+          v.capabilities.every((c) => typeof c === 'string' && c.length <= 64)))
     );
   if (typeof v.uri !== 'string' || v.uri.length > 8192) return false;
   if (v.type === 'document.close') return true;

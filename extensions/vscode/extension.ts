@@ -69,7 +69,12 @@ async function connect(folder: vscode.WorkspaceFolder) {
       } else if (msg.type === 'status') {
         status.text = `$(circuit-board) RTL Graph: ${msg.status}`;
         status.tooltip = msg.detail ?? msg.uri;
-      } else if (msg.type === 'document.applyPatch')
+      } else if (msg.type === 'recovery.open')
+        void openRecovery(msg).catch((e) => {
+          log.appendLine(String(e));
+          void vscode.window.showErrorMessage(`RTL Graph: ${String(e)}`);
+        });
+      else if (msg.type === 'document.applyPatch')
         void patch(msg).catch((e) => {
           log.appendLine(String(e));
           void vscode.window.showErrorMessage(`RTL Graph: ${String(e)}`);
@@ -83,6 +88,7 @@ async function connect(folder: vscode.WorkspaceFolder) {
           token: config.token,
           workspace: config.workspace,
           editor: 'vscode',
+          capabilities: ['recovery-review'],
         }),
       ),
     );
@@ -97,6 +103,33 @@ async function connect(folder: vscode.WorkspaceFolder) {
       fail(new Error('Local service disconnected. Reconnect and reopen the current module.'));
     });
   });
+}
+async function openRecovery(message: Extract<ServiceMessage, { type: 'recovery.open' }>) {
+  if (
+    typeof message.text !== 'string' ||
+    message.text.length > 1_000_000 ||
+    typeof message.uri !== 'string' ||
+    typeof message.compare !== 'boolean'
+  )
+    throw new Error('Invalid recovery message.');
+  const current = vscode.workspace.textDocuments.find((d) => d.uri.toString() === message.uri);
+  if (message.compare && (!current || !shared.has(message.uri)))
+    throw new Error('Share the current buffer before comparing recovery.');
+  const language = /\.vhdl?$/i.test(message.uri)
+    ? 'vhdl'
+    : /\.sv$/i.test(message.uri)
+      ? 'systemverilog'
+      : 'verilog';
+  const recovered = await vscode.workspace.openTextDocument({ content: message.text, language });
+  if (message.compare)
+    await vscode.commands.executeCommand(
+      'vscode.diff',
+      recovered.uri,
+      current!.uri,
+      'Recovered copy ↔ Current buffer',
+      { preview: false },
+    );
+  else await vscode.window.showTextDocument(recovered, { preview: false });
 }
 async function patch(p: Extract<ServiceMessage, { type: 'document.applyPatch' }>) {
   const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === p.uri);

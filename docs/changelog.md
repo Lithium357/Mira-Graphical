@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+- Added immediate durable checkpoints of shared live buffers and pending graph drafts, with previous-session preservation and visible storage-failure warnings.
+- Added a recovery browser with source/draft preview, offline clipboard copying, separate untitled copies and native VS Code comparisons. Current buffers are never automatically overwritten.
+- Added crash-style restart, corrupt/oversized snapshot, path/symlink and failure-handling tests, plus real desktop and installed-editor recovery checks.
+- Removed the stale Verilog-only workspace caption.
+- Wait for native clipboard writes to finish before confirming success, and report a clear recovery upgrade requirement for older companion extensions.
+
 ## 0.5.0
 
 - Added native SystemVerilog support for logic declarations, fill literals and bounded complete `always_comb` blocks.

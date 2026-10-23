@@ -2,7 +2,7 @@
 
 A local, bidirectional Verilog, SystemVerilog and VHDL graph companion. Write RTL in VS Code; construct, wire and inspect supported circuits in a separate desktop window. Semantic edits synchronize after **15 seconds of inactivity**. Original code is **GPL-3.0-only**.
 
-Version 0.5.0 adds native SystemVerilog and VHDL combinational RTL support and a resizable canvas-first workspace. Each language supports source synchronization, construction, wiring, hierarchy, clipboard actions and local simulation within the [documented subset](docs/supported-syntax.md). Clocked logic, testbenches and full language standards remain outside this version.
+Version 0.6.0 adds durable live-buffer/draft recovery and native VS Code recovery copies/comparisons. Verilog, SystemVerilog and VHDL support source synchronization, construction, wiring, hierarchy, clipboard actions and local simulation within the [documented subset](docs/supported-syntax.md). Clocked logic, testbenches and full language standards remain outside this version. See the [launch readiness checklist](docs/launch-readiness.md).
 
 ## Install and run
 
@@ -28,7 +28,7 @@ To run the companion extension from source:
 
 Only explicitly shared documents participate. Use **RTL Graph: Connect/Disconnect** to disconnect; use **RTL Graph: Show Sync Status** for details. After a service restart, reconnect and run Open Current Module again to negotiate the current buffer. One desktop workspace and one VS Code adapter connection are supported at a time, with multiple shared document sessions. No extension marketplace publishing or native desktop installer is provided yet.
 
-To use the packaged companion, run `pnpm package:extension`, then choose **Extensions: Install from VSIX…** in VS Code and select `dist/packages/mira-graphical-0.5.0.vsix`. Keep the desktop app running for the same workspace and share a `.v`, `.sv`, `.vhd` or `.vhdl` file with Open Current Module. The official [VS Code packaging tool](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#packaging-extensions) creates the unsigned VSIX; this does not publish to the Marketplace or create/sign a desktop installer. CI uploads the VSIX with its test artifacts.
+To use the packaged companion, run `pnpm package:extension`, then choose **Extensions: Install from VSIX…** in VS Code and select `dist/packages/mira-graphical-0.6.0.vsix`. Keep the desktop app running for the same workspace and share a `.v`, `.sv`, `.vhd` or `.vhdl` file with Open Current Module. The official [VS Code packaging tool](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#packaging-extensions) creates the unsigned VSIX; this does not publish to the Marketplace or create/sign a desktop installer. CI uploads the VSIX with its test artifacts.
 
 ## Adder demo
 
@@ -40,6 +40,12 @@ To use the packaged companion, run `pnpm package:extension`, then choose **Exten
 6. Leave a half-written expression and wait 15 seconds: a diagnostic appears while the last valid graph stays visible. Finish the expression to resume synchronization.
 
 Later semantic user edits take priority over pending earlier edits. Movement may restart the inactivity interval but never changes that priority. Superseded work is saved under `.hdlgraph/recovery-*.json`; see [recovery and architecture](docs/architecture.md). The conservative graph-last rebase only patches selected operators and retains unrelated source work. Changed operands, ambiguous source or precedence changes are refused visibly.
+
+## Recover unsaved work
+
+Mira checkpoints explicitly shared live buffers and pending graph drafts in the workspace's `.hdlgraph` directory as they change, before the synchronization timer expires. On a new session, a different previous checkpoint is archived before replacement. Checkpoint failures appear in the app while your live editing session stays available. These local snapshots do not save or overwrite your HDL files.
+
+Click **Recovery** in the desktop header, select a snapshot, and choose its original buffer or pending graph preview. **Open recovered copy** opens a separate untitled document in connected VS Code; **Compare in VS Code** opens a native diff against an explicitly shared current buffer. Review and copy the changes you want to keep. **Copy text** works even without an editor connection. Recovery never replays saved actions or replaces current work automatically. Up to 100 recent snapshots are listed; files are not automatically deleted. Include `.hdlgraph/` in your project's ignore rules.
 
 ## Build and wire a circuit
 
@@ -104,13 +110,14 @@ Try `fixtures/combinational.v`: select `8'h0F` and queue `8'h2A`, select `a[7:0]
 
 Keyboard arrow keys move selected nodes and save their positions. Newly shared modules open automatically in the module picker. Window bounds are saved on close and restored on a connected monitor; unplugged-monitor bounds are clamped back on screen.
 
-Unsupported constructs reject the projection rather than silently disappearing. Layout and graph identities are independent of source formatting and operator spelling. New nodes receive left-to-right dependency placement; a committed removal discards their old position. Renames and structural expression rewrites may create new identities. Recovery restore is manual. Sequential simulation, synthesis, multi-workspace window management and arbitrary Verilog support remain outside this version.
+Unsupported constructs reject the projection rather than silently disappearing. Layout and graph identities are independent of source formatting and operator spelling. New nodes receive left-to-right dependency placement; a committed removal discards their old position. Renames and structural expression rewrites may create new identities. Recovery opens reviewable copies; merging recovered changes remains manual. Sequential simulation, synthesis, multi-workspace window management and arbitrary Verilog support remain outside this version.
 
 ## Repository map
 
 - `packages/protocol`: versioned messages, validation, operator/patch types.
 - `packages/core`: scheduler, arbitration, recovery, identities/layout and local service.
 - `packages/verilog`: Chevrotain lexer, restricted parser, graph projection and exact token patches.
+- `packages/vhdl`: native typed VHDL frontend and source construction adapter.
 - `apps/graph`: Electron shell, secured preload, React Flow canvas and inspector.
 - `extensions/vscode`: unsaved document sharing and guarded native WorkspaceEdit patches.
 - `tests`, `fixtures`, `scripts`: fake-clock tests, protocol fixtures and real-app smoke runners.

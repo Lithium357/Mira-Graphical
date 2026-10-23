@@ -83,10 +83,21 @@ else {
         if (!command || typeof command !== 'object') throw new Error('Invalid command.');
         const c = command as Record<string, unknown>;
         if (c.type === 'copyText' && typeof c.text === 'string' && c.text.length <= 1_000_000) {
-          clipboard.writeText(c.text);
-          return;
+          return clipboard.writeText(c.text);
         }
         if (c.type === 'snapshot') return { workspace, states: [...service!.states.values()] };
+        if (c.type === 'recoveryList') return service!.recovery.list();
+        if (c.type === 'recoveryRead' && typeof c.id === 'string')
+          return service!.recovery.inspect(c.id);
+        if (
+          c.type === 'recoveryOpen' &&
+          typeof c.id === 'string' &&
+          typeof c.preview === 'boolean' &&
+          typeof c.compare === 'boolean' &&
+          typeof c.expectedHash === 'string' &&
+          /^[a-f0-9]{64}$/.test(c.expectedHash)
+        )
+          return service!.openRecovery(c.id, c.preview, c.compare, c.expectedHash);
         if (typeof c.uri !== 'string' || !service!.sessions.has(c.uri))
           throw new Error('Document not shared.');
         if (c.type === 'edit' && typeof c.id === 'string' && operators.includes(c.op as Operator))

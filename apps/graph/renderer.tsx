@@ -16,6 +16,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import './style.css';
 import { PaneDivider } from './pane-divider.js';
+import { RecoveryPanel } from './recovery-panel.js';
 import type { State } from '../../packages/core/index.js';
 import { SimulationPanel } from './simulation-panel.js';
 import type { Simulation } from '../../packages/verilog/simulation.js';
@@ -945,6 +946,7 @@ function Diagram({
   );
 }
 function App() {
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [states, setStates] = useState<State[]>([]);
   const [uri, setUri] = useState('');
   const [workspace, setWorkspace] = useState('');
@@ -986,7 +988,8 @@ function App() {
           <span>HDL graph companion</span>
         </div>
         <div className="header-right">
-          <span className="version">0.5 · CIRCUIT WORKBENCH</span>
+          <button onClick={() => setRecoveryOpen(true)}>Recovery</button>
+          <span className="version">0.6 · CIRCUIT WORKBENCH</span>
           <span
             className={`status ${(state?.status ?? 'Disconnected').replaceAll(' ', '-')}`}
             role="status"
@@ -1030,8 +1033,13 @@ function App() {
             ))}
           </select>
         )}
-        <span className="nav-note">RTL STRUCTURE · VERILOG-2005 SUBSET</span>
+        <span className="nav-note">COMBINATIONAL HDL WORKSPACE</span>
       </nav>
+      {state?.recoveryWarning && (
+        <div className="notice" role="alert">
+          {state.recoveryWarning}
+        </div>
+      )}
       {error || state?.diagnostics.length || state?.detail ? (
         <div className="notice" role="alert">
           {error ||
@@ -1077,6 +1085,7 @@ function App() {
         </span>
         <span>GPLv3 · Local first</span>
       </footer>
+      {recoveryOpen && <RecoveryPanel onClose={() => setRecoveryOpen(false)} />}
     </main>
   );
 }

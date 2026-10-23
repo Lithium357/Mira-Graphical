@@ -27,6 +27,7 @@ jobs:
             test-results/desktop-smoke.png
             test-results/workspace-*.png
             test-results/language-*.png
+            test-results/recovery-smoke.png
             test-results/desktop-smoke.json
             test-results/vscode-smoke.json
             test-results/vscode-smoke-*.log
@@ -46,6 +47,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: sudo apt-get update && sudo apt-get install -y ghdl iverilog
+      - run: pnpm test
       - run: pnpm test:languages
       - uses: actions/upload-artifact@v4
         if: always()

@@ -1,10 +1,10 @@
-# Verification report — 0.5.0
+# Verification report — 0.6.0
 
 Windows verification with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an isolated official VS Code 1.143.1 runtime. Linux/macOS app releases have not been validated.
 
 ## Automated checks
 
-- `pnpm test`: **90 passed, 0 failed**. Includes native Verilog/SystemVerilog/VHDL parsing, typed arithmetic, construction, scoped patches, hierarchy, clipboard safety, simulation, recovery, scheduling, authenticated WebSocket integration and layout persistence.
+- `pnpm test`: **99 tests, 0 failures** (98 passed locally; the file-symlink case skips when Windows denies that privilege). Includes native HDL parsing, typed arithmetic, construction, scoped patches, hierarchy, clipboard safety, simulation, durable recovery, scheduling, authenticated WebSocket integration and layout persistence. The Ubuntu CI job also runs the complete unit suite so symlink refusal is exercised on Linux.
 - `pnpm lint`, `pnpm build`, `pnpm format:check`: passed.
 - `pnpm run licenses`: **211 installed package versions**, no unclassified licenses. Two exact-version, exact-license-hash Microsoft helpers are development-only exceptions, never runtime/VSIX contents; signing scripts are disabled. See [license scope](licenses.md).
 - `pnpm audit --json`: **0 advisories**.
@@ -26,6 +26,8 @@ The construction phase runs at 1000×680, checks that existing nodes remain visi
 `desktop-smoke.json` records `resizableWorkspace` and `responsiveLayouts`. Cropped application screenshots are saved as `workspace-1280x800.png`, `workspace-1000x680.png` and `workspace-900x600.png`; CI retains these with the smoke artifacts. Browser storage for desktop smoke is isolated from the user's pane preferences.
 
 ## VS Code and VSIX evidence
+
+The desktop recovery check selects an archived graph preview, copies its exact text, switches back to the saved source, verifies the modal fits the window, and closes it with Escape. Its screenshot is `recovery-smoke.png`. Both editor passes open an inert recovery snapshot as an untitled VHDL buffer and open its draft in a native diff; they assert that the current unsaved source and disk file remain unchanged. The result includes `recoveryReviewCopy`.
 
 The official packager checks an exact five-source-file allowlist: manifest, README, GPL license, third-party notices and bundled extension runtime. The generated VSIX additionally contains the standard VSIX metadata. It excludes node_modules, signing helpers, test code and source maps.
 

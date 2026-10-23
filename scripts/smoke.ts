@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, createWriteStream, readdirSync } from 'node:fs';
+import {
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  createWriteStream,
+  readdirSync,
+  existsSync,
+} from 'node:fs';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { runTests, runVSCodeCommand } from '@vscode/test-electron';
@@ -204,6 +211,30 @@ for (let pass = 0; pass < 2; pass++) {
       }),
     );
     const log = createWriteStream(join(output, `vscode-smoke-${pass}.log`));
+    const recoveryRequest = join(workspace, '.hdlgraph', `recovery-request-${pass}.json`);
+    let handledRecovery = '',
+      recoveryError: unknown;
+    const recoveryTimer = setInterval(() => {
+      try {
+        if (!existsSync(recoveryRequest)) return;
+        const request = JSON.parse(readFileSync(recoveryRequest, 'utf8'));
+        if (request.phase === handledRecovery) return;
+        handledRecovery = request.phase;
+        const id = service.recovery.archive({
+          at: new Date().toISOString(),
+          reason: 'Editor recovery smoke',
+          uri: request.uri,
+          version: 1,
+          text: request.text,
+          previewText: request.preview,
+          graphEdits: [],
+        });
+        service.openRecovery(id, request.phase === 'compare', request.phase === 'compare');
+      } catch (error) {
+        if (error instanceof SyntaxError) return;
+        recoveryError = error;
+      }
+    }, 50);
     try {
       await runTests({
         vscodeExecutablePath: process.env.MIRA_CODE_EXE,
@@ -224,8 +255,10 @@ for (let pass = 0; pass < 2; pass++) {
         ],
       });
     } finally {
+      clearInterval(recoveryTimer);
       log.end();
     }
+    assert.equal(recoveryError, undefined);
     const result = JSON.parse(
       readFileSync(join(workspace, '.hdlgraph/vscode-smoke-result.json'), 'utf8'),
     );

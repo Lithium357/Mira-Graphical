@@ -61,6 +61,7 @@ export type State = {
   undoCount?: number;
   redoCount?: number;
   canConstruct?: boolean;
+  recoveryWarning?: string;
 };
 export interface Clock {
   now(): number;
@@ -73,6 +74,7 @@ const clock: Clock = {
   clear: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
 };
 export interface Hooks {
+  checkpoint?(snapshot: Recovery): void;
   publish(state: State): void;
   patch(p: {
     uri: string;
@@ -93,6 +95,7 @@ type DraftFrame = {
 };
 type ConstructionDraft = DraftFrame & { undo: DraftFrame[]; redo: DraftFrame[] };
 export class Session {
+  private lastCheckpoint?: { text: string; version: number; table?: PatchDraft; edits: string };
   state: State;
   text: string;
   private authority?: 'text' | 'graph';
@@ -125,6 +128,28 @@ export class Session {
     this.activity();
   }
   private emit() {
+    if (this.hooks.checkpoint) {
+      const current = {
+        text: this.text,
+        version: this.state.version,
+        table: this.draft?.table,
+        edits: JSON.stringify([...this.edits]),
+      };
+      if (
+        !this.lastCheckpoint ||
+        Object.entries(current).some(
+          ([key, value]) => this.lastCheckpoint![key as keyof typeof current] !== value,
+        )
+      ) {
+        try {
+          this.hooks.checkpoint(this.recoveryData('Live buffer checkpoint'));
+          this.lastCheckpoint = current;
+          this.state.recoveryWarning = undefined;
+        } catch (error) {
+          this.state.recoveryWarning = `Recovery checkpoint could not be saved: ${String(error)}`;
+        }
+      }
+    }
     this.state.pendingEdits = Object.fromEntries(this.edits);
     this.state.previewGraph = this.draft?.graph;
     this.state.pendingSteps = this.draft?.steps.length ?? 0;
@@ -139,16 +164,34 @@ export class Session {
     this.hooks.publish(structuredClone(this.state));
   }
   private snapshot(reason: string) {
-    this.hooks.recover({
+    this.hooks.recover(this.recoveryData(reason));
+  }
+  private recoveryData(reason: string): Recovery {
+    let previewText = this.draft?.table.text;
+    if (previewText === undefined && this.edits.size) {
+      try {
+        const edits = [...this.edits]
+          .map(([id, change]) => graphPatch(this.text, this.state.graph, id, change))
+          .sort((a, b) => b.start - a.start);
+        validateEditableEdits(this.text, edits);
+        previewText = edits.reduce(
+          (text, e) => text.slice(0, e.start) + e.text + text.slice(e.end),
+          this.text,
+        );
+      } catch {
+        /* A concurrent source change may make the saved intent unsafe to render. */
+      }
+    }
+    return {
       at: new Date(this.time.now()).toISOString(),
       reason,
       uri: this.state.uri,
       version: this.state.version,
       text: this.text,
       graphEdits: [...this.edits],
-      previewText: this.draft?.table.text,
+      previewText,
       graphActions: this.draft?.steps,
-    });
+    };
   }
   private activity() {
     if (this.timer !== undefined) this.time.clear(this.timer);
