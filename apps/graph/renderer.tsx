@@ -106,7 +106,13 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
         )}
       </div>
       <div className="node-width">
-        {data.width ?? '?'} bit{data.width === 1 ? '' : 's'}
+        {data.kind === 'instance' ? (
+          `${(data.inputPorts as unknown[] | undefined)?.length ?? 0} inputs · ${(data.outputPorts as unknown[] | undefined)?.length ?? 0} outputs`
+        ) : (
+          <>
+            {data.width ?? '?'} bit{data.width === 1 ? '' : 's'}
+          </>
+        )}
         {data.kind === 'op' ? ' · RTL expression' : ''}
       </div>
       {data.assignmentTarget ? (
@@ -319,7 +325,11 @@ function Diagram({
           </button>
           <button
             disabled={!state.canConstruct || !state.pendingSteps}
-            onClick={() => void command({ type: 'discard', uri: state.uri })}
+            onClick={() =>
+              void command({ type: 'discard', uri: state.uri }).then(() =>
+                setCopyNote('Pending batch discarded.'),
+              )
+            }
           >
             Discard pending
           </button>
@@ -359,14 +369,18 @@ function Diagram({
             panOnDrag={[1, 2]}
             multiSelectionKeyCode={['Meta', 'Control']}
             nodes={displayNodes}
-            edges={(graph?.edges ?? []).map((e) => ({
-              ...e,
-              label: wireLabels
-                ? `${graph?.nodes.find((n) => n.id === e.source)?.sourceNet ?? graph?.nodes.find((n) => n.id === e.source)?.label} · ${graph?.nodes.find((n) => n.id === e.source)?.width ?? '?'}b`
-                : undefined,
-              labelStyle: { fill: '#b7dccf', fontSize: 10 },
-              labelBgStyle: { fill: '#0c1827' },
-            }))}
+            edges={(graph?.edges ?? []).map((e) => {
+              const source = graph?.nodes.find((n) => n.id === e.source),
+                port = source?.outputPorts?.find((p) => `out:${p.name}` === e.sourceHandle);
+              return {
+                ...e,
+                label: wireLabels
+                  ? `${port?.signal ?? source?.sourceNet ?? source?.label} · ${port?.width ?? source?.width ?? '?'}b`
+                  : undefined,
+                labelStyle: { fill: '#b7dccf', fontSize: 10 },
+                labelBgStyle: { fill: '#0c1827' },
+              };
+            })}
             nodeTypes={nodeTypes}
             onNodesChange={(changes) => {
               for (const c of changes)
@@ -581,7 +595,7 @@ function Diagram({
             )}
             <dl>
               <dt>Width</dt>
-              <dd>{node.width} bits</dd>
+              <dd>{node.width === undefined ? 'See named ports' : `${node.width} bits`}</dd>
               <dt>Operands</dt>
               <dd>{node.operands?.join(', ') ?? '—'}</dd>
               <dt>Position</dt>
