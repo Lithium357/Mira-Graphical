@@ -38,16 +38,19 @@ else {
         saved,
         screen.getAllDisplays().map((d) => d.workArea),
       );
+      const available = screen.getPrimaryDisplay().workArea;
       window = new BrowserWindow({
-        width: 1320,
-        height: 860,
+        width: Math.min(1320, available.width),
+        height: Math.min(860, available.height),
         ...restored,
-        minWidth: 900,
-        minHeight: 600,
+        minWidth: Math.min(900, available.width),
+        minHeight: Math.min(600, available.height),
         show: !process.argv.includes('--smoke'),
         backgroundColor: '#0b1220',
         title: 'Mira Graphical',
         webPreferences: {
+          // Smoke runs keep pane preferences and browser storage out of the user's session.
+          partition: process.argv.includes('--smoke') ? 'mira-smoke' : undefined,
           preload: join(root, 'dist/apps/graph/preload.cjs'),
           contextIsolation: true,
           nodeIntegration: false,

@@ -59,6 +59,14 @@ The canvas flags undriven and unused signals, width extension, truncation and ve
 
 Search the component palette by name or by “bus”/“port”. Drag a selection box on empty canvas, or hold Shift while dragging; Ctrl/Meta-click adds nodes. Use **Copy**, **Paste**, **Duplicate**, or Ctrl/Meta+C/V/D while the canvas is focused. Ctrl/Meta+K opens the palette. The clipboard stays inside Mira. Named subgraphs preserve internal connections, create unique names and retain external references only when those signals exist in the destination. Select a root expression to duplicate its result as a wire; selecting a port explicitly duplicates that interface port, which can be refused if it would invalidate existing instances. **Wire labels** shows signal names and widths.
 
+## Workspace controls
+
+The circuit uses the full workspace until you select a component or open **Inspector**. Close the inspector to reclaim that space. Drag the divider to resize it; focused dividers also accept arrow keys, Home and End. Pane sizes are remembered locally.
+
+**Add component** and **Simulation** stay on the main toolbar. **Edit** contains Undo/Redo, discard and clipboard actions; the selected component also offers Copy/Duplicate in its inspector. **View** contains wire labels and **Readable zoom**. The fit control gives a complete overview; Readable zoom favors legible nodes, with pan/zoom for larger circuits.
+
+Simulation docks below the circuit. Drag its top divider, minimize it to keep samples while reclaiming canvas space, or close it. Inputs sit beside waveforms, with trace choices under **Signals**. The page itself does not scroll; each open pane owns its content scrolling.
+
 ## Simulation and waveforms
 
 Open **Simulation**, set top-level inputs using decimal, `0x` hex, `0b` binary or `x`, then click **Sample inputs**. Values appear on nodes and in the waveform panel. Each click records an input vector, not a timed clock cycle. Choose up to 16 traces, inspect the latest 64 samples, or copy the trace as CSV. Samples reset when source/draft semantics change or modules change; layout-only movement preserves them.

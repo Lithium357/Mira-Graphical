@@ -19,6 +19,12 @@ The workbench portion samples two input vectors and checks the resulting on-node
 
 `test-results/desktop-smoke.json` records each path, including `boxSelection`, `copyPasteDuplicate`, `simulationWaveforms`, `moduleImport`, `hierarchy` and `busConstruction`. The image is `test-results/desktop-smoke.png`.
 
+## Workspace regression checks
+
+The desktop smoke also drags both pane dividers with native pointer events, checks keyboard resizing, collapses the inspector, and minimizes/expands simulation while retaining its sample. At requested window sizes of 1280×800, 1000×680 and 900×600 it asserts no document overflow, no nested waveform scroller, a full-width canvas with the inspector closed, more vertical space for the graph than the dock, and a readable zoom with the first node row visible. Measurements use the actual content area after Windows window borders and work-area constraints.
+
+`desktop-smoke.json` records `resizableWorkspace` and `responsiveLayouts`. Cropped application screenshots are saved as `workspace-1280x800.png`, `workspace-1000x680.png` and `workspace-900x600.png`; CI retains these with the smoke artifacts. Browser storage for desktop smoke is isolated from the user's pane preferences.
+
 ## VS Code and VSIX evidence
 
 The official packager checks an exact five-source-file allowlist: manifest, README, GPL license, third-party notices and bundled extension runtime. The generated VSIX additionally contains the standard VSIX metadata. It excludes node_modules, signing helpers, test code and source maps.

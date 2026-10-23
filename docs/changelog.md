@@ -1,5 +1,13 @@
 # Changelog
 
+## Workspace refinement (unreleased)
+
+- Replaced the fixed inspector and oversized toolbar with a canvas-first workspace, collapsible inspector, contextual clipboard actions, and Edit/View menus.
+- Added pointer/keyboard pane resizing with locally remembered sizes, and simulation minimize/expand without losing samples.
+- Removed page and nested waveform scrollbars; inputs and waveforms share a single dock content area.
+- Increased label typography, handle size and automatic node spacing, including tall multi-port components. Default zoom favors readability; overview remains available.
+- Bound new windows to the available monitor work area and added small-window screenshot/layout checks.
+
 ## 0.4.0
 
 - Added concatenation and equal-width bus splitting, including ascending bus order and individually wired join sockets.

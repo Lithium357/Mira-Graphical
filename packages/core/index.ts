@@ -232,9 +232,14 @@ export class Session {
     };
   }
   private place(graph: Circuit) {
-    for (const n of graph.nodes)
+    const columns = new Map<number, number>();
+    for (const n of [...graph.nodes].sort((a, b) => a.row - b.row)) {
+      const y = columns.get(n.depth) ?? 0;
+      const ports = Math.max(n.inputPorts?.length ?? 0, n.outputPorts?.length ?? 0);
+      columns.set(n.depth, y + Math.max(160, ports * 26 + 110));
       if (!this.state.layout.nodes[n.id]?.manuallyPlaced)
-        this.state.layout.nodes[n.id] = { x: n.depth * 250, y: n.row * 120, manuallyPlaced: false };
+        this.state.layout.nodes[n.id] = { x: n.depth * 250, y, manuallyPlaced: false };
+    }
   }
   private clearDraft() {
     this.draft = undefined;

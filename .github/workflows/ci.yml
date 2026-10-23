@@ -25,6 +25,7 @@ jobs:
           name: smoke-results
           path: |
             test-results/desktop-smoke.png
+            test-results/workspace-*.png
             test-results/desktop-smoke.json
             test-results/vscode-smoke.json
             test-results/vscode-smoke-*.log

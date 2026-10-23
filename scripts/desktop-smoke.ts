@@ -574,6 +574,127 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   }
   const output = join(root, 'test-results');
   mkdirSync(output, { recursive: true });
+  // Workspace regressions: no outer/nested scrolling, readable zoom, and usable docks.
+  await click('Readable zoom');
+  await sleep(300);
+  if (!(await win.webContents.executeJavaScript(`!!document.querySelector('.inspector')`)))
+    await click('Inspector');
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `!!document.querySelector('[aria-label="Resize inspector"]')`,
+    ),
+  );
+  const resizePane = async (label: string, dx: number, dy: number) => {
+    const point = await win.webContents.executeJavaScript(
+      `(()=>{const r=document.querySelector('[aria-label="${label}"]').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`,
+    );
+    win.focus();
+    win.webContents.focus();
+    win.webContents.sendInputEvent({ type: 'mouseMove', ...point });
+    win.webContents.sendInputEvent({ type: 'mouseDown', ...point, button: 'left', clickCount: 1 });
+    await sleep(100);
+    win.webContents.sendInputEvent({
+      type: 'mouseMove',
+      x: point.x + dx,
+      y: point.y + dy,
+      modifiers: ['leftbuttondown'],
+    });
+    await sleep(100);
+    win.webContents.sendInputEvent({
+      type: 'mouseUp',
+      x: point.x + dx,
+      y: point.y + dy,
+      button: 'left',
+      clickCount: 1,
+    });
+    await sleep(150);
+  };
+  const setPaneEdge = async (label: string, key: string) => {
+    win.focus();
+    win.webContents.focus();
+    await win.webContents.executeJavaScript(
+      `document.querySelector('[aria-label="${label}"]').focus()`,
+    );
+    win.webContents.sendInputEvent({ type: 'keyDown', keyCode: key });
+    win.webContents.sendInputEvent({ type: 'keyUp', keyCode: key });
+    await sleep(150);
+  };
+  await setPaneEdge('Resize inspector', 'Home');
+  const inspectorBefore = await win.webContents.executeJavaScript(
+    `document.querySelector('.inspector').getBoundingClientRect().width`,
+  );
+  await resizePane('Resize inspector', -40, 0);
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('.inspector').getBoundingClientRect().width>${inspectorBefore}+10`,
+    ),
+  );
+  await setPaneEdge('Resize simulation', 'End');
+  const simulationBefore = await win.webContents.executeJavaScript(
+    `document.querySelector('.simulation-dock').getBoundingClientRect().height`,
+  );
+  await resizePane('Resize simulation', 0, 40);
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('.simulation-dock').getBoundingClientRect().height<${simulationBefore}-10`,
+    ),
+  );
+  await win.webContents.executeJavaScript(
+    `document.querySelector('[aria-label="Resize simulation"]').focus()`,
+  );
+  win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Up' });
+  win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Up' });
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `Number(document.querySelector('[aria-label="Resize simulation"]').getAttribute('aria-valuenow'))>${simulationBefore}-40+5`,
+    ),
+  );
+  await win.webContents.executeJavaScript(
+    `document.querySelector('[aria-label="Close inspector"]').click()`,
+  );
+  await until(() => win.webContents.executeJavaScript(`!document.querySelector('.inspector')`));
+  await click('Minimize');
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('.simulation-dock').getBoundingClientRect().height<=43 && !!document.querySelector('svg[aria-label="Waveforms, 1 samples"]')`,
+    ),
+  );
+  await click('Expand');
+  await until(() =>
+    win.webContents.executeJavaScript(`!document.querySelector('.simulation-content').hidden`),
+  );
+  const responsiveLayouts = [];
+  for (const [width, height] of [
+    [1280, 800],
+    [1000, 680],
+    [900, 600],
+  ]) {
+    win.setSize(width!, height!);
+    await sleep(350);
+    await click('Readable zoom');
+    await sleep(250);
+    const metrics = await win.webContents.executeJavaScript(
+      `(()=>{const graph=document.querySelector('.flow-surface').getBoundingClientRect();const dock=document.querySelector('.simulation-dock').getBoundingClientRect();const waveform=document.querySelector('.waveform-scroll');return {width:innerWidth,height:innerHeight,graphWidth:graph.width,graphHeight:graph.height,graphTop:graph.top,firstNodeTop:Math.min(...Array.from(document.querySelectorAll('.react-flow__node')).map(n=>n.getBoundingClientRect().top)),dockHeight:dock.height,zoom:Number(document.querySelector('.react-flow__viewport').style.transform.match(/scale\\(([^)]+)\\)/)[1]),outerOverflow:document.documentElement.scrollHeight>innerHeight||document.documentElement.scrollWidth>innerWidth,nestedWaveformScroll:['auto','scroll'].includes(getComputedStyle(waveform).overflowY)}})()`,
+    );
+    assert(!metrics.outerOverflow, JSON.stringify(metrics));
+    assert(!metrics.nestedWaveformScroll, JSON.stringify(metrics));
+    assert(metrics.graphWidth >= metrics.width * 0.95, JSON.stringify(metrics));
+    assert(metrics.graphHeight > metrics.dockHeight, JSON.stringify(metrics));
+    assert(metrics.zoom >= 0.7, JSON.stringify(metrics));
+    assert(metrics.firstNodeTop >= metrics.graphTop + 8, JSON.stringify(metrics));
+    responsiveLayouts.push(metrics);
+    writeFileSync(
+      join(output, `workspace-${width}x${height}.png`),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+  }
+  win.setSize(
+    Math.min(1320, screen.getPrimaryDisplay().workArea.width),
+    Math.min(860, screen.getPrimaryDisplay().workArea.height),
+  );
+  await sleep(350);
+  await click('Readable zoom');
+  await sleep(250);
   writeFileSync(join(output, 'desktop-smoke.png'), (await win.webContents.capturePage()).toPNG());
   writeFileSync(
     join(output, 'desktop-smoke.json'),
@@ -583,6 +704,8 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
         patches,
         adderNodes: 4,
         combinationalNodes: 11,
+        resizableWorkspace: true,
+        responsiveLayouts,
         pointerDrag: true,
         multiDocument: true,
         literalSliceSelector: true,

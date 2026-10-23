@@ -138,26 +138,7 @@ select {
   font-size: 10px;
   letter-spacing: 1.5px;
 }
-.workspace {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-.canvas {
-  position: relative;
-  flex: 1;
-  background: #0b1220;
-}
-.canvas-caption {
-  position: absolute;
-  top: 22px;
-  left: 25px;
-  z-index: 4;
-  pointer-events: none;
-  font-size: 10px;
-  letter-spacing: 1.4px;
-  color: #afbdd0;
-}
+
 .live-dot {
   display: inline-block;
   width: 6px;
@@ -166,13 +147,7 @@ select {
   background: #56debd;
   margin-right: 8px;
 }
-.caption-count {
-  display: block;
-  margin: 7px 0 0 15px;
-  font-size: 10px;
-  letter-spacing: 0;
-  color: #7689a6;
-}
+
 .circuit-node {
   width: 172px;
   border: 1px solid #41536d;
@@ -243,29 +218,13 @@ select {
   width: 140px;
   height: 95px;
 }
-.canvas-legend {
-  position: absolute;
-  bottom: 17px;
-  left: 65px;
-  font-size: 10px;
-  color: #8292aa;
-  pointer-events: none;
-  right: 175px;
-}
+
 .canvas-legend span {
   display: block;
   margin-top: 5px;
   color: #5e738e;
 }
-.inspector {
-  position: relative;
-  width: 284px;
-  flex-shrink: 0;
-  padding: 29px 24px;
-  background: #101a2b;
-  border-left: 1px solid #263247;
-  overflow-y: auto;
-}
+
 .eyebrow {
   font-size: 9px;
   letter-spacing: 1.8px;
@@ -493,15 +452,7 @@ footer {
 .node-name {
   overflow-wrap: anywhere;
 }
-.construction-toolbar {
-  position: absolute;
-  top: 48px;
-  left: 16px;
-  z-index: 5;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
+
 .construction-toolbar button {
   background: #172b40;
   color: #c8e5ef;
@@ -533,43 +484,17 @@ button:disabled {
   border-radius: 5px;
   max-width: 100%;
 }
-.flow-surface {
-  position: absolute;
-  inset: 95px 0 0;
-}
+
 .node-result {
   font-size: 11px;
   color: #9dd8cc;
   margin-top: 6px;
 }
-.flow-surface {
-  top: 140px;
-}
-.construction-toolbar {
-  right: 16px;
-  top: 46px;
-  align-items: center;
-}
+
 .construction-toolbar label {
   font-size: 11px;
   color: #adc6d0;
   white-space: nowrap;
-}
-.canvas-caption .caption-count {
-  display: inline;
-  margin-left: 16px;
-}
-.simulation-panel {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 300px;
-  z-index: 5;
-  background: #101d2e;
-  border-top: 1px solid #426478;
-  padding: 12px;
-  overflow: auto;
 }
 .simulation-heading,
 .simulation-inputs,
@@ -602,10 +527,7 @@ button:disabled {
 .simulation-inputs input {
   width: 95px;
 }
-.waveform-scroll {
-  overflow: auto;
-  max-height: 175px;
-}
+
 .waveform-scroll table {
   font-size: 10px;
   border-collapse: collapse;
@@ -650,4 +572,411 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+}
+
+/* The application owns the viewport. Only a pane's content can scroll. */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+:root {
+  font-size: 14px;
+}
+main {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+header {
+  height: 58px;
+  flex: 0 0 58px;
+  padding: 0 20px;
+}
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  font-size: 24px;
+}
+.brand {
+  font-size: 20px;
+}
+.brand span,
+.project-name span,
+.version,
+.nav-note {
+  display: none;
+}
+nav {
+  min-height: 46px;
+  height: auto;
+  flex: 0 0 auto;
+  padding: 6px 20px;
+  gap: 10px;
+}
+nav select {
+  min-width: 0;
+  max-width: 40%;
+  font-size: 14px;
+}
+footer {
+  height: 26px;
+  flex: 0 0 26px;
+  font-size: 12px;
+}
+.workspace {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: #0b1220;
+  overflow: hidden;
+}
+.construction-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #101a2b;
+  border-bottom: 1px solid #263247;
+  z-index: 10;
+}
+.construction-toolbar button,
+.toolbar-menu summary,
+.node-actions button,
+.pane-heading button {
+  font-size: 14px;
+  padding: 7px 10px;
+  color: #d6e4f2;
+  background: #172b40;
+  border: 1px solid #415570;
+  border-radius: 5px;
+}
+.construction-toolbar > button:first-child {
+  background: #17483d;
+  color: #8cf5d4;
+  border-color: #388d7b;
+}
+.construction-toolbar button[aria-pressed='true'] {
+  border-color: #64d9bd;
+  color: #8cf5d4;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+.toolbar-menu {
+  position: relative;
+}
+.toolbar-menu summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+.toolbar-menu summary::after {
+  content: ' ▾';
+  color: #99acc5;
+}
+.menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 190px;
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+  background: #172337;
+  border: 1px solid #415570;
+  box-shadow: 0 12px 32px #0008;
+  border-radius: 8px;
+}
+.menu-popover button {
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+}
+.menu-popover button:hover,
+.menu-popover button:focus-visible {
+  background: #283950;
+}
+.menu-popover label {
+  padding: 10px;
+  white-space: nowrap;
+}
+.flow-surface {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.canvas-caption {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 4;
+  pointer-events: none;
+  font-size: 12px;
+  color: #b9c9dc;
+  background: #0b1220df;
+  padding: 5px 8px;
+  border-radius: 4px;
+}
+.caption-count {
+  display: inline;
+  margin-left: 14px;
+  color: #99aec9;
+  font-size: 12px;
+}
+.canvas-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 64px;
+  right: 12px;
+  font-size: 12px;
+  color: #99aec9;
+  pointer-events: none;
+}
+.inspector {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 0 20px 20px;
+  background: #101a2b;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.pane-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #101a2b;
+  min-height: 48px;
+  border-bottom: 1px solid #28364b;
+  margin-bottom: 16px;
+}
+.pane-heading button {
+  font-size: 20px;
+  padding: 2px 9px;
+}
+.node-actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.inspector select {
+  min-width: 0;
+  width: 100%;
+}
+.inspector h3,
+.muted,
+.hint,
+.edit-form label,
+dl,
+.diagnostic-list,
+.diagnostic-list button {
+  font-size: 14px;
+}
+.inspector-bottom {
+  display: none;
+}
+.pane-divider {
+  flex: 0 0 6px;
+  background: #1b3045;
+  touch-action: none;
+  z-index: 12;
+  outline-offset: -2px;
+}
+.pane-divider:hover,
+.pane-divider:focus-visible {
+  background: #4cc5a7;
+}
+.pane-divider.vertical {
+  width: 6px;
+  cursor: col-resize;
+}
+.pane-divider.horizontal {
+  height: 6px;
+  width: 100%;
+  cursor: row-resize;
+}
+.simulation-dock {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #345268;
+}
+.simulation-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #101d2e;
+}
+.simulation-heading {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 40px;
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin: 0;
+  padding: 4px 12px;
+  border-bottom: 1px solid #283b50;
+  font-size: 14px;
+}
+.simulation-heading span {
+  font-size: 13px;
+}
+.simulation-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.simulation-content[hidden] {
+  display: none;
+}
+.simulation-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.simulation-tools .simulation-actions {
+  display: grid;
+  margin: 0;
+}
+.simulation-setup {
+  min-width: 0;
+}
+.trace-options > summary {
+  cursor: pointer;
+  color: #adc6d0;
+  padding: 6px 0;
+}
+.trace-options .trace-controls {
+  margin-top: 8px;
+}
+.simulation-inputs {
+  gap: 8px;
+}
+.simulation-inputs input {
+  width: 72px;
+}
+.simulation-inputs > span {
+  display: none;
+}
+.simulation-inputs,
+.trace-controls {
+  font-size: 14px;
+}
+.simulation-inputs span {
+  font-size: 13px;
+}
+.simulation-panel input,
+.simulation-panel select,
+.simulation-panel button {
+  font: inherit;
+}
+.simulation-panel select {
+  min-width: 0;
+  max-width: 240px;
+}
+.waveform-scroll {
+  width: max-content;
+  min-width: 100%;
+}
+.waveform-scroll table {
+  font-size: 13px;
+}
+.node-kind {
+  font-size: 12px;
+  letter-spacing: 0.7px;
+}
+.node-width,
+.node-result,
+.node-simulation {
+  font-size: 14px;
+}
+.node-name {
+  font-size: 24px;
+}
+.react-flow__handle {
+  width: 13px;
+  height: 13px;
+}
+.react-flow__edge-text {
+  font-weight: 500;
+}
+.workspace-status {
+  position: absolute;
+  bottom: 12px;
+  left: 64px;
+  z-index: 20;
+  pointer-events: none;
+  background: #17392f;
+  color: #a3f2d7;
+  border-radius: 5px;
+  font-size: 14px;
+}
+.workspace-status:not(:empty) {
+  padding: 8px 12px;
+  animation: status-fade 5s forwards;
+}
+@keyframes status-fade {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@media (max-width: 1050px) {
+  .project-name {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .header-divider {
+    margin: 0 5px;
+  }
+  .canvas-legend {
+    display: none;
+  }
+  .caption-count {
+    margin-left: 6px;
+  }
+}
+@media (max-height: 720px) {
+  .react-flow__minimap {
+    display: none;
+  }
+  .canvas-caption {
+    top: 6px;
+  }
 }
