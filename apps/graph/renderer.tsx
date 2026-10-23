@@ -5,6 +5,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  ControlButton,
   MiniMap,
   Handle,
   Position,
@@ -141,6 +142,10 @@ const nodeTypes = { circuit: CircuitNode };
 // overview fit when a layout/status update renders the parent in the same frame.
 const initialFit = { padding: 0.15, minZoom: 0.65, maxZoom: 1 };
 const overviewFit = { padding: 0.15, minZoom: 0.25, maxZoom: 1 };
+const afterPaneResize = () =>
+  new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  );
 function Diagram({
   state,
   shared,
@@ -152,6 +157,7 @@ function Diagram({
 }) {
   const graph = state.previewGraph ?? state.graph;
   const flowInstance = useRef<(() => Promise<boolean>) | null>(null);
+  const overviewInstance = useRef<(() => Promise<boolean>) | null>(null);
   const [adding, setAdding] = useState(false);
   const [selection, setSelection] = useState<string[]>([]);
   const [clipboard, setClipboard] = useState<ClipboardItem[]>([]);
@@ -201,6 +207,7 @@ function Diagram({
   }, [inspectorWidth, simulationHeight]);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode<Data>>([]);
   const [selected, setSelected] = useState<string>();
+  const lastValidSelection = useRef<string | undefined>(undefined);
   useEffect(() => {
     inspector.current?.scrollTo(0, 0);
   }, [selected, adding]);
@@ -217,6 +224,9 @@ function Diagram({
     setNodes(
       (old) =>
         graph?.nodes.map((n) => ({
+          // Keep React Flow's measured dimensions. Dropping them on a status or
+          // layout refresh hides unchanged nodes whose ResizeObserver won't fire.
+          ...old.find((o) => o.id === n.id),
           id: n.id,
           type: 'circuit',
           position: state.layout.nodes[n.id] ?? { x: n.depth * 250, y: n.row * 160 },
@@ -226,6 +236,13 @@ function Diagram({
     );
   }, [graph, state.layout, state.status, state.canConstruct, setNodes]);
   const node = graph?.nodes.find((n) => n.id === selected);
+  useEffect(() => {
+    if (node) lastValidSelection.current = node.id;
+    else if (selected && lastValidSelection.current === selected) {
+      lastValidSelection.current = undefined;
+      setSelected(undefined);
+    }
+  }, [selected, node]);
   useEffect(() => {
     setDraft(node ? (pending[node.id]?.value ?? node.range ?? node.selector ?? node.label) : '');
   }, [selected, node?.label, node?.range, node?.selector, pending[selected ?? '']?.value]);
@@ -516,7 +533,12 @@ function Diagram({
             fitView={!state.layout.viewport}
             fitViewOptions={initialFit}
             onInit={(flow) => {
+              overviewInstance.current = async () => {
+                await afterPaneResize();
+                return flow.fitView(overviewFit);
+              };
               flowInstance.current = async () => {
+                await afterPaneResize();
                 const fitted = await flow.fitView({ padding: 0.15, minZoom: 0.75, maxZoom: 1 });
                 const bounds = flow.getNodesBounds(flow.getNodes());
                 const area = workspaceElement.current?.querySelector('.flow-surface');
@@ -565,7 +587,25 @@ function Diagram({
             }}
           >
             <Background color="#26354c" gap={24} size={1} />
-            <Controls showInteractive={false} fitViewOptions={overviewFit} />
+            <Controls showInteractive={false} showFitView={false}>
+              <ControlButton
+                className="react-flow__controls-fitview"
+                title="Fit entire circuit"
+                aria-label="Fit entire circuit"
+                onClick={() => void overviewInstance.current?.()}
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <path d="M6 2H2v4m8-4h4v4M2 10v4h4m4 0h4v-4" />
+                </svg>
+              </ControlButton>
+            </Controls>
             <MiniMap
               pannable
               zoomable

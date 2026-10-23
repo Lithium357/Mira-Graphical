@@ -2,6 +2,7 @@
 
 ## Workspace refinement (unreleased)
 
+- Fixed existing nodes disappearing after construction/status refreshes by retaining canvas measurements.
 - Replaced the fixed inspector and oversized toolbar with a canvas-first workspace, collapsible inspector, contextual clipboard actions, and Edit/View menus.
 - Added pointer/keyboard pane resizing with locally remembered sizes, and simulation minimize/expand without losing samples.
 - Removed page and nested waveform scrollbars; inputs and waveforms share a single dock content area.

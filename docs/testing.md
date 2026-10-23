@@ -21,7 +21,7 @@ The workbench portion samples two input vectors and checks the resulting on-node
 
 ## Workspace regression checks
 
-The desktop smoke also drags both pane dividers with native pointer events, checks keyboard resizing, collapses the inspector, and minimizes/expands simulation while retaining its sample. At requested window sizes of 1280×800, 1000×680 and 900×600 it asserts no document overflow, no nested waveform scroller, a full-width canvas with the inspector closed, more vertical space for the graph than the dock, and a readable zoom with the first node row visible. Measurements use the actual content area after Windows window borders and work-area constraints.
+The construction phase runs at 1000×680, checks that existing nodes remain visible after a draft update, and verifies that overview fitting includes every node even with the inspector open. The desktop smoke also drags both pane dividers with native pointer events, checks keyboard resizing, collapses the inspector, and minimizes/expands simulation while retaining its sample. At requested window sizes of 1280×800, 1000×680 and 900×600 it asserts no document overflow, no nested waveform scroller, a full-width canvas with the inspector closed, more vertical space for the graph than the dock, and a readable zoom with the first node row visible. Measurements use the actual content area after Windows window borders and work-area constraints.
 
 `desktop-smoke.json` records `resizableWorkspace` and `responsiveLayouts`. Cropped application screenshots are saved as `workspace-1280x800.png`, `workspace-1000x680.png` and `workspace-900x600.png`; CI retains these with the smoke artifacts. Browser storage for desktop smoke is isolated from the user's pane preferences.
 

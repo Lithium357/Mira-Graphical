@@ -152,6 +152,18 @@ else {
           app.quit();
         } catch (error) {
           console.error(error);
+          try {
+            writeFileSync(
+              join(root, 'test-results/smoke-failure.png'),
+              (await win.webContents.capturePage()).toPNG(),
+            );
+            console.error(
+              'SMOKE UI',
+              await win.webContents.executeJavaScript(
+                `({text:document.body.innerText,viewport:document.querySelector('.react-flow__viewport')?.style.transform,handles:Array.from(document.querySelectorAll('.react-flow__handle')).map(h=>{const r=h.getBoundingClientRect();return {node:h.closest('[data-id]')?.getAttribute('data-id'),class:h.className,rect:r.toJSON(),hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.outerHTML.slice(0,350)};})})`,
+              ),
+            );
+          } catch {}
           process.exitCode = 1;
           app.exit(1);
         }

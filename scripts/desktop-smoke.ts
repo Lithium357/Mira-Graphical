@@ -18,6 +18,16 @@ async function until(f: () => boolean | Promise<boolean>, timeout = 20_000) {
 export async function desktopSmoke(service: SyncService, win: BrowserWindow, root: string) {
   // Exercise construction/selection in a laptop-sized viewport on every host.
   win.setSize(1000, 680);
+  const click = async (label: string) => {
+    await until(() =>
+      win.webContents.executeJavaScript(
+        `Array.from(document.querySelectorAll('button')).some(b=>b.textContent===${JSON.stringify(label)}&&!b.disabled)`,
+      ),
+    );
+    await win.webContents.executeJavaScript(
+      `(()=>{const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent===${JSON.stringify(label)});const menu=button.closest('details');if(menu&&!menu.open)menu.querySelector('summary').click();button.click();})()`,
+    );
+  };
   const config = await service.ready();
   const ws = new WebSocket(`ws://127.0.0.1:${config.port}`);
   let patches = 0;
@@ -174,16 +184,12 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   );
   assert.equal(live, original.replace('a + b', 'a * b'), 'Other shared document remains unchanged');
   await until(() => service.states.get(comboURI)?.status === 'Synced');
-  await win.webContents.executeJavaScript(
-    `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Add component').click()`,
-  );
+  await click('Add component');
   await until(() => win.webContents.executeJavaScript(`!!document.querySelector('#new-name')`));
   await win.webContents.executeJavaScript(`document.querySelector('#new-name').select()`);
   win.webContents.insertText('product');
   await sleep(100);
-  await win.webContents.executeJavaScript(
-    `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Create component').click()`,
-  );
+  await click('Create component');
   await until(
     () =>
       !!service.states
@@ -196,6 +202,11 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   const a = graph.nodes.find((n) => n.label === 'a')!;
   await until(() =>
     win.webContents.executeJavaScript(
+      `Array.from(document.querySelectorAll('.react-flow__node')).every(n=>getComputedStyle(n).visibility==='visible'&&n.getBoundingClientRect().width>0)`,
+    ),
+  );
+  await until(() =>
+    win.webContents.executeJavaScript(
       `!!document.querySelector('[data-id="${product.id}"] .react-flow__handle.target.connectable')`,
     ),
   );
@@ -203,14 +214,15 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     `document.querySelector('.react-flow__controls-fitview').click()`,
   );
   await sleep(600);
-  const points = await win.webContents.executeJavaScript(
-    `(()=>{const point=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}};return [point('[data-id="${a.id}"] .react-flow__handle.source'),point('[data-id="${product.id}"] .react-flow__handle[data-handleid="left"]')];})()`,
-  );
-  await until(() =>
-    win.webContents.executeJavaScript(
+  let points: { x: number; y: number }[] = [];
+  await until(async () => {
+    points = await win.webContents.executeJavaScript(
+      `(()=>{const point=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}};return [point('[data-id="${a.id}"] .react-flow__handle.source'),point('[data-id="${product.id}"] .react-flow__handle[data-handleid="left"]')];})()`,
+    );
+    return win.webContents.executeJavaScript(
       `${JSON.stringify(points)}.every((p,i)=>document.elementFromPoint(p.x,p.y)?.matches(i===0?'.react-flow__handle.source.connectablestart':'.react-flow__handle.target.connectable'))`,
-    ),
-  );
+    );
+  });
   win.focus();
   win.webContents.focus();
   win.webContents.sendInputEvent({ type: 'mouseMove', ...points[0] });
@@ -249,18 +261,14 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     );
     throw error;
   }
-  await win.webContents.executeJavaScript(
-    `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Undo pending').click()`,
-  );
+  await click('Undo pending');
   await until(() => service.states.get(comboURI)?.pendingSteps === 1);
   await until(() =>
     win.webContents.executeJavaScript(
       `Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Redo pending'&&!b.disabled)`,
     ),
   );
-  await win.webContents.executeJavaScript(
-    `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Redo pending').click()`,
-  );
+  await click('Redo pending');
   await until(() => service.states.get(comboURI)?.pendingSteps === 2);
   assert.equal(patches, 2, 'Construction must wait for inactivity');
   await until(() => patches === 3);
@@ -278,16 +286,6 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   await until(() =>
     win.webContents.executeJavaScript(`!!document.querySelector('.circuit-node.instance')`),
   );
-  const click = async (label: string) => {
-    await until(() =>
-      win.webContents.executeJavaScript(
-        `Array.from(document.querySelectorAll('button')).some(b=>b.textContent===${JSON.stringify(label)}&&!b.disabled)`,
-      ),
-    );
-    await win.webContents.executeJavaScript(
-      `Array.from(document.querySelectorAll('button')).find(b=>b.textContent===${JSON.stringify(label)}).click()`,
-    );
-  };
   const fill = async (selector: string, value: string) => {
     await win.webContents.executeJavaScript(
       `document.querySelector(${JSON.stringify(selector)}).select()`,
@@ -447,6 +445,10 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   await click('Discard pending');
   await until(() => !service.states.get(hierarchyURI)?.previewGraph);
   // Real box selection, copy and paste of two input ports.
+  await until(() => win.webContents.executeJavaScript(`!document.querySelector('.inspector')`));
+  // Explicitly reopen it to verify overview fitting in the narrower canvas as well.
+  await click('Inspector');
+  await until(() => win.webContents.executeJavaScript(`!!document.querySelector('.inspector')`));
   await win.webContents.executeJavaScript(
     `document.querySelector('.react-flow__controls-fitview').click()`,
   );
@@ -540,7 +542,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   assert.equal(patches, 4);
   assert.equal(hierarchy, hierarchyOriginal.replace('a + b', 'a * b'));
   await win.webContents.executeJavaScript(
-    `document.querySelector('.construction-toolbar input[type="checkbox"]').click()`,
+    `(()=>{const input=document.querySelector('.construction-toolbar input[type="checkbox"]');const menu=input.closest('details');if(!menu.open)menu.querySelector('summary').click();input.click();})()`,
   );
   await until(() =>
     win.webContents.executeJavaScript(
