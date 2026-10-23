@@ -129,6 +129,38 @@ test('native procedural mux drivers can be replaced by a direct wire without lea
     );
   }
 });
+
+test('VHDL wiring qualifies scalar concatenation and converts array types and widths', () => {
+  let source = readFileSync('fixtures/conversions.vhd', 'utf8');
+  for (const [from, to] of [
+    ['bit_in', 'unsigned_result'],
+    ['bit_in', 'scalar_vector'],
+    ['vector_in', 'vector_result'],
+    ['unsigned_in', 'scalar_result'],
+  ])
+    source = apply(source, {
+      kind: 'connect',
+      source: `conversions/net/${from}`,
+      target: `conversions/net/${to}`,
+      port: 'left',
+    });
+  assert(source.includes("unsigned'('0' & bit_in)"));
+  assert.throws(
+    () => parse(source.replace("unsigned'('0' & bit_in)", "unsigned('0' & bit_in)")),
+    /Qualify/,
+  );
+  for (const bit of ['0', '1']) {
+    const result = simulate(source, 'conversions', {
+      bit_in: bit,
+      vector_in: '165',
+      unsigned_in: '129',
+    });
+    assert.equal(result.signals.unsigned_result.value, bit === '1' ? '0x01' : '0x00');
+    assert.equal(result.signals.scalar_vector.value, bit === '1' ? '0x01' : '0x00');
+    assert.equal(result.signals.vector_result.value, '0x5');
+    assert.equal(result.signals.scalar_result.value, '1');
+  }
+});
 test('SystemVerilog logic, always_comb and named hierarchy project and simulate', () => {
   assert.equal(parse(sv).language, 'systemverilog');
   assert(project(parse(sv, 'workbench')).nodes.some((n) => n.kind === 'instance'));

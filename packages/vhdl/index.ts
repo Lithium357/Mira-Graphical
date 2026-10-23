@@ -623,6 +623,18 @@ export function inferVhdl(
     if (
       !e.qualified &&
       e.conversion !== 'resize' &&
+      e.value.kind === 'concat' &&
+      !e.value.parts.some(
+        (p) =>
+          p.nativeType !== 'std_logic' && (p.kind !== 'literal' || p.nativeType === 'unsigned'),
+      )
+    )
+      bad(
+        "Qualify scalar/literal concatenations with unsigned'(...) or std_logic_vector'(...) to resolve their array type.",
+      );
+    if (
+      !e.qualified &&
+      e.conversion !== 'resize' &&
       e.value.kind === 'literal' &&
       e.value.nativeType !== 'unsigned'
     )

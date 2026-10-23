@@ -101,6 +101,22 @@ function generate() {
         port: 'left',
       });
     }
+    if (language === 'vhd') {
+      source += '\n' + readFileSync('fixtures/conversions.vhd', 'utf8');
+      for (const [from, to] of [
+        ['bit_in', 'unsigned_result'],
+        ['bit_in', 'scalar_vector'],
+        ['vector_in', 'vector_result'],
+        ['unsigned_in', 'scalar_result'],
+      ])
+        action({
+          kind: 'connect',
+          scope: 'conversions',
+          source: `conversions/net/${from}`,
+          target: `conversions/net/${to}`,
+          port: 'left',
+        });
+    }
     writeFileSync(join(output, `generated.${language}`), source);
     const rows: string[][] = [],
       vhdlLines: string[] = [],
@@ -146,9 +162,16 @@ function generate() {
         `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
 entity bench is end; architecture test of bench is
 signal a,b:unsigned(7 downto 0); signal select_b:std_logic;
+signal converted_bit:std_logic; signal converted_vector:std_logic_vector(3 downto 0);
+signal converted_unsigned:unsigned(7 downto 0); signal scalar_vector:std_logic_vector(7 downto 0);
 ${signals.map((n) => `signal ${n}:unsigned(${['joined', 'product', 'concat_result'].includes(n) ? 15 : n === 'low_result' ? 3 : 7} downto 0);`).join('\n')}
 begin dut:entity work.workbench port map(a=>a,b=>b,select_b=>select_b,${signals.map((n) => `${n}=>${n}`).join(',')});
-process begin ${vhdlLines.join('\n')} wait; end process; end;`,
+conversion_dut:entity work.conversions port map(bit_in=>'1',vector_in=>x"A5",unsigned_in=>to_unsigned(129,8),scalar_result=>converted_bit,vector_result=>converted_vector,unsigned_result=>converted_unsigned,scalar_vector=>scalar_vector);
+process begin wait for 1 ns;
+assert converted_bit='1' severity failure; assert converted_vector=x"5" severity failure;
+assert converted_unsigned=to_unsigned(1,8) severity failure; assert scalar_vector=x"01" severity failure;
+report "CONVERSIONS PASS";
+${vhdlLines.join('\n')} wait; end process; end;`,
       );
     } else
       writeFileSync(
@@ -168,6 +191,11 @@ function verify() {
   let comparisons = 0;
   for (const language of ['sv', 'vhd']) {
     const log = readFileSync(join(output, `${language}.log`), 'utf8');
+    if (language === 'vhd')
+      assert(
+        log.includes('CONVERSIONS PASS'),
+        'Native scalar/vector conversion assertions must run',
+      );
     const rows = [...log.matchAll(/MIRA\s+([0-9]+)((?:\s+[0-9]+){9})/g)];
     assert.equal(rows.length, 256, `${language}: expected every vector exactly once`);
     rows.forEach((m, i) => {

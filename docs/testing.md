@@ -4,7 +4,7 @@ Windows verification with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an iso
 
 ## Automated checks
 
-- `pnpm test`: **89 passed, 0 failed**. Includes native Verilog/SystemVerilog/VHDL parsing, typed arithmetic, construction, scoped patches, hierarchy, clipboard safety, simulation, recovery, scheduling, authenticated WebSocket integration and layout persistence.
+- `pnpm test`: **90 passed, 0 failed**. Includes native Verilog/SystemVerilog/VHDL parsing, typed arithmetic, construction, scoped patches, hierarchy, clipboard safety, simulation, recovery, scheduling, authenticated WebSocket integration and layout persistence.
 - `pnpm lint`, `pnpm build`, `pnpm format:check`: passed.
 - `pnpm run licenses`: **211 installed package versions**, no unclassified licenses. Two exact-version, exact-license-hash Microsoft helpers are development-only exceptions, never runtime/VSIX contents; signing scripts are disabled. See [license scope](licenses.md).
 - `pnpm audit --json`: **0 advisories**.
@@ -35,7 +35,7 @@ Both passes edit an unsaved adder buffer, apply a guarded graph patch, verify na
 
 ## Independent simulator check
 
-`pnpm test:languages` requires GHDL and Icarus in PATH (`MIRA_GHDL`, `MIRA_IVERILOG`, `MIRA_VVP` may override executables). It constructs and duplicates circuits through native source actions, then compares 256 deterministic input vectors × 9 outputs × 2 languages: **4,608 matching values**. An independent arithmetic oracle also checks Mira's expected results. Local verification used GHDL 5.0.1 and Icarus 12.0 through WSL. The Ubuntu CI job installs both tools and runs this check; artifacts include generated source, benches, simulator logs and results.
+`pnpm test:languages` requires GHDL and Icarus in PATH (`MIRA_GHDL`, `MIRA_IVERILOG`, `MIRA_VVP` may override executables). It constructs and duplicates circuits through native source actions, then compares 256 deterministic input vectors × 9 outputs × 2 languages: **4,608 matching values**. An independent arithmetic oracle also checks Mira's expected results. Four additional native GHDL assertions check scalar/vector type conversion and resizing, including qualification needed to resolve overloaded concatenation. Local verification used GHDL 5.0.1 and Icarus 12.0 through WSL. The Ubuntu CI job installs both tools and runs this check; artifacts include generated source, benches, simulator logs and results.
 
 For separate compiler environments, run `pnpm test:languages --generate`; compile `test-results/hdl-reference/generated.vhd` plus `bench.vhd` with VHDL-2008/top `bench`, and `generated.sv` plus `bench.sv` with SystemVerilog-2012/top `bench`. Save simulator stdout to `vhd.log` and `sv.log` in that directory, then run `pnpm test:languages --verify`.
 

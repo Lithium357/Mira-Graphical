@@ -221,7 +221,7 @@ function reference(net: Net, expected: { type: VhdlType; width: number }): strin
   let text = net.name,
     width = net.width;
   if (net.nativeType === 'std_logic') {
-    text = `unsigned('0' & ${text})`;
+    text = `unsigned'('0' & ${text})`;
     width = 2;
   } else if (net.nativeType === 'std_logic_vector') text = `unsigned(${text})`;
   if (width !== expected.width) text = `resize(${text}, ${expected.width})`;
