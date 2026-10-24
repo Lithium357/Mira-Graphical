@@ -11,12 +11,19 @@ import {
   realpathSync,
   rmSync,
 } from 'node:fs';
-import { resolve, join, relative, isAbsolute } from 'node:path';
+import { resolve, join, relative, isAbsolute, dirname } from 'node:path';
+import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 if (process.platform !== 'win32') throw new Error('Build the Windows installer on Windows.');
 const root = process.cwd(),
   manifest = JSON.parse(readFileSync('package.json', 'utf8'));
+// Electron's official entry point initializes its pinned binary when pnpm's store lacks it.
+const electronDist = dirname(createRequire(import.meta.url)('electron'));
+if (
+  readFileSync(join(electronDist, 'version'), 'utf8').trim() !== manifest.devDependencies.electron
+)
+  throw new Error('Electron runtime version does not match the locked Windows build.');
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const changes = execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], {
   encoding: 'utf8',
@@ -96,7 +103,7 @@ const artifacts = await build({
     executableName: 'Mira Graphical',
     directories: { app: stage, output, buildResources: resolve('build') },
     electronVersion: manifest.devDependencies.electron,
-    electronDist: resolve('node_modules/electron/dist'),
+    electronDist,
     asar: true,
     npmRebuild: false,
     nodeGypRebuild: false,

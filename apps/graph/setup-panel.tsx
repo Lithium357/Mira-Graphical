@@ -54,14 +54,14 @@ export function SetupGuide({ workspace }: { workspace: string }) {
         <li>
           {packaged ? (
             <>
-              Install the companion: Extensions → … → Install from VSIX → Use{' '}
-              <strong>Show VS Code extension…</strong> above to locate the VSIX, then select it with
-              Extensions: Install from VSIX in VS Code. The file is{' '}
+              Use <strong>Show VS Code extension…</strong> above to locate the VSIX, then select it
+              with Extensions: Install from VSIX in VS Code. The file is{' '}
               <code>resources/companion/mira-graphical.vsix</code> inside the app's installation
               folder.
             </>
           ) : (
             <>
+              Install the companion: Extensions → … → Install from VSIX →{' '}
               <code>mira-graphical-0.8.0.vsix</code> from <code>dist/packages</code>.
             </>
           )}
