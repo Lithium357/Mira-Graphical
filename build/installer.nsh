@@ -1,4 +1,5 @@
 ; SPDX-License-Identifier: GPL-3.0-only
+!ifndef BUILD_UNINSTALLER
 !include "LogicLib.nsh"
 !include "WordFunc.nsh"
 
@@ -34,3 +35,4 @@ Var miraReplaceMessage
     ${EndIf}
   ${EndIf}
 !macroend
+!endif
