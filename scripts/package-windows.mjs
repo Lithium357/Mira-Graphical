@@ -1,8 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { build as bundle } from 'esbuild';
 import { build, Platform, Arch } from 'electron-builder';
-import { mkdirSync, cpSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import {
+  mkdirSync,
+  cpSync,
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  lstatSync,
+  realpathSync,
+  rmSync,
+} from 'node:fs';
+import { resolve, join, relative, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 if (process.platform !== 'win32') throw new Error('Build the Windows installer on Windows.');
@@ -18,6 +27,18 @@ if (changes)
   );
 const stage = resolve('dist/windows-stage'),
   output = resolve('dist/windows');
+if (existsSync(stage)) {
+  const actual = realpathSync(stage),
+    within = relative(realpathSync(root), actual);
+  if (
+    lstatSync(stage).isSymbolicLink() ||
+    lstatSync(resolve('dist')).isSymbolicLink() ||
+    within !== join('dist', 'windows-stage') ||
+    isAbsolute(within)
+  )
+    throw new Error('Refusing to replace an unexpected Windows staging directory.');
+  rmSync(actual, { recursive: true, force: true });
+}
 mkdirSync(stage, { recursive: true });
 mkdirSync(output, { recursive: true });
 writeFileSync(
