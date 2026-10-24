@@ -1,0 +1,9 @@
+{
+  "appId": "com.lithium357.miragraphical",
+  "guid": "0d40cd5f-ce4b-50ca-a7d4-5d76492f6c9b",
+  "upgradeBaseline": {
+    "version": "0.9.0",
+    "url": "https://github.com/Lithium357/Mira-Graphical/releases/download/v0.9.0/Mira-Graphical-Setup-0.9.0-x64.exe",
+    "sha256": "39d6d3dda79a3873c3ca1a4c65da456811fe6b6bf6864228f6c41af8a0d3bc45"
+  }
+}

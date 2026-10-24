@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 if (process.platform !== 'win32') throw new Error('Build the Windows installer on Windows.');
 const root = process.cwd(),
   manifest = JSON.parse(readFileSync('package.json', 'utf8'));
+const installerConfig = JSON.parse(readFileSync('build/windows-installer.json', 'utf8'));
 // Electron's official entry point initializes its pinned binary when pnpm's store lacks it.
 const electronDist = dirname(createRequire(import.meta.url)('electron'));
 if (
@@ -98,7 +99,7 @@ const artifacts = await build({
   targets: Platform.WINDOWS.createTarget(['nsis'], Arch.x64),
   publish: 'never',
   config: {
-    appId: 'com.lithium357.miragraphical',
+    appId: installerConfig.appId,
     productName: 'Mira Graphical',
     executableName: 'Mira Graphical',
     directories: { app: stage, output, buildResources: resolve('build') },
@@ -133,6 +134,8 @@ const artifacts = await build({
       artifactName: 'Mira-Graphical-Setup-${version}-x64.exe',
     },
     nsis: {
+      guid: installerConfig.guid,
+      include: resolve('build/installer.nsh'),
       oneClick: false,
       perMachine: false,
       allowElevation: false,

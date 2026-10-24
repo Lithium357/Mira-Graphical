@@ -1,8 +1,16 @@
-# Windows distribution — 0.9.0
+# Windows distribution — 0.9.1
 
-Download the [0.9.0 Windows testing preview](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.0). The release assets and the **windows-installer** CI artifact contain **Mira-Graphical-Setup-0.9.0-x64.exe**, corresponding project source, a manifest and SHA-256 checksums. Run the installer, then launch Mira Graphical from the Start menu or desktop. Select your project folder on first launch; Setup help can switch folders later. In Setup help, **Show VS Code extension…** locates the bundled VSIX for VS Code's **Extensions: Install from VSIX…** command. Open that same project folder in VS Code and share an HDL file with **RTL Graph: Open Current Module**. Running the installed application needs no Node, pnpm, repository checkout or terminal.
+Download the [0.9.1 Windows testing preview](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.1). The release assets and the **windows-installer** CI artifact contain **Mira-Graphical-Setup-0.9.1-x64.exe**, corresponding project source, a manifest and SHA-256 checksums. Run the installer, then launch Mira Graphical from the Start menu or desktop. Select your project folder on first launch; Setup help can switch folders later. In Setup help, **Show VS Code extension…** locates the bundled VSIX for VS Code's **Extensions: Install from VSIX…** command. Open that same project folder in VS Code and share an HDL file with **RTL Graph: Open Current Module**. Running the installed application needs no Node, pnpm, repository checkout or terminal.
 
 This is an unsigned per-user NSIS installer. Windows may show an unknown-publisher/SmartScreen prompt. It supports a custom install directory, creates shortcuts and an uninstaller, and preserves project files/recovery data on uninstall. The GitHub prerelease distributes the tested unsigned build; code signing and Marketplace publishing remain deferred.
+
+## Replacing an existing version
+
+Setup detects the existing per-user Mira installation by its stable application identity. Interactive setup shows the installed version and location and asks before replacing it; the default answer is **No**. Installing the same version offers reinstallation. A newer installed version blocks an older installer. Setup keeps the existing location by default and uses the previous uninstaller to remove old application files before writing the new build. Projects, recovery snapshots and app settings are retained. The VS Code companion must still be updated separately through Setup help.
+
+Silent setup (`/S`) authorizes an upgrade or same-version reinstall without a prompt; downgrade attempts exit with code **1638**. Declining interactive replacement exits with **1602** and leaves the installed app unchanged. Per-user installations are supported; this does not manage copies manually extracted outside the installer.
+
+## Build and verify
 
 Use the exact Git commit from the selected green CI run. On Windows with Node 24 and pnpm 11.25.0:
 
@@ -27,7 +35,7 @@ The Windows CI artifact `smoke-results` includes:
 
 | File                             | Purpose                                                                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mira-graphical-0.9.0.vsix`      | Unsigned companion, with bundled runtime, README, GPL license and third-party notices                                                           |
+| `mira-graphical-0.9.1.vsix`      | Unsigned companion, with bundled runtime, README, GPL license and third-party notices                                                           |
 | `manifest.json`                  | Package version, Git revision, dirty-checkout flag, relative filename, byte count, SHA-256, allowed source files, signing flag and Node version |
 | `SHA256SUMS`                     | SHA-256 of the VSIX and manifest                                                                                                                |
 | Smoke JSON, editor logs and PNGs | Validation evidence, including native keyboard/accessibility-tree and service-soak reports                                                      |
@@ -46,4 +54,4 @@ Check that the manifest revision matches the intended CI commit and `dirty` is f
 
 The app's Setup help shows the workspace and current connection state. Changing projects restarts the app after checkpointing pending work; reconnect/share the selected project's live buffer in VS Code. The editor remains responsible for saving source files. Developer launches may still use `pnpm exec electron . --workspace="C:\path\to\project"`.
 
-Before 1.0, resolve the open gates in [launch readiness](launch-readiness.md), review [supported syntax](supported-syntax.md), attach release notes and exact-run evidence, and select the tested artifact. The 0.9.0 testing prerelease is available on GitHub; a stable 1.0 release, Marketplace upload and signing remain separate actions.
+Before 1.0, resolve the open gates in [launch readiness](launch-readiness.md), review [supported syntax](supported-syntax.md), attach release notes and exact-run evidence, and select the tested artifact. The 0.9.1 testing prerelease is available on GitHub; a stable 1.0 release, Marketplace upload and signing remain separate actions.
