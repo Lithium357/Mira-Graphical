@@ -1034,6 +1034,104 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   );
   await sleep(500);
   writeFileSync(join(output, 'signed-alu.png'), (await win.webContents.capturePage()).toPNG());
+  const clockedURI = pathToFileURL(join(service.workspace, 'clocked.v')).href;
+  ws.send(
+    JSON.stringify({
+      type: 'document.open',
+      uri: clockedURI,
+      version: 1,
+      text: readFileSync(join(root, 'fixtures/alu-int16-clocked.v'), 'utf8'),
+    }),
+  );
+  await until(() => !!service.states.get(clockedURI)?.graph);
+  service.selectModule(clockedURI, 'INT16_MUL');
+  await win.webContents.executeJavaScript(
+    `(()=>{const s=document.querySelector('[aria-label="Shared module"]');s.value=${JSON.stringify(clockedURI)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+  );
+  await until(() =>
+    win.webContents.executeJavaScript(`document.body.innerText.includes('INT16_MUL')`),
+  );
+  if (
+    !(await win.webContents.executeJavaScript(
+      `!!document.querySelector('[aria-label="Clocked simulation"]')`,
+    ))
+  )
+    await click('Simulation');
+  const sampled = async (count: number) =>
+    until(() =>
+      win.webContents.executeJavaScript(
+        `document.querySelector('[aria-label="Clocked simulation"] [role="status"]')?.textContent.includes('${count} ${count === 1 ? 'sample' : 'samples'}') && !Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Evaluating…')`,
+      ),
+    );
+  await fill('[aria-label="Simulation input reset"]', '1');
+  await click('Sample inputs');
+  await sampled(1);
+  await fill('[aria-label="Simulation input reset"]', '0');
+  await fill('[aria-label="Simulation input OPm"]', '65535');
+  await fill('[aria-label="Simulation input OPn"]', '2');
+  await fill('[aria-label="Simulation input signed_mode"]', '1');
+  await fill('[aria-label="Simulation input start"]', '1');
+  await click('Step clk');
+  await sampled(2);
+  await fill('[aria-label="Simulation input start"]', '0');
+  for (let i = 0; i < 16; i++) {
+    await click('Step clk');
+    await sampled(i + 3);
+  }
+  const clockedGraph = service.states.get(clockedURI)!.graph!;
+  const clockedProduct = clockedGraph.nodes.find(
+    (n) => n.kind === 'output' && n.label === 'result',
+  )!;
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('[data-id="${clockedProduct.id}"] .node-simulation')?.textContent==='0xfffffffe'`,
+    ),
+  );
+  assert.equal(clockedGraph.nodes.filter((n) => n.register).length, 7);
+  assert.equal(service.states.get(clockedURI)!.canConstruct, false);
+  await fill('[aria-label="Simulation input reset"]', '1');
+  await click('Sample inputs');
+  await sampled(19);
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('[data-id="${clockedProduct.id}"] .node-simulation')?.textContent==='0x00000000'`,
+    ),
+  );
+  await click('Restart simulation');
+  await fill('[aria-label="Simulation input reset"]', '0');
+  await fill('[aria-label="Simulation input clk"]', '0');
+  await click('Sample inputs');
+  await sampled(1);
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('[data-id="${clockedProduct.id}"] .node-simulation')?.textContent.startsWith('0bxxxxxxxx')`,
+    ),
+  );
+  writeFileSync(
+    join(output, 'clocked-multiplier.png'),
+    (await win.webContents.capturePage()).toPNG(),
+  );
+  writeFileSync(
+    join(output, 'clocked-smoke.json'),
+    JSON.stringify(
+      {
+        passed: true,
+        registers: 7,
+        clockSteps: 17,
+        signedProduct: true,
+        asynchronousReset: true,
+        restartUnknown: true,
+        sourceUntouched: true,
+      },
+      null,
+      2,
+    ),
+  );
+  await win.webContents.executeJavaScript(
+    `(()=>{const s=document.querySelector('[aria-label="Module definition"]');if(s.disabled)throw new Error('Clocked module navigation disabled');s.value='ALU_INT16';s.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+  );
+  await until(() => service.states.get(clockedURI)?.graph?.module === 'ALU_INT16');
+  assert.equal(service.states.get(clockedURI)!.canConstruct, true);
   writeFileSync(
     join(output, 'alu-smoke.json'),
     JSON.stringify(

@@ -243,7 +243,7 @@ export function WiringInspector({
   const [source, setSource] = useState('');
   const ports: InputPort[] =
     node.kind === 'op'
-      ? node.op === '~'
+      ? node.op === '~' || node.op === '!'
         ? ['left']
         : ['left', 'right']
       : node.kind === 'mux'

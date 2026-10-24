@@ -216,7 +216,7 @@ else {
         )
           return service!.copy(c.uri, c.ids);
         else if (c.type === 'simulate' && c.inputs && typeof c.inputs === 'object')
-          return service!.simulate(c.uri, c.inputs as Record<string, string>);
+          return service!.simulate(c.uri, c.inputs as Record<string, string>, c.reset === true);
         else if (c.type === 'discard') service!.discardGraphChanges(c.uri);
         else throw new Error('Unsupported graph command.');
       });

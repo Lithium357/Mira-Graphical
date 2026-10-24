@@ -19,7 +19,7 @@ export function SimulationPanel({
   onClose: () => void;
   revision: string;
   disabled: boolean;
-  run: (inputs: Record<string, string>) => Promise<Simulation>;
+  run: (inputs: Record<string, string>, reset?: boolean) => Promise<Simulation>;
   onValues: (values: Record<string, string>) => void;
   onError: (message: string) => void;
 }) {
@@ -34,6 +34,7 @@ export function SimulationPanel({
   const [latest, setLatest] = useState<Simulation>();
   const [busy, setBusy] = useState(false);
   const generation = useRef(0);
+  const fresh = useRef(true);
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
     panel.current?.querySelector<HTMLInputElement>('input')?.focus();
@@ -42,6 +43,7 @@ export function SimulationPanel({
   callbacks.current = { onValues, onError };
   useEffect(() => {
     generation.current++;
+    fresh.current = true;
     setSamples([]);
     setLatest(undefined);
     setBusy(false);
@@ -61,11 +63,21 @@ export function SimulationPanel({
     },
     [],
   );
-  const sample = async () => {
+  const sample = async (clock?: { signal: string; edge: 'posedge' | 'negedge' }) => {
     const revision = generation.current;
     setBusy(true);
     try {
-      const result = await run(inputs);
+      let vector = inputs;
+      if (clock) {
+        const inactive = { ...inputs, [clock.signal]: clock.edge === 'posedge' ? '0' : '1' };
+        await run(inactive, fresh.current);
+        if (revision !== generation.current) return;
+        fresh.current = false;
+        vector = { ...inputs, [clock.signal]: clock.edge === 'posedge' ? '1' : '0' };
+        setInputs(vector);
+      }
+      const result = await run(vector, fresh.current);
+      fresh.current = false;
       if (revision !== generation.current) return;
       setLatest(result);
       setSamples((old) =>
@@ -88,11 +100,16 @@ export function SimulationPanel({
     ].join('\n');
   };
   return (
-    <section ref={panel} className="simulation-panel" aria-label="Combinational simulation">
+    <section
+      ref={panel}
+      className="simulation-panel"
+      aria-label={graph.sequential ? 'Clocked simulation' : 'Combinational simulation'}
+    >
       <div className="simulation-heading">
         <strong>Simulation</strong>
         <span role="status">
-          {samples.length} {samples.length === 1 ? 'sample' : 'samples'} · combinational
+          {samples.length} {samples.length === 1 ? 'sample' : 'samples'} ·{' '}
+          {graph.sequential ? 'clocked' : 'combinational'}
         </span>
         <details className="toolbar-menu simulation-tools">
           <summary>Trace</summary>
@@ -154,7 +171,38 @@ export function SimulationPanel({
               </label>
             ))}
             <button disabled={disabled || busy}>{busy ? 'Evaluating…' : 'Sample inputs'}</button>
+            {graph.clocks?.map((clock) => (
+              <button
+                type="button"
+                key={clock.signal}
+                disabled={disabled || busy}
+                onClick={() => void sample(clock)}
+              >
+                Step {clock.signal}
+              </button>
+            ))}
+            {graph.sequential && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  generation.current++;
+                  fresh.current = true;
+                  setLatest(undefined);
+                  setSamples([]);
+                  onValues({});
+                }}
+              >
+                Restart simulation
+              </button>
+            )}
             <span>Decimal, 0x hex, 0b binary, or x</span>
+            {graph.sequential && (
+              <span>
+                Registers start unknown. Assert the circuit’s reset input and sample before
+                stepping. Each step pulses one clock; other inputs stay fixed.
+              </span>
+            )}
           </form>
           <details className="trace-options">
             <summary>Signals ({watch.length})</summary>

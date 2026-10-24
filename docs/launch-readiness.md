@@ -1,6 +1,6 @@
 # Launch readiness
 
-The intended first release is the documented unsigned combinational HDL workbench. Full HDL standards, clocked simulation and synthesis are outside the current product scope. The owner authorized an unsigned Windows installer; signing remains deferred.
+The intended first release is the documented unsigned HDL workbench: combinational construction and bounded standalone Verilog/SystemVerilog clocked viewing/simulation. Full HDL standards, timed simulation, sequential hierarchy and synthesis are outside the current product scope. The owner authorized an unsigned Windows installer; signing remains deferred.
 
 Completed release foundations:
 

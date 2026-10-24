@@ -1,3 +1,3 @@
 module sequential(input clk, output reg q);
-  always @(posedge clk) q <= 1;
+  always @(posedge clk) #1 q <= 1;
 endmodule

@@ -13,7 +13,9 @@ type Bits = { width: number; value: bigint; known: bigint };
 export type Simulation = {
   signals: Record<string, { width: number; value: string }>;
   nodes: Record<string, string>;
+  state?: SimulationState;
 };
+export type SimulationState = { registers: Record<string, string>; events: Record<string, string> };
 const mask = (width: number) => {
   if (!Number.isSafeInteger(width) || width < 1 || width > 4096)
     throw new Error('Simulation widths must be 1–4096 bits.');
@@ -78,11 +80,12 @@ function format(bits: Bits): string {
     result += bits.known & (1n << BigInt(i)) ? (bits.value & (1n << BigInt(i)) ? '1' : '0') : 'x';
   return bits.width === 1 ? result : '0b' + result;
 }
-/** Zero-delay combinational evaluator. Unknown bits never silently become zeros. */
+/** Sampled zero-delay evaluator. Register updates commit after old-state evaluation. */
 export function simulate(
   source: string,
   selected: string,
   inputs: Record<string, string>,
+  previous?: SimulationState,
 ): Simulation {
   const root = parse(source, selected);
   if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs))
@@ -93,6 +96,12 @@ export function simulate(
   const signals: Simulation['signals'] = Object.create(null),
     nodes: Simulation['nodes'] = Object.create(null);
   let signalCount = 0;
+  let registers = previous?.registers ?? Object.create(null);
+  let advancing = true;
+  const next: Record<string, string> = Object.assign(Object.create(null), registers);
+  const events: Record<string, string> = Object.create(null);
+  const truth = (bits: Bits) =>
+    bits.value & bits.known ? 1 : bits.known === mask(bits.width) ? 0 : -1;
   function evaluate(ast: Module, bindings: Record<string, Bits>, path: string): Map<string, Bits> {
     const values = new Map<string, Bits>(),
       active = new Set<string>(),
@@ -107,7 +116,12 @@ export function simulate(
       if (declaration.direction === 'input') result = bindings[name] ?? unknown(declaration.width);
       else {
         const driver = ast.assigns.find((a) => a.target === name);
-        if (driver) result = expression(driver.expr, declaration.width);
+        if (driver?.events)
+          result = input(
+            Object.hasOwn(registers, path + name) ? registers[path + name] : 'x',
+            declaration.width,
+          );
+        else if (driver) result = expression(driver.expr, declaration.width);
         else {
           const inst = ast.instances.find((i) =>
             i.ports.some(
@@ -180,7 +194,7 @@ export function simulate(
         let value = 0n,
           k = 0n,
           w = 0;
-        for (const part of e.parts) {
+        for (const part of Array.from({ length: e.repeat ?? 1 }, () => e.parts).flat()) {
           const bits = expression(part);
           w += bits.width;
           mask(w);
@@ -190,9 +204,30 @@ export function simulate(
         return resize({ width: w, value, known: k }, Math.max(context, w), signed);
       }
       if (e.kind === 'unary') {
+        if (e.op === '!') {
+          const t = truth(expression(e.value));
+          return resize(t === -1 ? unknown(1) : known(1, BigInt(!t)), Math.max(1, context));
+        }
         const w = Math.max(width(e), context),
           a = resize(expression(e.value, w, signed), w, signed);
         return { width: w, value: ~a.value & mask(w), known: a.known };
+      }
+      if (e.kind === 'op' && (e.op === '&&' || e.op === '||')) {
+        const a = truth(expression(e.left)),
+          b = truth(expression(e.right));
+        const t =
+          e.op === '&&'
+            ? a === 0 || b === 0
+              ? 0
+              : a === 1 && b === 1
+                ? 1
+                : -1
+            : a === 1 || b === 1
+              ? 1
+              : a === 0 && b === 0
+                ? 0
+                : -1;
+        return resize(t === -1 ? unknown(1) : known(1, BigInt(t)), Math.max(context, 1));
       }
       if (e.kind === 'op' && isComparison(e.op)) {
         const w = Math.max(width(e.left), width(e.right)),
@@ -283,7 +318,31 @@ export function simulate(
       const result = net(declaration.name);
       signals[path + declaration.name] = { width: result.width, value: format(result) };
       if (!path) nodes[`${ast.name}/net/${declaration.name}`] = format(result);
+      if (!path && ast.assigns.some((a) => a.target === declaration.name && a.events))
+        nodes[`${ast.name}/register/${declaration.name}`] = format(result);
     }
+    if (advancing)
+      for (const driver of ast.assigns.filter((a) => a.events)) {
+        let triggered = false;
+        for (const event of driver.events!) {
+          const key = path + event.signal;
+          const now = format(net(event.signal)),
+            before =
+              previous?.events && Object.hasOwn(previous.events, key) ? previous.events[key] : 'x';
+          events[key] = now;
+          triggered ||=
+            event.edge === 'posedge'
+              ? (before === '0' && now !== '0') || (before !== '1' && now === '1')
+              : (before === '1' && now !== '1') || (before !== '0' && now === '0');
+        }
+        if (triggered)
+          next[path + driver.target] = format(
+            resize(
+              expression(driver.expr, ast.nets.find((n) => n.name === driver.target)!.width),
+              ast.nets.find((n) => n.name === driver.target)!.width,
+            ),
+          );
+      }
     if (!path)
       for (const [key, e] of expressions(ast)) {
         const target = ast.assigns.find(
@@ -314,5 +373,12 @@ export function simulate(
       declaration.width,
     );
   evaluate(root, bindings, '');
+  if (root.assigns.some((a) => a.events)) {
+    registers = next;
+    advancing = false;
+    signalCount = 0;
+    evaluate(root, bindings, '');
+    return { signals, nodes, state: { registers: next, events } };
+  }
   return { signals, nodes };
 }

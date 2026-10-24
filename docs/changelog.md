@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.4
+
+- Added bounded standalone Verilog/SystemVerilog clocked modules: `always`/`always_ff` with one or two scalar input edge controls, nonblocking whole-register assignments, nested `begin`/`end` and `if`/`else`, register holds and asynchronous resets. Register values commit together after evaluating old-state right-hand sides.
+- Added register nodes and layout boundaries so feedback through a register is valid while combinational cycles remain errors. Clocked modules support viewing and simulation; structural graph edits/copy are refused to preserve sequential behavior.
+- Added persistent simulation state, **Step clock** controls, asynchronous reset sampling and **Restart simulation**. Registers start unknown; source changes restart state. Clear trace preserves state.
+- Added signed net declarations, logical `!`/`&&`/`||` and bounded constant replication such as `{16{result[15]}}`, including signed clipboard declarations and unknown-bit handling.
+- Added the reported three-module ALU/multiplier fixture, 17,570 Icarus comparisons over clock/reset phases, all 16 ALU opcodes, signed/unsigned products, old-state ordering, logical operators and replication, plus desktop and packaged-runtime tests.
+- Clocked instantiations, delays, cases/loops, blocking clocked assignments, assignment to register slices and clocked VHDL remain unsupported. Upgrade desktop and the bundled VS Code companion together.
+
 ## 0.9.3
 
 - Added Verilog/SystemVerilog `$signed(...)`, `$unsigned(...)` and arithmetic right shift `>>>`, including two's-complement comparisons, sign extension, context sizing and unknown sign-bit propagation. Signed declarations and signed based literals remain outside this bounded subset.

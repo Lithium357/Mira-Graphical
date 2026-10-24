@@ -75,7 +75,7 @@ The initial disconnected workspace asserts visible setup/VSIX guidance before sh
 
 ## Remaining validation
 
-Unsigned zero-delay combinational simulation is covered; sequential timing, signedness, source x/z literals, parameters and SystemVerilog outside the documented subset remain unsupported. Undriven signals use x, without a separate z state. Instance dependency checks are conservative. See [exact syntax and limits](supported-syntax.md).
+Combinational simulation and bounded standalone clocked Verilog/SystemVerilog are covered, including signed nets/casts. `pnpm test:clocked` compares 17,570 outputs against Icarus across 1,255 samples of the reported ALU/multiplier and a falling-edge register probe. Native desktop checks exercise clock stepping, asynchronous reset and restart; packaged-runtime checks retain register state through IPC. Sequential timing/delays, sequential hierarchy, source x/z literals, parameters and syntax outside the documented subset remain unsupported. Undriven signals use x, without a separate z state. Instance dependency checks are conservative. See [exact syntax and limits](supported-syntax.md).
 
 Monitor geometry/restoration has automated coverage; the app is a separate movable Windows window. Screen-reader behavior, touch/pen interaction, other operating systems, live cross-file elaboration and automatic recovery restore remain unverified or outside this version. Signing is deliberately deferred; Windows now has an unsigned installer.
 

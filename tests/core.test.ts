@@ -106,6 +106,23 @@ test('reject precedence changes that would regroup surrounding expression', () =
     /precedence/,
   );
 });
+test('clocked session state persists between samples and resets after source changes or restart', () => {
+  const { s, time } = setup();
+  const text = `module counter(input clk,reset,output reg [7:0] q);always @(posedge clk or posedge reset) if(reset) q<=8'd0;else q<=q+8'd1;endmodule`;
+  s.userText(2, text);
+  time.tick(15000);
+  assert.equal(s.state.status, 'Synced');
+  assert.equal(s.state.canConstruct, false);
+  assert.equal(s.simulate({ clk: '0', reset: '1' }).signals.q.value, '0x00');
+  s.simulate({ clk: '0', reset: '0' });
+  assert.equal(s.simulate({ clk: '1', reset: '0' }).signals.q.value, '0x01');
+  assert.equal(s.simulate({ clk: '1', reset: '0' }).signals.q.value, '0x01');
+  s.userText(3, text + '\n// revision');
+  time.tick(15000);
+  assert.equal(s.simulate({ clk: '0', reset: '0' }).signals.q.value, '0bxxxxxxxx');
+  s.simulate({ clk: '0', reset: '1' });
+  assert.equal(s.simulate({ clk: '0', reset: '0' }, true).signals.q.value, '0bxxxxxxxx');
+});
 test('bounded invalid and unsupported syntax, undeclared and cycles', () => {
   for (const text of [
     readFileSync('fixtures/invalid.v', 'utf8'),

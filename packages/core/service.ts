@@ -286,8 +286,8 @@ export class SyncService {
   copy(uri: string, ids: string[]) {
     return this.sessions.get(uri)!.copy(ids);
   }
-  simulate(uri: string, inputs: Record<string, string>) {
-    return this.sessions.get(uri)!.simulate(inputs);
+  simulate(uri: string, inputs: Record<string, string>, reset = false) {
+    return this.sessions.get(uri)!.simulate(inputs, reset);
   }
   circuitAction(uri: string, action: CircuitAction) {
     return this.sessions.get(uri)!.circuitAction(action);

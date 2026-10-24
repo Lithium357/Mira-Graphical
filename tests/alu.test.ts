@@ -18,7 +18,9 @@ test('user INT16 ALU projects every operation with scalar comparison selectors',
   for (const text of [source, source.replaceAll('wire', 'logic')]) {
     const graph = project(parse(text, 'ALU_INT16'));
     assert.equal(graph.nodes.filter((n) => n.kind === 'mux').length, 13);
-    for (const op of operators.filter((op) => !['<', '>', '>>>', '===', '!=='].includes(op)))
+    for (const op of operators.filter(
+      (op) => !['<', '>', '>>>', '===', '!==', '!', '&&', '||'].includes(op),
+    ))
       assert(
         graph.nodes.some((n) => n.op === op),
         op,

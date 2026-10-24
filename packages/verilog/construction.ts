@@ -79,8 +79,11 @@ function create(source: string, ast: Module, action: CreateComponent): Edit[] {
   if (!Number.isSafeInteger(action.width) || action.width < 1 || action.width > 4096)
     throw new Error('Choose a width between 1 and 4096 bits.');
   const width = declarationWidth(action.width, action.netRange);
+  if (action.signed !== undefined && typeof action.signed !== 'boolean')
+    throw new Error('Invalid signed declaration.');
+  const signed = action.signed ? 'signed ' : '';
   if (action.component === 'input' || action.component === 'output') {
-    const declaration = `${action.component} wire ${width}${action.name}`;
+    const declaration = `${action.component} wire ${signed}${width}${action.name}`;
     const line = source.lastIndexOf('\n', ast.portClose - 1) + 1;
     if (line > source.indexOf('(') && /^[\t ]*$/.test(source.slice(line, ast.portClose))) {
       return [
@@ -139,13 +142,13 @@ function create(source: string, ast: Module, action: CreateComponent): Edit[] {
     }
     return [bodyInsertion(source, ast, lines)];
   }
-  const statements = [`wire ${width}${action.name};`];
+  const statements = [`wire ${signed}${width}${action.name};`];
   let expression: string | undefined;
   if (action.component === 'operation') {
     if (!operators.includes(action.operator!)) throw new Error('Choose a supported operation.');
     expression =
-      action.operator === '~'
-        ? `~${zero(action.width)}`
+      action.operator === '~' || action.operator === '!'
+        ? `${action.operator}${zero(action.width)}`
         : `${zero(action.width)} ${action.operator} ${zero(action.width)}`;
   } else if (action.component === 'mux')
     expression = `1'd0 ? ${zero(action.width)} : ${zero(action.width)}`;
@@ -200,6 +203,10 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
   if (!action || typeof action !== 'object') throw new Error('Invalid construction action.');
   const ast = parse(source, action.scope),
     graph = project(ast);
+  if (ast.assigns.some((a) => a.events))
+    throw new Error(
+      'Edit clocked modules in the HDL editor; graph construction currently supports combinational modules.',
+    );
   if (action.kind === 'create') return checked(source, create(source, ast, action));
   if (action.kind === 'paste') return paste(source, ast, action.items);
   if (action.kind === 'import') {
@@ -429,6 +436,10 @@ export function copyComponents(
     names = new Set<string>(),
     instances = new Set<string>(),
     ports = new Set<string>();
+  if (ast.assigns.some((a) => a.events))
+    throw new Error(
+      'Clocked registers cannot be copied as combinational components. Edit this module in the HDL editor.',
+    );
   for (const id of ids) {
     const node = graph.nodes.find((n) => n.id === id);
     if (!node) throw new Error('Selection no longer exists.');
@@ -453,6 +464,7 @@ export function copyComponents(
     return {
       name,
       width: net.width,
+      signed: net.signed,
       ...(net.msb || net.lsb ? { netRange: `[${net.msb}:${net.lsb}]` } : {}),
       ...(net.direction === 'wire' || !ports.has(name) ? {} : { direction: net.direction }),
       ...(driver
@@ -525,12 +537,17 @@ function paste(source: string, ast: Module, items: ClipboardItem[]): Edit[] {
         name: mapping.get(item.name)!,
         width: item.width,
         netRange: item.netRange,
+        signed: item.signed,
       }),
     );
   }
   const lines = items
     .filter((i) => !i.direction && !i.instance)
-    .map((i) => `wire ${declarationWidth(i.width, i.netRange)}${mapping.get(i.name)};`);
+    .map((i) => {
+      if (i.signed !== undefined && typeof i.signed !== 'boolean')
+        throw new Error('Invalid signed clipboard declaration.');
+      return `wire ${i.signed ? 'signed ' : ''}${declarationWidth(i.width, i.netRange)}${mapping.get(i.name)};`;
+    });
   for (const item of items) {
     if (item.expression !== undefined) {
       if (item.instance || item.direction === 'input') throw new Error('Invalid clipboard driver.');
@@ -570,11 +587,13 @@ function copyExpression(source: string, e: Expr, contextWidth: number): string {
       : e.kind === 'slice'
         ? `${e.value}[${e.bit ? e.msb : `${e.msb}:${e.lsb}`}]`
         : e.kind === 'concat'
-          ? `{${e.parts.map(render).join(', ')}}`
+          ? e.repeat
+            ? `{${e.repeat}{${e.parts.map(render).join(', ')}}}`
+            : `{${e.parts.map(render).join(', ')}}`
           : e.kind === 'mux'
             ? `(${e.procedural ? `(((${render(e.condition)}) != 0) === 1'b1)` : render(e.condition)} ? ${branch(e, e.truthy)} : ${branch(e, e.falsy)})`
             : e.kind === 'unary'
-              ? `(~${render(e.value)})`
+              ? `(${e.op}${render(e.value)})`
               : e.kind === 'convert' && ['signed', 'unsigned'].includes(e.conversion)
                 ? `$${e.conversion}(${render(e.value)})`
                 : e.kind === 'op'

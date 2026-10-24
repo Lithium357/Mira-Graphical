@@ -10,7 +10,7 @@ import {
   type ClipboardItem,
 } from '../protocol/index.js';
 import { exportVhdlModule } from '../vhdl/index.js';
-import { simulate } from '../verilog/simulation.js';
+import { simulate, type SimulationState } from '../verilog/simulation.js';
 import { PatchDraft } from '../verilog/patches.js';
 import { autoLayout } from './auto-layout.js';
 import {
@@ -96,6 +96,7 @@ type DraftFrame = {
 };
 type ConstructionDraft = DraftFrame & { undo: DraftFrame[]; redo: DraftFrame[] };
 export class Session {
+  private simulation?: { key: string; state?: SimulationState };
   private lastCheckpoint?: { text: string; version: number; table?: PatchDraft; edits: string };
   state: State;
   text: string;
@@ -158,6 +159,7 @@ export class Session {
     this.state.redoCount = this.draft?.redo.length ?? 0;
     this.state.canConstruct =
       !!this.state.graph &&
+      !this.state.graph.sequential &&
       this.connected &&
       !this.pendingText &&
       !this.inFlight &&
@@ -390,9 +392,18 @@ export class Session {
         : this.text.slice(ast.library[name].start, ast.library[name].end),
     );
   }
-  simulate(inputs: Record<string, string>) {
+  simulate(inputs: Record<string, string>, reset = false) {
     this.editableConstruction();
-    return simulate(this.draft?.table.text ?? this.text, this.state.graph!.module, inputs);
+    const source = this.draft?.table.text ?? this.text;
+    const key = this.state.graph!.module + ':' + hash(source);
+    const result = simulate(
+      source,
+      this.state.graph!.module,
+      inputs,
+      !reset && this.simulation?.key === key ? this.simulation.state : undefined,
+    );
+    this.simulation = { key, state: result.state };
+    return result;
   }
   copy(ids: string[]): ClipboardItem[] {
     this.editableConstruction();

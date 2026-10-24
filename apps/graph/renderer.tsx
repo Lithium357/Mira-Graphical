@@ -55,6 +55,9 @@ const names: Record<Operator, string> = {
   '>': 'GT',
   '>=': 'GE',
   '~': 'NOT',
+  '!': 'LOGICAL NOT',
+  '&&': 'LOGICAL AND',
+  '||': 'LOGICAL OR',
 };
 type Data = { label: string; kind: string; width?: number; op?: Operator; [key: string]: unknown };
 function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
@@ -62,7 +65,7 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
     <div
       className={`circuit-node ${data.kind} ${data.inspected ? 'selected' : ''}`}
       style={
-        ['instance', 'concat'].includes(data.kind)
+        ['instance', 'register', 'concat'].includes(data.kind)
           ? {
               minHeight: Math.max(
                 110,
@@ -77,7 +80,7 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
           : undefined
       }
     >
-      {!['input', 'literal', 'instance', 'concat'].includes(data.kind) && (
+      {!['input', 'literal', 'instance', 'register', 'concat'].includes(data.kind) && (
         <Handle
           type="target"
           position={Position.Left}
@@ -85,7 +88,7 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
           style={{ top: ['op', 'mux'].includes(data.kind) ? '35%' : '50%' }}
         />
       )}
-      {['op', 'mux'].includes(data.kind) && data.op !== '~' && (
+      {['op', 'mux'].includes(data.kind) && data.op !== '~' && data.op !== '!' && (
         <Handle type="target" position={Position.Left} id="right" style={{ top: '72%' }} />
       )}
       {(data.inputPorts as { name: string; width: number }[] | undefined)?.map((p, i, ports) => (
@@ -109,9 +112,11 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
       ))}
       {data.kind === 'mux' && <Handle type="target" position={Position.Top} id="select" />}
       <div className="node-kind">
-        {['op', 'literal', 'slice'].includes(data.kind)
-          ? `${data.kind.toUpperCase()} · EDITABLE`
-          : data.kind.toUpperCase()}
+        {data.register
+          ? 'REGISTER'
+          : ['op', 'literal', 'slice'].includes(data.kind) && !data.readonly
+            ? `${data.kind.toUpperCase()} · EDITABLE`
+            : data.kind.toUpperCase()}
       </div>
       <div className="node-name">
         {data.kind === 'op' ? (
@@ -137,7 +142,8 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
       {data.assignmentTarget ? (
         <div className="node-result">→ {String(data.assignmentTarget)}</div>
       ) : null}
-      {data.kind !== 'instance' && (
+      {data.eventControl ? <div className="node-result">{String(data.eventControl)}</div> : null}
+      {!['instance', 'register'].includes(data.kind) && (
         <Handle
           type="source"
           position={Position.Right}
@@ -264,7 +270,12 @@ function Diagram({
           initialHeight: nodeHeight(n),
           position: state.layout.nodes[n.id] ?? { x: n.depth * 250, y: n.row * 160 },
           selected: old.find((o) => o.id === n.id)?.selected,
-          data: { ...n, label: n.label, connectable: state.canConstruct },
+          data: {
+            ...n,
+            label: n.label,
+            readonly: graph.sequential,
+            connectable: state.canConstruct,
+          },
         })) ?? [],
     );
   }, [graph, state.layout, state.status, state.canConstruct, setNodes]);
@@ -561,6 +572,7 @@ function Diagram({
                 : 'VERILOG'}{' '}
             <span className="caption-count">
               {graph?.nodes.length ?? 0} nodes · {graph?.edges.length ?? 0} connections
+              {graph?.sequential ? ' · clocked · edit in HDL' : ''}
             </span>
           </div>
           <ReactFlow
@@ -757,12 +769,13 @@ function Diagram({
               }}
               graph={graph}
               revision={`${state.version}:${state.pendingSteps}`}
-              disabled={!state.canConstruct}
-              run={(inputs) =>
+              disabled={!state.canConstruct && !(graph.sequential && state.status === 'Synced')}
+              run={(inputs, reset) =>
                 window.mira.command({
                   type: 'simulate',
                   uri: state.uri,
                   inputs,
+                  reset,
                 }) as Promise<Simulation>
               }
               onValues={setValues}
@@ -945,7 +958,10 @@ function Diagram({
                     <h3>Replace operation</h3>
                     <div className="palette">
                       {(graph?.language === 'vhdl' ? vhdlOperators : operators)
-                        .filter((op) => (op === '~') === (node.op === '~'))
+                        .filter(
+                          (op) =>
+                            (op === '~' || op === '!') === (node.op === '~' || node.op === '!'),
+                        )
                         .map((op) => (
                           <button
                             key={op}
@@ -1148,7 +1164,10 @@ function App() {
           <select
             aria-label="Module definition"
             value={state.graph.module}
-            disabled={!state.canConstruct || !!state.pendingSteps}
+            disabled={
+              (!state.canConstruct && !(state.graph.sequential && state.status === 'Synced')) ||
+              !!state.pendingSteps
+            }
             onChange={(e) =>
               void window.mira
                 .command({ type: 'module', uri: state.uri, name: e.target.value })
@@ -1160,7 +1179,7 @@ function App() {
             ))}
           </select>
         )}
-        <span className="nav-note">COMBINATIONAL HDL WORKSPACE</span>
+        <span className="nav-note">HDL WORKSPACE</span>
       </nav>
       {state?.recoveryWarning && (
         <div className="notice" role="alert">

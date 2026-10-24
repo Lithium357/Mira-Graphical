@@ -548,6 +548,7 @@ button:disabled {
   overflow: hidden;
 }
 .circuit-node.instance,
+.circuit-node.register,
 .circuit-node.concat {
   border-color: #a386c5;
   min-height: 100px;

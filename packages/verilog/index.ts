@@ -35,7 +35,7 @@ const Based = createToken({ name: 'Based', pattern: /[0-9][0-9_]*'[bBoOdDhH][0-9
 const Integer = createToken({ name: 'Integer', pattern: /[0-9][0-9_]*/ });
 const Symbol = createToken({
   name: 'Symbol',
-  pattern: />>>|===|!==|<<|>>|==|!=|<=|>=|[{}()[\]:?;,.=+*\-&|^~<>]/,
+  pattern: />>>|===|!==|&&|\|\||<<|>>|==|!=|<=|>=|[{}()[\]:?;,.=+*\-&|^~<>!@]/,
 });
 const lexer = new Lexer([WS, Comment, SystemCast, Identifier, Fill, Based, Integer, Symbol], {
   ensureOptimizations: false,
@@ -60,12 +60,12 @@ export type Expr = (
       start: number;
       end: number;
     }
-  | { kind: 'concat'; parts: Expr[]; start: number; end: number }
+  | { kind: 'concat'; parts: Expr[]; repeat?: number; start: number; end: number }
   | { kind: 'ref'; value: string; start: number; end: number }
   | { kind: 'literal'; value: string; start: number; end: number }
   | {
       kind: 'unary';
-      op: '~';
+      op: '~' | '!';
       value: Expr;
       start: number;
       end: number;
@@ -103,12 +103,14 @@ export type Expr = (
       procedural?: boolean;
     }
 ) & {
+  signed?: boolean;
   outerStart?: number;
   outerEnd?: number;
   nativeType?: 'std_logic' | 'std_logic_vector' | 'unsigned';
   nativeWidth?: number;
 };
 export type Net = {
+  signed?: boolean;
   name: string;
   direction: 'input' | 'output' | 'wire';
   width: number;
@@ -159,7 +161,13 @@ export type Module = {
   }[];
   library: Record<string, Module>;
   nets: Net[];
-  assigns: { target: string; expr: Expr; start: number; end: number }[];
+  assigns: {
+    target: string;
+    expr: Expr;
+    start: number;
+    end: number;
+    events?: { signal: string; edge: 'posedge' | 'negedge' }[];
+  }[];
   portClose: number;
   lastPortEnd: number;
   portCount: number;
@@ -184,6 +192,8 @@ export const expressionSpan = (e: Expr) => ({
   end: e.outerEnd ?? e.end,
 });
 const precedence: Record<string, number> = {
+  '||': -1,
+  '&&': 0,
   '|': 1,
   '^': 2,
   '&': 3,
@@ -264,6 +274,12 @@ export function validateLibrary(
       if (!child)
         throw new ParseError(
           `Unknown module ${inst.module}. Include its definition in this shared document.`,
+          inst.start,
+          inst.end,
+        );
+      if (child.assigns.some((a) => a.events))
+        throw new ParseError(
+          'Clocked modules currently support standalone simulation. Select/share the clocked module without instantiating it in another module.',
           inst.start,
           inst.end,
         );
@@ -354,7 +370,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
     take(']');
     return { width: Math.abs(msb - lsb) + 1, msb, lsb };
   };
-  function expr(min = 0): Expr {
+  function expr(min = -1): Expr {
     if (++recursion > 128) fail('Expression nesting exceeds 128 levels.');
     let left: Expr;
     if (tokens[i]?.tokenType === SystemCast) {
@@ -369,12 +385,12 @@ function parseSingle(source: string, tokens: IToken[]): Module {
         start: token.startOffset,
         end: close.endOffset! + 1,
       };
-    } else if (peek() === '~') {
-      const token = take('~');
+    } else if (peek() === '~' || peek() === '!') {
+      const token = take();
       const value = expr(9);
       left = {
         kind: 'unary',
-        op: '~',
+        op: token.image as '~' | '!',
         value,
         start: token.startOffset,
         end: expressionSpan(value).end,
@@ -383,15 +399,22 @@ function parseSingle(source: string, tokens: IToken[]): Module {
       };
     } else if (peek() === '{') {
       const open = take('{');
+      let repeat: number | undefined;
+      if (tokens[i]?.tokenType === Integer && tokens[i + 1]?.image === '{') {
+        repeat = integer();
+        if (repeat < 1 || repeat > 4096) fail('Replication count must be 1–4096.');
+        take('{');
+      }
       const parts: Expr[] = [];
       do {
         parts.push(expr());
         if (peek() !== ',') break;
         take(',');
       } while (true);
+      if (repeat !== undefined) take('}');
       const end = take('}').endOffset! + 1;
       if (parts.length < 1 || parts.length > 64) fail('Concatenation needs 1–64 parts.');
-      left = { kind: 'concat', parts, start: open.startOffset, end };
+      left = { kind: 'concat', parts, repeat, start: open.startOffset, end };
     } else if (peek() === '(') {
       const open = take('(');
       left = expr();
@@ -431,7 +454,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
         }
       }
     }
-    while (peek() && (precedence[peek()] ?? -1) >= min) {
+    while (peek() && (precedence[peek()] ?? -2) >= min) {
       const t = take();
       const right = expr(precedence[t.image] + 1);
       left = {
@@ -445,7 +468,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
         tokenEnd: t.endOffset! + 1,
       };
     }
-    if (min === 0 && peek() === '?') {
+    if (min === -1 && peek() === '?') {
       take('?');
       const truthy = expr();
       take(':');
@@ -469,16 +492,24 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   let direction: 'input' | 'output' | undefined;
   let portWidth = { width: 1, msb: 0, lsb: 0 };
   let portType = 'wire';
+  let portSigned = false;
   while (peek() !== ')') {
     if (peek() === 'input' || peek() === 'output') {
       direction = take().image as 'input' | 'output';
       if (['wire', 'logic', 'reg'].includes(peek())) portType = take().image;
       else portType = 'wire';
-      if (peek() === 'unsigned') take();
+      portSigned = peek() === 'signed';
+      if (peek() === 'unsigned' || peek() === 'signed') take();
       portWidth = width();
     }
     if (!direction) fail('Only ANSI input/output ports are supported.');
-    nets.push({ name: name(), direction: direction!, netType: portType, ...portWidth });
+    nets.push({
+      name: name(),
+      direction: direction!,
+      netType: portType,
+      signed: portSigned,
+      ...portWidth,
+    });
     if (peek() !== ',') break;
     take(',');
     if (peek() === ')') fail('Trailing port comma.');
@@ -496,10 +527,11 @@ function parseSingle(source: string, tokens: IToken[]): Module {
       const start = take().startOffset,
         first = nets.length;
       const netType = tokens[i - 1].image;
-      if (peek() === 'unsigned') take();
+      const signed = peek() === 'signed';
+      if (peek() === 'unsigned' || peek() === 'signed') take();
       const w = width();
       do {
-        nets.push({ name: name(), direction: 'wire', netType, ...w });
+        nets.push({ name: name(), direction: 'wire', netType, signed, ...w });
         if (peek() !== ',') break;
         take(',');
       } while (true);
@@ -508,6 +540,88 @@ function parseSingle(source: string, tokens: IToken[]): Module {
         net.declarationStart = start;
         net.declarationEnd = end;
       }
+    } else if (peek() === 'always' || peek() === 'always_ff') {
+      const start = take().startOffset;
+      take('@');
+      take('(');
+      const events: NonNullable<Module['assigns'][number]['events']> = [];
+      do {
+        if (!['posedge', 'negedge'].includes(peek()))
+          fail(
+            'Unsupported event control: use posedge/negedge clock and optional asynchronous reset.',
+          );
+        const edge = take().image as 'posedge' | 'negedge';
+        const signal = name();
+        if (!nets.some((n) => n.name === signal && n.direction === 'input' && n.width === 1))
+          fail('Clock/reset event controls must be scalar input ports.');
+        if (events.some((e) => e.signal === signal)) fail('Duplicate event signal.');
+        events.push({ signal, edge });
+        if (peek() !== 'or' && peek() !== ',') break;
+        take();
+      } while (events.length < 2);
+      take(')');
+      let nesting = 0;
+      const hold = (target: string): Expr => ({ kind: 'ref', value: target, start, end: start });
+      const statement = (values: Map<string, Expr>): void => {
+        if (++nesting > 128) fail('Clocked statement nesting exceeds 128 levels.');
+        if (peek() === 'begin') {
+          take();
+          while (peek() !== 'end') statement(values);
+          take('end');
+        } else if (peek() === 'if') {
+          take();
+          take('(');
+          const condition = expr();
+          take(')');
+          const truthy = new Map(values),
+            falsy = new Map(values);
+          statement(truthy);
+          if (peek() === 'else') {
+            take();
+            statement(falsy);
+          }
+          for (const target of new Set([...truthy.keys(), ...falsy.keys()])) {
+            const t = truthy.get(target) ?? hold(target),
+              f = falsy.get(target) ?? hold(target);
+            values.set(
+              target,
+              t === f
+                ? t
+                : {
+                    kind: 'mux',
+                    procedural: true,
+                    condition,
+                    truthy: t,
+                    falsy: f,
+                    start: condition.start,
+                    end: tokens[i - 1].endOffset! + 1,
+                  },
+            );
+          }
+        } else {
+          const target = name();
+          if (
+            !nets.some(
+              (n) =>
+                n.name === target &&
+                n.direction !== 'input' &&
+                ['reg', 'logic'].includes(n.netType ?? ''),
+            )
+          )
+            fail('Clocked targets must be declared reg or logic.');
+          if (peek() !== '<=')
+            fail('Clocked blocks support nonblocking (<=) assignments to whole registers.');
+          take('<=');
+          values.set(target, expr());
+          take(';');
+        }
+        nesting--;
+      };
+      const values = new Map<string, Expr>();
+      statement(values);
+      const end = tokens[i - 1].endOffset! + 1;
+      for (const [target, value] of values)
+        assigns.push({ target, expr: value, start, end, events });
     } else if (peek() === 'always_comb') {
       take();
       const block = peek() === 'begin';
@@ -617,6 +731,17 @@ function parseSingle(source: string, tokens: IToken[]): Module {
     declared.set(net.name, net);
   }
   const driven = new Set<string>();
+  let expressionCount = 0;
+  const bounded = (e: Expr, depth = 0): void => {
+    if (++expressionCount > 8192 || depth > 256)
+      throw new ParseError(
+        'Expanded clocked/ordinary expressions exceed the bounded graph limit.',
+        e.start,
+        e.end,
+      );
+    for (const [, child] of children(e)) bounded(child, depth + 1);
+  };
+  for (const a of assigns) bounded(a.expr);
   for (const a of [
     ...assigns,
     ...instances.flatMap((inst) => inst.ports.map((p) => ({ target: undefined, expr: p.expr }))),
@@ -633,6 +758,9 @@ function parseSingle(source: string, tokens: IToken[]): Module {
       for (const [, c] of children(e)) check(c);
       if ((e.kind === 'ref' || e.kind === 'slice') && !declared.has(e.value))
         throw new ParseError(`Undeclared identifier ${e.value}.`, e.start, e.end);
+      if (e.kind === 'ref') e.signed = declared.get(e.value)?.signed;
+      if (e.kind === 'concat' && expressionWidth(e, nets) > 4096)
+        throw new ParseError('Concatenation/replication exceeds 4096 bits.', e.start, e.end);
       if (e.kind === 'concat') {
         const sized = (part: Expr): void => {
           if (part.kind === 'literal' && !part.value.includes("'"))
@@ -662,7 +790,9 @@ function parseSingle(source: string, tokens: IToken[]): Module {
     check(a.expr);
   }
   return {
-    language: tokens.some((t) => ['logic', 'always_comb'].includes(t.image) || t.tokenType === Fill)
+    language: tokens.some(
+      (t) => ['logic', 'always_comb', 'always_ff'].includes(t.image) || t.tokenType === Fill,
+    )
       ? 'systemverilog'
       : 'verilog',
     name: moduleName,
@@ -679,6 +809,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   };
 }
 export type Node = {
+  eventControl?: string;
   signed?: boolean;
   nativeType?: Net['nativeType'];
   id: string;
@@ -694,7 +825,9 @@ export type Node = {
     | 'mux'
     | 'concat'
     | 'instance'
+    | 'register'
     | 'convert';
+  register?: boolean;
   width?: number;
   op?: Operator;
   operands?: string[];
@@ -714,6 +847,8 @@ export type Node = {
   outputPorts?: { name: string; width: number; signal: string }[];
 };
 export type Circuit = {
+  clocks?: { signal: string; edge: 'posedge' | 'negedge' }[];
+  sequential?: boolean;
   language?: Module['language'];
   module: string;
   library?: { name: string; ports: { name: string; direction: string; width: number }[] }[];
@@ -746,32 +881,35 @@ export const opNames: Record<Operator, string> = {
   '>': 'GT',
   '>=': 'GE',
   '~': 'NOT',
+  '!': 'LOGICAL NOT',
+  '&&': 'LOGICAL AND',
+  '||': 'LOGICAL OR',
 };
 /** Unsigned Verilog self-determined width; VHDL widths come from its typed frontend. */
 export function expressionWidth(e: Expr, nets: Net[]): number {
   if (e.nativeWidth !== undefined) return e.nativeWidth;
   const width = (child: Expr) => expressionWidth(child, nets);
   if (e.kind === 'convert') return e.resultWidth ?? width(e.value);
-  if (e.kind === 'unary') return width(e.value);
+  if (e.kind === 'unary') return e.op === '!' ? 1 : width(e.value);
   if (e.kind === 'ref') return nets.find((n) => n.name === e.value)!.width;
   if (e.kind === 'slice') return Math.abs(e.msb - e.lsb) + 1;
   if (e.kind === 'literal') return literalWidth(e.value);
-  if (e.kind === 'concat') return e.parts.reduce((sum, p) => sum + width(p), 0);
+  if (e.kind === 'concat') return (e.repeat ?? 1) * e.parts.reduce((sum, p) => sum + width(p), 0);
   if (e.kind === 'mux') return Math.max(width(e.truthy), width(e.falsy));
-  if (isComparison(e.op)) return 1;
+  if (isComparison(e.op) || e.op === '&&' || e.op === '||') return 1;
   if (e.op === '<<' || e.op === '>>' || e.op === '>>>') return width(e.left);
   return Math.max(width(e.left), width(e.right));
 }
-/** Self-determined Verilog type. Nets in this subset are unsigned; explicit
- * casts and unsized decimal literals can introduce signed expressions. */
+/** Self-determined Verilog type, including declared nets and explicit casts. */
 export function expressionSigned(e: Expr): boolean {
   if (e.nativeType) return false;
+  if (e.kind === 'ref') return e.signed ?? false;
   if (e.kind === 'convert') return e.conversion === 'signed';
   if (e.kind === 'literal') return /^[0-9][0-9_]*$/.test(e.value);
-  if (e.kind === 'unary') return expressionSigned(e.value);
+  if (e.kind === 'unary') return e.op !== '!' && expressionSigned(e.value);
   if (e.kind === 'mux')
     return !e.procedural && expressionSigned(e.truthy) && expressionSigned(e.falsy);
-  if (e.kind !== 'op' || isComparison(e.op)) return false;
+  if (e.kind !== 'op' || isComparison(e.op) || e.op === '&&' || e.op === '||') return false;
   return (
     expressionSigned(e.left) && (['<<', '>>', '>>>'].includes(e.op) || expressionSigned(e.right))
   );
@@ -800,6 +938,7 @@ export function project(
         nativeType: n.nativeType,
         label: n.name,
         width: n.width,
+        signed: n.signed,
         sourceNet: n.name,
         netRange: n.width === 1 ? '[0]' : `[${n.msb}:${n.lsb}]`,
         undriven:
@@ -831,16 +970,21 @@ export function project(
     const signed = signedContext ?? expressionSigned(e);
     if (e.kind === 'unary') {
       const w = Math.max(context, widthOf(e));
-      const child = visit(e.value, key + '/V', w, signed);
+      const child = visit(
+        e.value,
+        key + '/V',
+        e.op === '!' ? 0 : w,
+        e.op === '!' ? undefined : signed,
+      );
       const node = add(key, {
         kind: 'op',
         expressionKey: key,
-        label: 'NOT',
-        op: '~',
+        label: opNames[e.op],
+        op: e.op,
         signed,
         width: w,
         operands: [child.label],
-        operandWidths: [w],
+        operandWidths: [child.width!],
         operandSignature: semantic(e.value),
       });
       connect(child, node, 'left');
@@ -883,10 +1027,10 @@ export function project(
       const parts = e.parts.map((p, i) => visit(p, `${key}/P${i}`));
       const node = add(`${key}/concat`, {
         kind: 'concat',
-        label: 'JOIN',
+        label: e.repeat ? `REPEAT ×${e.repeat}` : 'JOIN',
         expressionKey: key,
         operands: parts.map((p) => p.label),
-        width: parts.reduce((w, p) => w + p.width!, 0),
+        width: widthOf(e),
         inputPorts: parts.map((p, i) => ({ name: `part:${i}`, width: p.width! })),
       });
       parts.forEach((p, i) => connect(p, node, `part:${i}`));
@@ -912,16 +1056,27 @@ export function project(
       connect(f, n, 'right');
       return n;
     }
+    const logical = e.op === '&&' || e.op === '||';
     const comparison = isComparison(e.op),
       shift = e.op === '<<' || e.op === '>>' || e.op === '>>>';
-    const w = comparison ? 1 : Math.max(context, widthOf(e));
+    const w = comparison || logical ? 1 : Math.max(context, widthOf(e));
     const operandWidth = comparison ? Math.max(widthOf(e.left), widthOf(e.right)) : w;
-    const rightWidth = shift ? widthOf(e.right) : operandWidth;
+    const rightWidth = shift || logical ? widthOf(e.right) : operandWidth;
     const operandSigned = comparison
       ? expressionSigned(e.left) && expressionSigned(e.right)
       : signed;
-    const l = visit(e.left, key + '/L', operandWidth, operandSigned);
-    const r = visit(e.right, key + '/R', rightWidth, shift ? undefined : operandSigned);
+    const l = visit(
+      e.left,
+      key + '/L',
+      logical ? 0 : operandWidth,
+      logical ? undefined : operandSigned,
+    );
+    const r = visit(
+      e.right,
+      key + '/R',
+      logical ? 0 : rightWidth,
+      shift || logical ? undefined : operandSigned,
+    );
     const n = add(key, {
       kind: 'op',
       expressionKey: key,
@@ -929,7 +1084,7 @@ export function project(
       op: e.op,
       signed: comparison ? operandSigned : signed,
       operands: [l.label, r.label],
-      operandWidths: [operandWidth, rightWidth],
+      operandWidths: logical ? [l.width!, r.width!] : [operandWidth, rightWidth],
       operandSignature: JSON.stringify([semantic(e.left), semantic(e.right)]),
       width: w,
     });
@@ -972,10 +1127,30 @@ export function project(
       root.sourceNet = a.target;
       root.assignmentTarget = a.target;
     }
-    connect(root, nets.get(a.target)!, 'left');
+    if (a.events) {
+      const reg = add(`${ast.name}/register/${a.target}`, {
+        kind: 'register',
+        register: true,
+        label: a.target,
+        eventControl: a.events.map((e) => `${e.edge} ${e.signal}`).join(' / '),
+        width: nets.get(a.target)!.width,
+        inputPorts: [
+          { name: 'port:D', width: nets.get(a.target)!.width! },
+          ...a.events.map((e) => ({ name: `port:${e.signal}`, width: 1 })),
+        ],
+        outputPorts: [{ name: 'Q', width: nets.get(a.target)!.width!, signal: a.target }],
+      });
+      connect(root, reg, 'port:D');
+      for (const e of a.events) connect(nets.get(e.signal)!, reg, `port:${e.signal}`);
+      connect(reg, nets.get(a.target)!, 'left');
+      edges.at(-1)!.sourceHandle = 'out:Q';
+    } else connect(root, nets.get(a.target)!, 'left');
   }
   const incoming = new Map(
-    nodes.map((n) => [n.id, edges.filter((e) => e.target === n.id).map((e) => e.source)]),
+    nodes.map((n) => [
+      n.id,
+      n.register ? [] : edges.filter((e) => e.target === n.id).map((e) => e.source),
+    ]),
   );
   const depths = new Map<string, number>();
   const active = new Set<string>();
@@ -1012,11 +1187,11 @@ export function project(
       const expected =
         node.kind === 'mux' && edge.targetHandle === 'select'
           ? 1
-          : node.kind === 'instance' || node.kind === 'concat'
+          : node.kind === 'instance' || node.kind === 'register' || node.kind === 'concat'
             ? node.inputPorts?.find((p) => p.name === edge.targetHandle)?.width
             : (node.operandWidths?.[edge.targetHandle === 'right' ? 1 : 0] ?? node.width);
       const actual =
-        from.kind === 'instance'
+        from.kind === 'instance' || from.kind === 'register'
           ? from.outputPorts?.find((p) => `out:${p.name}` === edge.sourceHandle)?.width
           : from.width;
       if (node.kind === 'mux' && edge.targetHandle === 'select' && actual && actual !== 1) {
@@ -1042,6 +1217,12 @@ export function project(
     }
   }
   return {
+    sequential: ast.assigns.some((a) => !!a.events),
+    clocks: [
+      ...new Map(
+        ast.assigns.filter((a) => a.events).map((a) => [a.events![0].signal, a.events![0]]),
+      ).values(),
+    ],
     language: ast.language,
     module: ast.name,
     nodes,
@@ -1070,7 +1251,7 @@ export function expressions(ast: Module) {
 export function shape(e: Expr): string {
   if (e.kind === 'unary') return 'unary(' + shape(e.value) + ')';
   if (e.kind === 'convert') return `${e.conversion}:${e.resultWidth ?? ''}(${shape(e.value)})`;
-  if (e.kind === 'concat') return `concat(${e.parts.map(shape).join(',')})`;
+  if (e.kind === 'concat') return `concat:${e.repeat ?? 1}(${e.parts.map(shape).join(',')})`;
   return e.kind === 'mux'
     ? `${e.procedural ? 'ifmux' : 'mux'}(${shape(e.condition)},${shape(e.truthy)},${shape(e.falsy)})`
     : e.kind === 'op'
@@ -1082,7 +1263,7 @@ export function shape(e: Expr): string {
 function semantic(e: Expr): string {
   if (e.kind === 'unary') return e.op + '(' + semantic(e.value) + ')';
   if (e.kind === 'convert') return `${e.conversion}:${e.resultWidth ?? ''}(${semantic(e.value)})`;
-  if (e.kind === 'concat') return `concat(${e.parts.map(semantic).join(',')})`;
+  if (e.kind === 'concat') return `concat:${e.repeat ?? 1}(${e.parts.map(semantic).join(',')})`;
   return e.kind === 'mux'
     ? `${e.procedural ? 'ifmux' : 'mux'}(${semantic(e.condition)},${semantic(e.truthy)},${semantic(e.falsy)})`
     : e.kind === 'op'
@@ -1099,12 +1280,16 @@ export function operatorPatch(
   const node = graph?.nodes.find((n) => n.id === id && n.kind === 'op');
   if (!node) throw new Error('Select an editable operation.');
   const ast = parse(source, graph?.module);
+  if (ast.assigns.some((a) => a.events))
+    throw new Error(
+      'Edit clocked modules in the HDL editor; graph editing currently supports combinational modules.',
+    );
   project(ast);
   const all = expressions(ast);
   const e = all.get(node.key);
   if (e?.kind !== 'op' && e?.kind !== 'unary')
     throw new Error('Operation no longer exists in the live source.');
-  if ((e.kind === 'unary') !== (op === '~'))
+  if ((e.kind === 'unary') !== (op === '~' || op === '!'))
     throw new Error(
       'Unary and binary operations have different input counts. Create a new component instead.',
     );
@@ -1148,6 +1333,10 @@ export function graphPatch(
   if (!node?.expressionKey)
     throw new Error('Select an editable literal, slice or simple mux selector.');
   const ast = parse(source, graph?.module);
+  if (ast.assigns.some((a) => a.events))
+    throw new Error(
+      'Edit clocked modules in the HDL editor; graph editing currently supports combinational modules.',
+    );
   const current = project(ast).nodes.find((n) => n.key === node.key);
   const e = expressions(ast).get(node.expressionKey);
   if (ast.language === 'vhdl') return vhdlTokenEdit(source, ast, node, e, change, current);
@@ -1183,7 +1372,7 @@ export function validateEditableEdits(source: string, edits: Edit[]): void {
   if (ast.language === 'vhdl') return validateVhdlEdits(source, edits);
   const allowed: { start: number; end: number; kind: GraphChange['kind']; scalars?: string[] }[] =
     [];
-  for (const scope of Object.values(ast.library))
+  for (const scope of Object.values(ast.library).filter((m) => !m.assigns.some((a) => a.events)))
     for (const e of expressions(scope).values()) {
       if (e.kind === 'op' || e.kind === 'unary')
         allowed.push({ start: e.tokenStart, end: e.tokenEnd, kind: 'operator' });

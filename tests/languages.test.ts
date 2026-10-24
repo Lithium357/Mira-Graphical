@@ -189,7 +189,7 @@ test('SystemVerilog fill literals receive context but concatenations stay self-d
   assert.equal(result.signals.zeroes.value, '0x00');
   assert.equal(result.signals.pair.value, '0x2');
 });
-test('SystemVerilog rejects latches, clocked blocks, multiple drivers and procedural read-order dependencies', () => {
+test('SystemVerilog rejects latches, malformed clocked blocks, multiple drivers and procedural read-order dependencies', () => {
   for (const body of [
     'always_ff result = a;',
     'always_comb if (a) result = b;',

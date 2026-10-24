@@ -38,6 +38,10 @@ export async function checkPackagedApp(
       ext: 'signed.v',
       text: "module adder(input [7:0] a,b,output [7:0] y);assign y=(a==8'd2)?($signed(a)<$signed(b)):$unsigned($signed(a)>>>b);endmodule",
     },
+    {
+      ext: 'clocked.v',
+      text: "module counter(input clk,reset,output reg [7:0] y);always @(posedge clk or posedge reset) if(reset) y<=8'd0;else y<=y+8'd1;endmodule",
+    },
   ];
   ws.send(JSON.stringify({ ...config, type: 'hello', editor: 'vscode' }));
   for (const document of documents)
@@ -61,13 +65,18 @@ export async function checkPackagedApp(
     );
     await new Promise((r) => setTimeout(r, 100));
   }
-  for (const uri of service.states.keys())
+  for (const uri of [...service.states.keys()].filter((uri) => !uri.endsWith('clocked.v')))
     assert.equal(
       service.simulate(uri, { a: '2', b: '3' }).signals.y.value,
       uri.endsWith('alu.v') ? '0xef' : uri.endsWith('signed.v') ? '0x01' : '0x05',
     );
   const signedURI = pathToFileURL(join(workspace, 'check.signed.v')).href;
   assert.equal(service.simulate(signedURI, { a: '128', b: '1' }).signals.y.value, '0xc0');
+  const clockedURI = pathToFileURL(join(workspace, 'check.clocked.v')).href;
+  assert.equal(service.simulate(clockedURI, { clk: '0', reset: '1' }).signals.y.value, '0x00');
+  service.simulate(clockedURI, { clk: '0', reset: '0' });
+  assert.equal(service.simulate(clockedURI, { clk: '1', reset: '0' }).signals.y.value, '0x01');
+  assert.equal(service.simulate(clockedURI, { clk: '1', reset: '0' }).signals.y.value, '0x01');
   const snapshot = await win.webContents.executeJavaScript(
     `window.mira.command({type:'snapshot'})`,
   );
@@ -96,6 +105,7 @@ export async function checkPackagedApp(
         renderer: true,
         preloadIPC: true,
         simulation: true,
+        clockedSimulation: true,
       },
       null,
       2,
