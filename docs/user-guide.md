@@ -1,6 +1,6 @@
 # User guide
 
-Install the [Windows testing build](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.1), then follow [setup and verification](distribution.md). For source builds, see [development](development.md).
+Install the [Windows testing build](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.2), then follow [setup and verification](distribution.md). For source builds, see [development](development.md).
 
 ## Adder demo
 
@@ -41,7 +41,7 @@ Search the component palette by name or by “bus”/“port”. Drag a selectio
 
 The circuit uses the full workspace until you select a component or open **Inspector**. Close the inspector to reclaim that space. Drag the divider to resize it; focused dividers also accept arrow keys, Home and End. Pane sizes are remembered locally.
 
-**Add component** and **Simulation** stay on the main toolbar. **Edit** contains Undo/Redo, discard and clipboard actions; the selected component also offers Copy/Duplicate in its inspector. **View** contains wire labels and **Readable zoom**. The fit control gives a complete overview; Readable zoom favors legible nodes, with pan/zoom for larger circuits.
+**Add component** and **Simulation** stay on the main toolbar. **Edit** contains Undo/Redo, discard and clipboard actions; the selected component also offers Copy/Duplicate in its inspector. **View** contains wire labels, **Auto layout** and **Readable zoom**. Auto layout rearranges the current module, including dragged components, and returns to readable zoom. It keeps pending circuit edits and simulation samples. Ordinary source synchronization preserves dragged positions. Constants stay near their consumers; long mux chains fold into rows with their comparisons and operations. The fit control gives a complete overview; Readable zoom favors legible nodes, with pan/zoom for larger circuits.
 
 Simulation docks below the circuit. Drag its top divider, minimize it to keep samples while reclaiming canvas space, or close it. Inputs sit beside waveforms, with trace choices under **Signals**. The page itself does not scroll; each open pane owns its content scrolling.
 

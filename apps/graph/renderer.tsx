@@ -10,6 +10,7 @@ import {
   Handle,
   Position,
   useNodesState,
+  getViewportForBounds,
   type NodeProps,
   type Node as FlowNode,
 } from '@xyflow/react';
@@ -19,6 +20,7 @@ import { PaneDivider } from './pane-divider.js';
 import { RecoveryPanel } from './recovery-panel.js';
 import { SetupGuide, SetupPanel } from './setup-panel.js';
 import type { State } from '../../packages/core/index.js';
+import { nodeHeight } from '../../packages/core/auto-layout.js';
 import { SimulationPanel } from './simulation-panel.js';
 import type { Simulation } from '../../packages/verilog/simulation.js';
 import type { ClipboardItem, InputPort } from '../../packages/protocol/index.js';
@@ -244,6 +246,10 @@ function Diagram({
           ...old.find((o) => o.id === n.id),
           id: n.id,
           type: 'circuit',
+          // Supply initial geometry for newly constructed nodes. A status
+          // refresh can arrive before ResizeObserver has measured them.
+          initialWidth: 172,
+          initialHeight: nodeHeight(n),
           position: state.layout.nodes[n.id] ?? { x: n.depth * 250, y: n.row * 160 },
           selected: old.find((o) => o.id === n.id)?.selected,
           data: { ...n, label: n.label, connectable: state.canConstruct },
@@ -484,6 +490,16 @@ function Diagram({
                 Wire labels
               </label>
               <button onClick={() => void flowInstance.current?.()}>Readable zoom</button>
+              <button
+                onClick={async () => {
+                  await command({ type: 'autoLayout', uri: state.uri });
+                  await afterPaneResize();
+                  await flowInstance.current?.();
+                }}
+                title="Arrange all components in this module, replacing dragged positions"
+              >
+                Auto layout
+              </button>
               <label htmlFor="component-navigator">Component navigator</label>
               <select
                 id="component-navigator"
@@ -596,14 +612,32 @@ function Diagram({
             onInit={(flow) => {
               overviewInstance.current = async () => {
                 await afterPaneResize();
-                return flow.fitView(overviewFit);
+                const area = workspaceElement.current?.querySelector('.flow-surface');
+                if (!area) return false;
+                return flow.setViewport(
+                  getViewportForBounds(
+                    flow.getNodesBounds(flow.getNodes()),
+                    area.clientWidth,
+                    area.clientHeight,
+                    overviewFit.minZoom,
+                    overviewFit.maxZoom,
+                    overviewFit.padding,
+                  ),
+                );
               };
               flowInstance.current = async () => {
                 await afterPaneResize();
-                const fitted = await flow.fitView({ padding: 0.15, minZoom: 0.75, maxZoom: 1 });
                 const bounds = flow.getNodesBounds(flow.getNodes());
                 const area = workspaceElement.current?.querySelector('.flow-surface');
-                const viewport = flow.getViewport();
+                if (!area) return false;
+                const viewport = getViewportForBounds(
+                  bounds,
+                  area.clientWidth,
+                  area.clientHeight,
+                  0.75,
+                  1,
+                  0.15,
+                );
                 if (area)
                   await flow.setViewport({
                     ...viewport,
@@ -616,7 +650,7 @@ function Diagram({
                         ? 48 - bounds.y * viewport.zoom
                         : viewport.y,
                   });
-                return fitted;
+                return true;
               };
               if (state.layout.viewport && state.layout.viewport.zoom < 0.65)
                 requestAnimationFrame(

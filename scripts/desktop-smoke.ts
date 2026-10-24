@@ -912,6 +912,48 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     ),
     false,
   );
+  // Exercise the public command after a manual move, then inspect actual DOM
+  // geometry (including measured card height), rather than just layout data.
+  service.move(aluURI, not.id, 9000, 9000);
+  await click('Auto layout');
+  await until(() => !service.states.get(aluURI)!.layout.nodes[not.id].manuallyPlaced);
+  await sleep(500);
+  const geometry = await win.webContents.executeJavaScript(`(()=>{
+    const viewport=document.querySelector('.react-flow__viewport');
+    const zoom=new DOMMatrix(getComputedStyle(viewport).transform).a;
+    return Array.from(document.querySelectorAll('.react-flow__node')).map(n=>{
+      const r=n.getBoundingClientRect();
+      return {id:n.dataset.id,x:r.x/zoom,y:r.y/zoom,width:r.width/zoom,height:r.height/zoom};
+    });
+  })()`);
+  assert.equal(geometry.length, 57);
+  for (const [i, a] of geometry.entries())
+    for (const b of geometry.slice(i + 1))
+      assert(
+        a.x + a.width <= b.x ||
+          b.x + b.width <= a.x ||
+          a.y + a.height <= b.y ||
+          b.y + b.height <= a.y,
+        `ALU cards overlap: ${a.id}, ${b.id}`,
+      );
+  const layoutWidth =
+    Math.max(...geometry.map((n: any) => n.x + n.width)) -
+    Math.min(...geometry.map((n: any) => n.x));
+  const layoutHeight =
+    Math.max(...geometry.map((n: any) => n.y + n.height)) -
+    Math.min(...geometry.map((n: any) => n.y));
+  assert(layoutWidth < 3000 && layoutHeight < 3000, `ALU layout ${layoutWidth} x ${layoutHeight}`);
+  await win.webContents.executeJavaScript(
+    `document.querySelector('[aria-label="Fit entire circuit"]').click()`,
+  );
+  await sleep(500);
+  writeFileSync(join(output, 'alu-layout.png'), (await win.webContents.capturePage()).toPNG());
+  await click('Readable zoom');
+  await sleep(500);
+  writeFileSync(
+    join(output, 'alu-layout-readable.png'),
+    (await win.webContents.capturePage()).toPNG(),
+  );
   assert.equal(
     service.simulate(aluURI, { OPc: '15', OPd: '1', opcode: '8' }).signals.result.value,
     '0x001e',
@@ -929,6 +971,12 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
         unarySocket: true,
         shiftSimulation: true,
         notSimulation: true,
+        autoLayout: {
+          width: layoutWidth,
+          height: layoutHeight,
+          noOverlap: true,
+          resetManualPosition: true,
+        },
       },
       null,
       2,

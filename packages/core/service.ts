@@ -301,6 +301,9 @@ export class SyncService {
   move(uri: string, id: string, x: number, y: number) {
     this.sessions.get(uri)?.move(id, x, y);
   }
+  autoLayout(uri: string) {
+    this.sessions.get(uri)?.autoLayout();
+  }
   viewport(uri: string, v: Viewport) {
     this.sessions.get(uri)?.viewport(v);
   }

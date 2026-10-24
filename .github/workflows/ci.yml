@@ -41,6 +41,7 @@ jobs:
             test-results/project-soak.json
             test-results/accessibility-smoke.json
             test-results/alu-smoke.json
+            test-results/alu-layout*.png
   windows-installer:
     name: Windows installer
     runs-on: windows-latest

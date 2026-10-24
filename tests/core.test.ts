@@ -205,6 +205,23 @@ test('source rename allocates a new net identity', () => {
   const b = project(parse(source.replaceAll(/\ba\b/g, 'renamed')), a);
   assert(!b.nodes.some((n) => n.id === a.nodes.find((n) => n.label === 'a')!.id));
 });
+
+test('explicit auto layout resets dragged positions without changing pending source edits', () => {
+  const { s, time, patches, op } = setup();
+  time.tick(15000);
+  s.move(op().id, 9000, 9000);
+  s.graphEdit(op().id, '-');
+  const deadline = s.state.deadline;
+  const version = s.state.version;
+  s.autoLayout();
+  assert.equal(s.state.layout.nodes[op().id].manuallyPlaced, false);
+  assert(s.state.layout.nodes[op().id].x < 1000);
+  assert.equal(s.state.deadline, deadline);
+  assert.equal(s.state.version, version);
+  assert.equal(patches.length, 0);
+  time.tick(15000);
+  assert.equal(patches.length, 1, 'pending operator change still commits');
+});
 test('revision mismatch, stale ACK and disconnect preserve buffers', () => {
   const { s, time, patches, op, recovery } = setup();
   time.tick(15000);
@@ -387,6 +404,9 @@ test('module navigation preserves identities, placement and scoped patches witho
   s.selectModule('arithmetic');
   assert.equal(s.state.graph!.nodes.find((n) => n.kind === 'op')!.id, op.id);
   assert.equal(s.state.layout.nodes[op.id].x, 800);
+  s.autoLayout();
+  assert.equal(s.state.layout.nodes[op.id].manuallyPlaced, false);
+  assert.equal(s.state.layout.nodes[top.id].x, 123, 'other module placement is retained');
   s.graphEdit(op.id, '*');
   assert.throws(() => s.selectModule('workbench'), /pending/);
   time.tick(15000);

@@ -12,6 +12,7 @@ import {
 import { exportVhdlModule } from '../vhdl/index.js';
 import { simulate } from '../verilog/simulation.js';
 import { PatchDraft } from '../verilog/patches.js';
+import { autoLayout } from './auto-layout.js';
 import {
   sourceActionEdits,
   validateConstructionProof,
@@ -276,14 +277,21 @@ export class Session {
     };
   }
   private place(graph: Circuit) {
-    const columns = new Map<number, number>();
-    for (const n of [...graph.nodes].sort((a, b) => a.row - b.row)) {
-      const y = columns.get(n.depth) ?? 0;
-      const ports = Math.max(n.inputPorts?.length ?? 0, n.outputPorts?.length ?? 0);
-      columns.set(n.depth, y + Math.max(160, ports * 26 + 110));
+    const positions = autoLayout(graph);
+    for (const n of graph.nodes) {
       if (!this.state.layout.nodes[n.id]?.manuallyPlaced)
-        this.state.layout.nodes[n.id] = { x: n.depth * 250, y, manuallyPlaced: false };
+        this.state.layout.nodes[n.id] = { ...positions[n.id], manuallyPlaced: false };
     }
+  }
+  autoLayout() {
+    const graph = this.draft?.graph ?? this.state.graph;
+    if (!graph) return;
+    for (const n of graph.nodes) delete this.state.layout.nodes[n.id];
+    this.place(graph);
+    delete this.state.layout.viewport;
+    if (this.state.layout.viewports) delete this.state.layout.viewports[graph.module];
+    this.hooks.persist(this.state.uri, this.state.layout);
+    this.emit();
   }
   private clearDraft() {
     this.draft = undefined;

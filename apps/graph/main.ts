@@ -182,6 +182,7 @@ else {
             kind: c.kind as GraphChange['kind'],
             value: c.value,
           });
+        else if (c.type === 'autoLayout') service!.autoLayout(c.uri);
         else if (
           c.type === 'move' &&
           typeof c.id === 'string' &&

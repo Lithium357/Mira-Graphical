@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.2
+
+- Replaced declaration-order columns with deterministic dependency layout: constants stay near consumers, neighbouring layers reduce crossings, and long mux chains fold into rows with each stage's private comparison and operation.
+- Added **View → Auto layout** to rearrange the current module and return to readable zoom. Explicit rearrangement resets dragged positions; ordinary synchronization still preserves them. Source edits, construction drafts and simulation samples are retained.
+- Fixed overview/readable fitting after inspector resizing by measuring the visible canvas directly.
+- Added geometry checks for the reported 57-node INT16 ALU, small circuits and hierarchy, plus Windows UI checks for measured card overlap, manual-position reset and circuit fitting.
+
 ## 0.9.1
 
 - Detects existing per-user or all-users Windows installations and shows its installed version and location before replacement. Declining cancels before app files change; the same version offers reinstallation.
