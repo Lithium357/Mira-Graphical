@@ -108,7 +108,7 @@ test('reject precedence changes that would regroup surrounding expression', () =
 });
 test('clocked session state persists between samples and resets after source changes or restart', () => {
   const { s, time } = setup();
-  const text = `module counter(input clk,reset,output reg [7:0] q);always @(posedge clk or posedge reset) if(reset) q<=8'd0;else q<=q+8'd1;endmodule`;
+  const text = `module counter(input clk,reset,output reg [7:0] q);always @(posedge clk or posedge reset) if(reset) q<=8'd0;else q<=q+8'd1;endmodule module helper();endmodule`;
   s.userText(2, text);
   time.tick(15000);
   assert.equal(s.state.status, 'Synced');
@@ -122,6 +122,14 @@ test('clocked session state persists between samples and resets after source cha
   assert.equal(s.simulate({ clk: '0', reset: '0' }).signals.q.value, '0bxxxxxxxx');
   s.simulate({ clk: '0', reset: '1' });
   assert.equal(s.simulate({ clk: '0', reset: '0' }, true).signals.q.value, '0bxxxxxxxx');
+  s.simulate({ clk: '0', reset: '1' });
+  s.selectModule('helper');
+  s.selectModule('counter');
+  assert.equal(s.simulate({ clk: '0', reset: '0' }).signals.q.value, '0bxxxxxxxx');
+  s.simulate({ clk: '0', reset: '1' });
+  s.userText(4, text);
+  time.tick(15000);
+  assert.equal(s.simulate({ clk: '0', reset: '0' }).signals.q.value, '0bxxxxxxxx');
 });
 test('bounded invalid and unsupported syntax, undeclared and cycles', () => {
   for (const text of [

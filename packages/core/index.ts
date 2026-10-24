@@ -215,6 +215,7 @@ export class Session {
   }
   userText(version: number, text: string) {
     if (version <= this.state.version) return;
+    this.simulation = undefined;
     if (this.edits.size || this.draft) {
       this.snapshot('Text superseded pending graph edits');
       this.state.detail = 'Pending graph edits saved to recovery.';
@@ -418,6 +419,7 @@ export class Session {
     if (this.draft?.table.edits().length || this.edits.size)
       throw new Error('Synchronize or discard pending edits before navigating modules.');
     parse(this.text, name);
+    this.simulation = undefined;
     this.clearDraft();
     if (this.timer !== undefined) this.time.clear(this.timer);
     this.timer = undefined;
