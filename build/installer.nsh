@@ -28,7 +28,7 @@ Var miraReplaceMessage
       ${Else}
         StrCpy $miraReplaceMessage "Mira Graphical $miraOldVersion is installed. Replace it with ${VERSION}?"
       ${EndIf}
-      MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "$miraReplaceMessage$\r$\n$\r$\nInstalled in: $miraOldLocation$\r$\n$\r$\nYour project files, recovery snapshots and app settings are kept." IDYES miraReplaceConfirmed
+      MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "$miraReplaceMessage$\r$\n$\r$\nInstalled in: $miraOldLocation$\r$\n$\r$\nApplication files in this folder will be replaced. App settings and project folders outside this installation folder are kept." IDYES miraReplaceConfirmed
       SetErrorLevel 1602
       Quit
       miraReplaceConfirmed:
@@ -36,3 +36,4 @@ Var miraReplaceMessage
   ${EndIf}
 !macroend
 !endif
+
