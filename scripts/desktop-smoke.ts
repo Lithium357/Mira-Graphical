@@ -918,7 +918,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   // Suspend frames without hiding Chromium itself: executeJavaScript can pause
   // indefinitely in a hidden native window, which would stall the test driver.
   await win.webContents.executeJavaScript(
-    `window.__savedLayoutRAF=window.requestAnimationFrame;window.requestAnimationFrame=()=>0;`,
+    `window.__savedLayoutRAF=window.requestAnimationFrame;void(window.requestAnimationFrame=()=>0);`,
   );
   await click('Auto layout');
   await until(() => !service.states.get(aluURI)!.layout.nodes[not.id].manuallyPlaced);
