@@ -1,8 +1,8 @@
 # Windows distribution — 0.8.0
 
-The **windows-installer** CI artifact contains **Mira-Graphical-Setup-0.8.0-x64.exe**, corresponding project source, a manifest and SHA-256 checksums. Run the installer, then launch Mira Graphical from the Start menu or desktop. Select your project folder on first launch; Setup help can switch folders later. In Setup help, **Show VS Code extension…** locates the bundled VSIX for VS Code's **Extensions: Install from VSIX…** command. Open that same project folder in VS Code and share an HDL file with **RTL Graph: Open Current Module**. Running the installed application needs no Node, pnpm, repository checkout or terminal.
+Download the [0.8.0 Windows testing preview](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.8.0). The release assets and the **windows-installer** CI artifact contain **Mira-Graphical-Setup-0.8.0-x64.exe**, corresponding project source, a manifest and SHA-256 checksums. Run the installer, then launch Mira Graphical from the Start menu or desktop. Select your project folder on first launch; Setup help can switch folders later. In Setup help, **Show VS Code extension…** locates the bundled VSIX for VS Code's **Extensions: Install from VSIX…** command. Open that same project folder in VS Code and share an HDL file with **RTL Graph: Open Current Module**. Running the installed application needs no Node, pnpm, repository checkout or terminal.
 
-This is an unsigned per-user NSIS installer. Windows may show an unknown-publisher/SmartScreen prompt. It supports a custom install directory, creates shortcuts and an uninstaller, and preserves project files/recovery data on uninstall. Signing and publishing remain separate actions.
+This is an unsigned per-user NSIS installer. Windows may show an unknown-publisher/SmartScreen prompt. It supports a custom install directory, creates shortcuts and an uninstaller, and preserves project files/recovery data on uninstall. The GitHub prerelease distributes the tested unsigned build; code signing and Marketplace publishing remain deferred.
 
 Use the exact Git commit from the selected green CI run. On Windows with Node 24 and pnpm 11.25.0:
 
@@ -46,4 +46,4 @@ Check that the manifest revision matches the intended CI commit and `dirty` is f
 
 The app's Setup help shows the workspace and current connection state. Changing projects restarts the app after checkpointing pending work; reconnect/share the selected project's live buffer in VS Code. The editor remains responsible for saving source files. Developer launches may still use `pnpm exec electron . --workspace="C:\path\to\project"`.
 
-Before 1.0, resolve the open gates in [launch readiness](launch-readiness.md), review [supported syntax](supported-syntax.md), attach release notes and exact-run evidence, and select the tested artifact. Publishing a GitHub release, Marketplace upload and signing are separate actions.
+Before 1.0, resolve the open gates in [launch readiness](launch-readiness.md), review [supported syntax](supported-syntax.md), attach release notes and exact-run evidence, and select the tested artifact. The 0.8.0 testing prerelease is available on GitHub; a stable 1.0 release, Marketplace upload and signing remain separate actions.

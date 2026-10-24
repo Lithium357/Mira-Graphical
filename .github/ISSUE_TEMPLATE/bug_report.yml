@@ -1,0 +1,30 @@
+name: Bug report
+description: Report an installation, circuit, source synchronization or simulation problem.
+title: '[Bug]: '
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Mira version and environment
+      placeholder: '0.8.0; Windows 11 x64; VS Code version…'
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include what you expected and what happened. Mention whether the editor buffer had unsaved changes.
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Small HDL example
+      description: Include the language, relevant source and visible diagnostic. Remove private project details before posting.
+      render: text
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or other evidence
+      description: Optional. Remove private paths, source and credentials.

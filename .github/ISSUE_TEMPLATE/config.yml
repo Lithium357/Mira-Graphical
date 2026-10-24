@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Supported HDL syntax
+    url: https://github.com/Lithium357/Mira-Graphical/blob/main/docs/supported-syntax.md
+    about: Check the current language subset and limitations.
+  - name: Windows setup help
+    url: https://github.com/Lithium357/Mira-Graphical/blob/main/docs/distribution.md
+    about: Install the Windows app and connect the VS Code companion.

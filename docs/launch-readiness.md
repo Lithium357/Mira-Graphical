@@ -12,7 +12,7 @@ Completed release foundations:
 - Process hard-kill recovery verification and a 600-edit/60-reconnect, three-language service soak with 198-node generated datapaths.
 - Native keyboard and accessibility-tree checks for setup, component navigation, wiring, palette and simulation, plus modal Escape/focus restoration.
 - First-run workspace/connection guidance and actionable companion connection errors.
-- Pinned external-project refusal review, 0.7.0 release notes and unsigned artifact/checksum instructions.
+- Pinned external-project refusal review, 0.8.0 release notes and unsigned artifact/checksum instructions.
 
 Remaining work before declaring 1.0:
 
