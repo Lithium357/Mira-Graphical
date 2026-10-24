@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import { parse, expressions, expressionWidth, type Expr, type Module } from './index.js';
+import {
+  parse,
+  expressions,
+  expressionWidth,
+  expressionSigned,
+  type Expr,
+  type Module,
+} from './index.js';
 import { isComparison } from '../protocol/index.js';
 import { literalWidth } from './literals.js';
 type Bits = { width: number; value: bigint; known: bigint };
@@ -18,10 +25,15 @@ const known = (width: number, value: bigint): Bits => ({
   known: mask(width),
 });
 const unknown = (width: number): Bits => ({ width, value: 0n, known: 0n });
-function resize(bits: Bits, width: number): Bits {
+function resize(bits: Bits, width: number, signed = false): Bits {
   const m = mask(width),
     extended = width > bits.width ? m ^ mask(bits.width) : 0n;
-  return { width, value: bits.value & m, known: (bits.known | extended) & m };
+  const sign = 1n << BigInt(bits.width - 1);
+  return {
+    width,
+    value: (bits.value | (signed && bits.value & sign ? extended : 0n)) & m,
+    known: (bits.known | (!signed || bits.known & sign ? extended : 0n)) & m,
+  };
 }
 function literal(text: string): Bits {
   const width = literalWidth(text),
@@ -66,7 +78,7 @@ function format(bits: Bits): string {
     result += bits.known & (1n << BigInt(i)) ? (bits.value & (1n << BigInt(i)) ? '1' : '0') : 'x';
   return bits.width === 1 ? result : '0b' + result;
 }
-/** Zero-delay unsigned combinational evaluator. Unknown bits never silently become zeros. */
+/** Zero-delay combinational evaluator. Unknown bits never silently become zeros. */
 export function simulate(
   source: string,
   selected: string,
@@ -131,24 +143,38 @@ export function simulate(
       return result;
     };
     const width = (e: Expr): number => expressionWidth(e, ast.nets);
-    function expression(e: Expr, context = 0): Bits {
+    const evaluated = new Map<Expr, Bits>();
+    function expression(e: Expr, context = 0, signedContext?: boolean): Bits {
+      const result = evaluateExpression(e, context, signedContext);
+      evaluated.set(e, result);
+      return result;
+    }
+    function evaluateExpression(e: Expr, context = 0, signedContext?: boolean): Bits {
       if (ast.language === 'vhdl') context = 0;
-      if (e.kind === 'convert') return resize(expression(e.value), width(e));
-      if (e.kind === 'ref') return net(e.value);
+      const signed = signedContext ?? expressionSigned(e);
+      if (e.kind === 'convert')
+        return ast.language === 'vhdl'
+          ? resize(expression(e.value), width(e))
+          : resize(expression(e.value), Math.max(context, width(e)), signed);
+      if (e.kind === 'ref') return resize(net(e.value), Math.max(context, width(e)), signed);
       if (e.kind === 'literal')
         return /^'[01]$/.test(e.value)
           ? known(Math.max(1, context), e.value === "'1" ? mask(Math.max(1, context)) : 0n)
-          : literal(e.value);
+          : resize(literal(e.value), Math.max(context, width(e)), signed);
       if (e.kind === 'slice') {
         const declaration = ast.nets.find((n) => n.name === e.value)!,
           base = net(e.value),
           shift = Math.abs(e.lsb - declaration.lsb),
           w = width(e);
-        return {
-          width: w,
-          value: (base.value >> BigInt(shift)) & mask(w),
-          known: (base.known >> BigInt(shift)) & mask(w),
-        };
+        return resize(
+          {
+            width: w,
+            value: (base.value >> BigInt(shift)) & mask(w),
+            known: (base.known >> BigInt(shift)) & mask(w),
+          },
+          Math.max(context, w),
+          signed,
+        );
       }
       if (e.kind === 'concat') {
         let value = 0n,
@@ -161,68 +187,81 @@ export function simulate(
           value = (value << BigInt(bits.width)) | bits.value;
           k = (k << BigInt(bits.width)) | bits.known;
         }
-        return { width: w, value, known: k };
+        return resize({ width: w, value, known: k }, Math.max(context, w), signed);
       }
       if (e.kind === 'unary') {
         const w = Math.max(width(e), context),
-          a = resize(expression(e.value, w), w);
+          a = resize(expression(e.value, w, signed), w, signed);
         return { width: w, value: ~a.value & mask(w), known: a.known };
       }
       if (e.kind === 'op' && isComparison(e.op)) {
         const w = Math.max(width(e.left), width(e.right)),
           m = mask(w);
-        const a = resize(expression(e.left, w), w),
-          b = resize(expression(e.right, w), w);
+        const operandSigned = expressionSigned(e.left) && expressionSigned(e.right);
+        const a = resize(expression(e.left, w, operandSigned), w, operandSigned),
+          b = resize(expression(e.right, w, operandSigned), w, operandSigned);
         const mismatch = ((a.value ^ b.value) & a.known & b.known) !== 0n;
+        if (e.op === '===' || e.op === '!==') {
+          const equal = a.known === b.known && ((a.value ^ b.value) & a.known) === 0n;
+          return known(1, BigInt(e.op === '===' ? equal : !equal));
+        }
         if (e.op === '==' || e.op === '!=') {
           if (mismatch) return known(1, BigInt(e.op === '!='));
           if (a.known !== m || b.known !== m) return unknown(1);
           return known(1, BigInt(e.op === '=='));
         }
         if (a.known !== m || b.known !== m) return unknown(1);
+        const integer = (bits: Bits) =>
+          operandSigned && bits.value & (1n << BigInt(w - 1))
+            ? bits.value - (1n << BigInt(w))
+            : bits.value;
+        const av = integer(a),
+          bv = integer(b);
         return known(
           1,
           BigInt(
-            e.op === '<'
-              ? a.value < b.value
-              : e.op === '<='
-                ? a.value <= b.value
-                : e.op === '>'
-                  ? a.value > b.value
-                  : a.value >= b.value,
+            e.op === '<' ? av < bv : e.op === '<=' ? av <= bv : e.op === '>' ? av > bv : av >= bv,
           ),
         );
       }
       const w = Math.max(width(e), context),
         m = mask(w);
       if (e.kind === 'mux') {
+        const truthySigned = e.procedural ? expressionSigned(e.truthy) : signed;
+        const falsySigned = e.procedural ? expressionSigned(e.falsy) : signed;
         const condition = expression(e.condition),
-          truthy = resize(expression(e.truthy, w), w),
-          falsy = resize(expression(e.falsy, w), w);
+          truthy = resize(expression(e.truthy, w, truthySigned), w, truthySigned),
+          falsy = resize(expression(e.falsy, w, falsySigned), w, falsySigned);
         if (condition.value & condition.known) return truthy;
-        if (condition.known === mask(condition.width)) return falsy;
+        if (condition.known === mask(condition.width) || e.procedural) return falsy;
         return {
           width: w,
           value: truthy.value,
           known: truthy.known & falsy.known & ~(truthy.value ^ falsy.value) & m,
         };
       }
-      if (e.op === '<<' || e.op === '>>') {
-        const a = resize(expression(e.left, w), w),
+      if (e.op === '<<' || e.op === '>>' || e.op === '>>>') {
+        const a = resize(expression(e.left, w, signed), w, signed),
           b = expression(e.right);
         if (b.known !== mask(b.width)) return unknown(w);
-        if (b.value >= BigInt(w)) return known(w, 0n);
-        const n = b.value;
+        const n = b.value >= BigInt(w) ? BigInt(w) : b.value;
         if (e.op === '<<')
           return {
             width: w,
             value: (a.value << n) & m,
             known: ((a.known << n) | ((1n << n) - 1n)) & m,
           };
-        return { width: w, value: a.value >> n, known: (a.known >> n) | (m ^ (m >> n)) };
+        const fill = m ^ (m >> n);
+        const sign = 1n << BigInt(w - 1);
+        const arithmetic = e.op === '>>>' && signed;
+        return {
+          width: w,
+          value: (a.value >> n) | (arithmetic && a.value & sign ? fill : 0n),
+          known: (a.known >> n) | (!arithmetic || a.known & sign ? fill : 0n),
+        };
       }
-      const a = resize(expression(e.left, w), w),
-        b = resize(expression(e.right, w), w);
+      const a = resize(expression(e.left, w, signed), w, signed),
+        b = resize(expression(e.right, w, signed), w, signed);
       if (e.op === '&') {
         const zeros = (a.known & ~a.value) | (b.known & ~b.value);
         return { width: w, value: a.value & b.value, known: (a.known & b.known) | zeros };
@@ -249,7 +288,9 @@ export function simulate(
         const target = ast.assigns.find(
           (a) => `${ast.name}/assign/${a.target}/expr` === key,
         )?.target;
-        const result = expression(e, target ? ast.nets.find((n) => n.name === target)!.width : 0);
+        const result =
+          evaluated.get(e) ??
+          expression(e, target ? ast.nets.find((n) => n.name === target)!.width : 0);
         nodes[
           key +
             (e.kind === 'literal'

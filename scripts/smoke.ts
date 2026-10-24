@@ -34,6 +34,10 @@ for (const ext of ['sv', 'vhd', 'vhdl'])
     join(workspace, `hierarchy.${ext}`),
     readFileSync(`fixtures/hierarchy.${ext === 'vhdl' ? 'vhd' : ext}`),
   );
+writeFileSync(
+  join(workspace, 'hierarchy.signed.v'),
+  readFileSync('fixtures/hierarchy.v', 'utf8').replace('a + b', '$signed(a) >>> b'),
+);
 const electron = createRequire(import.meta.url)('electron') as string;
 async function launch(exe: string, args: string[], env = process.env) {
   return await new Promise<void>((ok, fail) => {
@@ -124,7 +128,7 @@ for (let pass = 0; pass < 2; pass++) {
     );
     for (const s of states) {
       if (
-        /hierarchy\.(sv|vhd|vhdl)$/.test(s.uri) &&
+        /hierarchy\.(sv|vhd|vhdl|signed\.v)$/.test(s.uri) &&
         !languageEdited.has(s.uri) &&
         s.status === 'Synced' &&
         s.graph
@@ -135,7 +139,7 @@ for (let pass = 0; pass < 2; pass++) {
         service.graphEdit(
           s.uri,
           graph.nodes.find((n) => n.kind === 'op')!.id,
-          s.uri.endsWith('.sv') ? '<<' : '-',
+          s.uri.endsWith('signed.v') ? '>>' : s.uri.endsWith('.sv') ? '<<' : '-',
         );
         service.circuitAction(s.uri, {
           kind: 'create',
@@ -146,7 +150,7 @@ for (let pass = 0; pass < 2; pass++) {
         });
         assert.equal(
           service.simulate(s.uri, { a: '9', b: '3' }).signals.result.value,
-          s.uri.endsWith('.sv') ? '0x48' : '0x06',
+          s.uri.endsWith('signed.v') ? '0x01' : s.uri.endsWith('.sv') ? '0x48' : '0x06',
         );
       }
       if (s.uri.endsWith('adder.v')) {

@@ -29,14 +29,15 @@ const Comment = createToken({
   line_breaks: true,
 });
 const Identifier = createToken({ name: 'Identifier', pattern: /[a-zA-Z_][a-zA-Z0-9_$]*/ });
+const SystemCast = createToken({ name: 'SystemCast', pattern: /\$(?:signed|unsigned)\b/ });
 const Fill = createToken({ name: 'Fill', pattern: /'[01]/ });
 const Based = createToken({ name: 'Based', pattern: /[0-9][0-9_]*'[bBoOdDhH][0-9a-fA-FxXzZ_]+/ });
 const Integer = createToken({ name: 'Integer', pattern: /[0-9][0-9_]*/ });
 const Symbol = createToken({
   name: 'Symbol',
-  pattern: /<<|>>|==|!=|<=|>=|[{}()[\]:?;,.=+*\-&|^~<>]/,
+  pattern: />>>|===|!==|<<|>>|==|!=|<=|>=|[{}()[\]:?;,.=+*\-&|^~<>]/,
 });
-const lexer = new Lexer([WS, Comment, Identifier, Fill, Based, Integer, Symbol], {
+const lexer = new Lexer([WS, Comment, SystemCast, Identifier, Fill, Based, Integer, Symbol], {
   ensureOptimizations: false,
 });
 export type Diagnostic = { message: string; start: number; end: number };
@@ -52,7 +53,7 @@ class ParseError extends Error implements Diagnostic {
 export type Expr = (
   | {
       kind: 'convert';
-      conversion: 'unsigned' | 'std_logic_vector' | 'resize';
+      conversion: 'signed' | 'unsigned' | 'std_logic_vector' | 'resize';
       value: Expr;
       resultWidth?: number;
       qualified?: boolean;
@@ -92,7 +93,15 @@ export type Expr = (
       rangeStart: number;
       rangeEnd: number;
     }
-  | { kind: 'mux'; condition: Expr; truthy: Expr; falsy: Expr; start: number; end: number }
+  | {
+      kind: 'mux';
+      condition: Expr;
+      truthy: Expr;
+      falsy: Expr;
+      start: number;
+      end: number;
+      procedural?: boolean;
+    }
 ) & {
   outerStart?: number;
   outerEnd?: number;
@@ -180,12 +189,15 @@ const precedence: Record<string, number> = {
   '&': 3,
   '==': 4,
   '!=': 4,
+  '===': 4,
+  '!==': 4,
   '<': 5,
   '<=': 5,
   '>': 5,
   '>=': 5,
   '<<': 6,
   '>>': 6,
+  '>>>': 6,
   '+': 7,
   '-': 7,
   '*': 8,
@@ -345,7 +357,19 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   function expr(min = 0): Expr {
     if (++recursion > 128) fail('Expression nesting exceeds 128 levels.');
     let left: Expr;
-    if (peek() === '~') {
+    if (tokens[i]?.tokenType === SystemCast) {
+      const token = take();
+      take('(');
+      const value = expr();
+      const close = take(')');
+      left = {
+        kind: 'convert',
+        conversion: token.image === '$signed' ? 'signed' : 'unsigned',
+        value,
+        start: token.startOffset,
+        end: close.endOffset! + 1,
+      };
+    } else if (peek() === '~') {
       const token = take('~');
       const value = expr(9);
       left = {
@@ -521,6 +545,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
             target: truthy.target,
             expr: {
               kind: 'mux',
+              procedural: true,
               condition,
               truthy: truthy.expr,
               falsy: falsy.expr,
@@ -654,6 +679,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   };
 }
 export type Node = {
+  signed?: boolean;
   nativeType?: Net['nativeType'];
   id: string;
   key: string;
@@ -710,8 +736,11 @@ export const opNames: Record<Operator, string> = {
   '^': 'XOR',
   '<<': 'SHL',
   '>>': 'SHR',
+  '>>>': 'ASHR',
   '==': 'EQ',
   '!=': 'NE',
+  '===': 'CASE EQ',
+  '!==': 'CASE NE',
   '<': 'LT',
   '<=': 'LE',
   '>': 'GT',
@@ -730,8 +759,22 @@ export function expressionWidth(e: Expr, nets: Net[]): number {
   if (e.kind === 'concat') return e.parts.reduce((sum, p) => sum + width(p), 0);
   if (e.kind === 'mux') return Math.max(width(e.truthy), width(e.falsy));
   if (isComparison(e.op)) return 1;
-  if (e.op === '<<' || e.op === '>>') return width(e.left);
+  if (e.op === '<<' || e.op === '>>' || e.op === '>>>') return width(e.left);
   return Math.max(width(e.left), width(e.right));
+}
+/** Self-determined Verilog type. Nets in this subset are unsigned; explicit
+ * casts and unsized decimal literals can introduce signed expressions. */
+export function expressionSigned(e: Expr): boolean {
+  if (e.nativeType) return false;
+  if (e.kind === 'convert') return e.conversion === 'signed';
+  if (e.kind === 'literal') return /^[0-9][0-9_]*$/.test(e.value);
+  if (e.kind === 'unary') return expressionSigned(e.value);
+  if (e.kind === 'mux')
+    return !e.procedural && expressionSigned(e.truthy) && expressionSigned(e.falsy);
+  if (e.kind !== 'op' || isComparison(e.op)) return false;
+  return (
+    expressionSigned(e.left) && (['<<', '>>', '>>>'].includes(e.op) || expressionSigned(e.right))
+  );
 }
 export function project(
   ast: Module,
@@ -783,16 +826,18 @@ export function project(
       targetHandle: port,
     });
   const widthOf = (e: Expr): number => expressionWidth(e, ast.nets);
-  function visit(e: Expr, key: string, context = 0): Node {
+  function visit(e: Expr, key: string, context = 0, signedContext?: boolean): Node {
     if (ast.language === 'vhdl') context = 0;
+    const signed = signedContext ?? expressionSigned(e);
     if (e.kind === 'unary') {
       const w = Math.max(context, widthOf(e));
-      const child = visit(e.value, key + '/V', w);
+      const child = visit(e.value, key + '/V', w, signed);
       const node = add(key, {
         kind: 'op',
         expressionKey: key,
         label: 'NOT',
         op: '~',
+        signed,
         width: w,
         operands: [child.label],
         operandWidths: [w],
@@ -807,7 +852,8 @@ export function project(
         kind: 'convert',
         label: e.conversion.toUpperCase(),
         expressionKey: key,
-        width: widthOf(e),
+        width: ast.language === 'vhdl' ? widthOf(e) : Math.max(context, widthOf(e)),
+        signed: ast.language === 'vhdl' ? undefined : signed,
         operands: [child.label],
       });
       connect(child, node, 'left');
@@ -849,11 +895,12 @@ export function project(
     if (e.kind === 'mux') {
       const w = Math.max(context, widthOf(e));
       const c = visit(e.condition, `${key}/C`),
-        t = visit(e.truthy, `${key}/T`, w),
-        f = visit(e.falsy, `${key}/F`, w);
+        t = visit(e.truthy, `${key}/T`, w, e.procedural ? undefined : signed),
+        f = visit(e.falsy, `${key}/F`, w, e.procedural ? undefined : signed);
       const n = add(`${key}/mux`, {
         kind: 'mux',
         label: 'MUX',
+        signed,
         expressionKey: key,
         selector: e.condition.kind === 'ref' ? e.condition.value : undefined,
         operandSignature: JSON.stringify([semantic(e.truthy), semantic(e.falsy)]),
@@ -866,17 +913,21 @@ export function project(
       return n;
     }
     const comparison = isComparison(e.op),
-      shift = e.op === '<<' || e.op === '>>';
+      shift = e.op === '<<' || e.op === '>>' || e.op === '>>>';
     const w = comparison ? 1 : Math.max(context, widthOf(e));
     const operandWidth = comparison ? Math.max(widthOf(e.left), widthOf(e.right)) : w;
     const rightWidth = shift ? widthOf(e.right) : operandWidth;
-    const l = visit(e.left, key + '/L', operandWidth);
-    const r = visit(e.right, key + '/R', rightWidth);
+    const operandSigned = comparison
+      ? expressionSigned(e.left) && expressionSigned(e.right)
+      : signed;
+    const l = visit(e.left, key + '/L', operandWidth, operandSigned);
+    const r = visit(e.right, key + '/R', rightWidth, shift ? undefined : operandSigned);
     const n = add(key, {
       kind: 'op',
       expressionKey: key,
       label: opNames[e.op],
       op: e.op,
+      signed: comparison ? operandSigned : signed,
       operands: [l.label, r.label],
       operandWidths: [operandWidth, rightWidth],
       operandSignature: JSON.stringify([semantic(e.left), semantic(e.right)]),
@@ -947,6 +998,12 @@ export function project(
   const warn = (node: Node, code: string, message: string) =>
     issues.push({ nodeKey: node.key, code, message });
   for (const node of nodes) {
+    if (node.op === '>>>' && !node.signed)
+      warn(
+        node,
+        'unsigned-shift',
+        'Arithmetic right shift has an unsigned operand in this expression and fills with zero. To isolate a signed shift from an unsigned mux arm, use $unsigned($signed(value) >>> amount).',
+      );
     if (node.undriven) warn(node, 'undriven', `${node.label} has no driver.`);
     if (['wire', 'input'].includes(node.kind) && !edges.some((e) => e.source === node.id))
       warn(node, 'unused', `${node.label} is unused.`);
@@ -980,7 +1037,7 @@ export function project(
         warn(
           node,
           actual > expected ? 'truncation' : 'extension',
-          `${from.sourceNet ?? from.label}: ${actual} -> ${expected} bits at ${node.label} (${actual > expected ? 'high bits discarded' : 'zero extended'}).`,
+          `${from.sourceNet ?? from.label}: ${actual} -> ${expected} bits at ${node.label} (${actual > expected ? 'high bits discarded' : node.kind === 'convert' && node.signed ? 'sign extended' : 'zero extended'}).`,
         );
     }
   }
@@ -1015,7 +1072,7 @@ export function shape(e: Expr): string {
   if (e.kind === 'convert') return `${e.conversion}:${e.resultWidth ?? ''}(${shape(e.value)})`;
   if (e.kind === 'concat') return `concat(${e.parts.map(shape).join(',')})`;
   return e.kind === 'mux'
-    ? `mux(${shape(e.condition)},${shape(e.truthy)},${shape(e.falsy)})`
+    ? `${e.procedural ? 'ifmux' : 'mux'}(${shape(e.condition)},${shape(e.truthy)},${shape(e.falsy)})`
     : e.kind === 'op'
       ? `(${shape(e.left)},${shape(e.right)})`
       : e.kind === 'slice'
@@ -1027,7 +1084,7 @@ function semantic(e: Expr): string {
   if (e.kind === 'convert') return `${e.conversion}:${e.resultWidth ?? ''}(${semantic(e.value)})`;
   if (e.kind === 'concat') return `concat(${e.parts.map(semantic).join(',')})`;
   return e.kind === 'mux'
-    ? `mux(${semantic(e.condition)},${semantic(e.truthy)},${semantic(e.falsy)})`
+    ? `${e.procedural ? 'ifmux' : 'mux'}(${semantic(e.condition)},${semantic(e.truthy)},${semantic(e.falsy)})`
     : e.kind === 'op'
       ? `${e.op}(${semantic(e.left)},${semantic(e.right)})`
       : shape(e);

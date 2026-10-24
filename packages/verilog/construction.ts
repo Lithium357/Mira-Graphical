@@ -18,6 +18,7 @@ import {
   type Module,
   type Node,
   children,
+  expressionSigned,
 } from './index.js';
 import { literalWidth } from './literals.js';
 import { PatchDraft } from './patches.js';
@@ -172,7 +173,7 @@ function create(source: string, ast: Module, action: CreateComponent): Edit[] {
   return [bodyInsertion(source, ast, statements)];
 }
 function operand(e: Expr, port: InputPort): Expr {
-  if (e.kind === 'unary' && port === 'left') return e.value;
+  if ((e.kind === 'unary' || e.kind === 'convert') && port === 'left') return e.value;
   if (e.kind === 'concat' && /^part:[0-9]+$/.test(port)) {
     const part = e.parts[Number(port.slice(5))];
     if (!part) throw new Error('Invalid concatenation socket.');
@@ -456,7 +457,7 @@ export function copyComponents(
       ...(net.direction === 'wire' || !ports.has(name) ? {} : { direction: net.direction }),
       ...(driver
         ? {
-            expression: copyExpression(source, driver.expr),
+            expression: copyExpression(source, driver.expr, net.width),
           }
         : {}),
     };
@@ -509,7 +510,7 @@ function paste(source: string, ast: Module, items: ClipboardItem[]): Edit[] {
     if (typeof text !== 'string' || text.length > 32768 || /[.;]|\/\/|\/\*/.test(text))
       throw new Error('Clipboard expressions cannot contain statements or comments.');
     return text.replace(
-      /[0-9][0-9_]*'[bBoOdDhH][0-9a-fA-F_]+|[a-zA-Z_][a-zA-Z0-9_$]*/g,
+      /\$(?:signed|unsigned)\b|[0-9][0-9_]*'[bBoOdDhH][0-9a-fA-F_]+|[a-zA-Z_][a-zA-Z0-9_$]*/g,
       (token) => mapping.get(token) ?? token,
     );
   };
@@ -550,11 +551,19 @@ function paste(source: string, ast: Module, items: ClipboardItem[]): Edit[] {
   return draft.edits();
 }
 
-function copyExpression(source: string, e: Expr): string {
+function copyExpression(source: string, e: Expr, contextWidth: number): string {
   const text = source
     .slice(expressionSpan(e).start, expressionSpan(e).end)
     .replace(/\/\/[^\r\n]*|\/\*[\s\S]*?\*\//g, ' ');
   if (!text.includes(';')) return text;
+  // A procedural if assigns each arm independently. Freeze each arm's width
+  // and type before expressing it as a ternary; bitwise OR preserves x masks.
+  const arm = (e: Expr) =>
+    `$unsigned((${render(e)}) | ${expressionSigned(e) ? `$signed(${contextWidth}'d0)` : `${contextWidth}'d0`})`;
+  const branch = (owner: Extract<Expr, { kind: 'mux' }>, value: Expr) =>
+    owner.procedural && (expressionSigned(owner.truthy) || expressionSigned(owner.falsy))
+      ? arm(value)
+      : render(value);
   const render = (e: Expr): string =>
     e.kind === 'ref' || e.kind === 'literal'
       ? e.value
@@ -563,13 +572,15 @@ function copyExpression(source: string, e: Expr): string {
         : e.kind === 'concat'
           ? `{${e.parts.map(render).join(', ')}}`
           : e.kind === 'mux'
-            ? `(${render(e.condition)} ? ${render(e.truthy)} : ${render(e.falsy)})`
+            ? `(${e.procedural ? `(((${render(e.condition)}) != 0) === 1'b1)` : render(e.condition)} ? ${branch(e, e.truthy)} : ${branch(e, e.falsy)})`
             : e.kind === 'unary'
               ? `(~${render(e.value)})`
-              : e.kind === 'op'
-                ? `(${render(e.left)} ${e.op} ${render(e.right)})`
-                : (() => {
-                    throw new Error('Unsupported cross-language expression.');
-                  })();
+              : e.kind === 'convert' && ['signed', 'unsigned'].includes(e.conversion)
+                ? `$${e.conversion}(${render(e.value)})`
+                : e.kind === 'op'
+                  ? `(${render(e.left)} ${e.op} ${render(e.right)})`
+                  : (() => {
+                      throw new Error('Unsupported cross-language expression.');
+                    })();
   return render(e);
 }

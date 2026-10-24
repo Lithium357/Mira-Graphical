@@ -620,6 +620,8 @@ export function inferVhdl(
       width: literalWidth(e.value),
     };
   else if (e.kind === 'convert') {
+    if (e.conversion === 'signed')
+      throw new Error('Signed Verilog casts are not VHDL conversions.');
     const inner = inferVhdl(
       e.value,
       ast,

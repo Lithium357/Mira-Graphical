@@ -7,8 +7,11 @@ export const operators = [
   ...vhdlOperators,
   '<<',
   '>>',
+  '>>>',
   '==',
   '!=',
+  '===',
+  '!==',
   '<',
   '<=',
   '>',
@@ -16,7 +19,8 @@ export const operators = [
   '~',
 ] as const;
 export type Operator = (typeof operators)[number];
-export const isComparison = (op: Operator) => ['==', '!=', '<', '<=', '>', '>='].includes(op);
+export const isComparison = (op: Operator) =>
+  ['==', '!=', '===', '!==', '<', '<=', '>', '>='].includes(op);
 export type Edit = { start: number; end: number; text: string };
 export type GraphChange = { kind: 'operator' | 'literal' | 'slice' | 'selector'; value: string };
 export type InputPort = 'left' | 'right' | 'select' | `part:${number}` | `port:${string}`;

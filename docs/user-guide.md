@@ -1,6 +1,6 @@
 # User guide
 
-Install the [Windows testing build](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.2), then follow [setup and verification](distribution.md). For source builds, see [development](development.md).
+Install the [Windows testing build](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.3), then follow [setup and verification](distribution.md). For source builds, see [development](development.md).
 
 ## Adder demo
 
@@ -49,7 +49,7 @@ Simulation docks below the circuit. Drag its top divider, minimize it to keep sa
 
 Open **Simulation**, set top-level inputs using decimal, `0x` hex, `0b` binary or `x`, then click **Sample inputs**. Values appear on nodes and in the waveform panel. Each click records an input vector, not a timed clock cycle. Choose up to 16 traces, inspect the latest 64 samples, or copy the trace as CSV. Samples reset when source/draft semantics change or modules change; layout-only movement preserves them.
 
-The built-in evaluator supports this unsigned combinational subset, including concatenations, ascending/descending slices, muxes and nested module instances. It retains unknown bits: bitwise operations and unknown-selector muxes can resolve known bits; arithmetic involving unknown operands is pessimistic. Undriven nets display `x` (the viewer does not distinguish high impedance). No sequential/event-driven timing, clocks, testbench language or synthesis is implemented. Simulation is local and never edits source. It is bounded to 4096-bit values and 512 expanded signals.
+The built-in evaluator supports this combinational subset, including explicit Verilog/SystemVerilog `$signed`/`$unsigned` casts, arithmetic right shift `>>>`, concatenations, ascending/descending slices, muxes and nested module instances. Both comparison operands must be signed for signed ordering. A `>>>` inside an unsigned mux chain can zero-fill; `$unsigned($signed(value) >>> amount)` isolates the signed shift, and zero-filling arithmetic shifts are flagged in the graph. See [signed expression rules](supported-syntax.md#explicit-signed-expressions-093). Unknown bits remain visible; signed extension propagates an unknown sign bit. Undriven nets display `x` (the viewer does not distinguish high impedance). No sequential/event-driven timing, clocks, testbench language or synthesis is implemented. Simulation is local and never edits source. It is bounded to 4096-bit values and 512 expanded signals.
 
 ## Reusable modules
 

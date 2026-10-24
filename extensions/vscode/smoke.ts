@@ -150,25 +150,28 @@ export async function run() {
   );
   assert.equal(combo.getText(), comboOriginal);
   assert.equal(doc.getText(), unsaved);
-  for (const ext of ['sv', 'vhd', 'vhdl']) {
+  for (const ext of ['sv', 'vhd', 'vhdl', 'signed.v']) {
     const nativeUri = vscode.Uri.joinPath(folder.uri, `hierarchy.${ext}`);
     const native = await vscode.workspace.openTextDocument(nativeUri);
     const diskSource = native.getText();
     await vscode.window.showTextDocument(native);
-    const prefix = `${ext === 'sv' ? '//' : '--'} unsaved native HDL checkpoint 🧪\n`;
+    const prefix = `${ext === 'sv' || ext === 'signed.v' ? '//' : '--'} unsaved native HDL checkpoint 🧪\n`;
     const prefixEdit = new vscode.WorkspaceEdit();
     prefixEdit.insert(nativeUri, new vscode.Position(0, 0), prefix);
     await vscode.workspace.applyEdit(prefixEdit);
     const liveSource = native.getText();
     await vscode.commands.executeCommand('mira.open');
-    const expectedOperation = ext === 'sv' ? 'a << b' : 'a - b';
+    const expectedOperation =
+      ext === 'signed.v' ? '$signed(a) >> b' : ext === 'sv' ? 'a << b' : 'a - b';
     const nativeStart = Date.now();
     while (Date.now() - nativeStart < 45000 && !native.getText().includes(expectedOperation))
       await sleep(100);
     assert(native.getText().startsWith(prefix.trimEnd()), `${ext} preserves the unsaved comment`);
     assert(native.getText().includes(expectedOperation), `${ext} native operator patch`);
     assert(
-      native.getText().includes(ext === 'sv' ? 'assign pair = {a, b};' : 'pair <= a & b;'),
+      native
+        .getText()
+        .includes(ext === 'sv' || ext === 'signed.v' ? 'assign pair = {a, b};' : 'pair <= a & b;'),
       `${ext} native construction`,
     );
     assert.equal(
@@ -255,6 +258,7 @@ export async function run() {
           constructionWiring: true,
           hierarchyBusesDuplicate: true,
           nativeLanguages: ['systemverilog', 'vhd', 'vhdl'],
+          signedCasts: true,
           recoveryReviewCopy: true,
           realDebounceMs: 15000,
         },

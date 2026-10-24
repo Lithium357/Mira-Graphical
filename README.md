@@ -3,21 +3,21 @@
 Build, wire and explore HDL circuits in a Windows desktop workspace, with live source synchronization to VS Code.
 
 [![CI](https://github.com/Lithium357/Mira-Graphical/actions/workflows/ci.yml/badge.svg)](https://github.com/Lithium357/Mira-Graphical/actions/workflows/ci.yml)
-[![Version: 0.9.2 preview](https://img.shields.io/badge/version-0.9.2_preview-42d6bc)](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.2)
+[![Version: 0.9.3 preview](https://img.shields.io/badge/version-0.9.3_preview-42d6bc)](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.3)
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE)
 
-**[Download for Windows x64](https://github.com/Lithium357/Mira-Graphical/releases/download/v0.9.2/Mira-Graphical-Setup-0.9.2-x64.exe)** · [Release notes and checksums](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.2) · [User guide](docs/user-guide.md)
+**[Download for Windows x64](https://github.com/Lithium357/Mira-Graphical/releases/download/v0.9.3/Mira-Graphical-Setup-0.9.3-x64.exe)** · [Release notes and checksums](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.3) · [User guide](docs/user-guide.md)
 
 ![Mira workbench showing named module wiring, bus widths, a mux and a docked simulation panel](docs/images/workbench.png)
 
 ## Start testing
 
-1. Run **Mira-Graphical-Setup-0.9.2-x64.exe** and launch **Mira Graphical**.
+1. Run **Mira-Graphical-Setup-0.9.3-x64.exe** and launch **Mira Graphical**.
 2. Choose your HDL project folder. Open **Setup help → Show VS Code extension…** to locate the bundled companion.
 3. In VS Code, run **Extensions: Install from VSIX…**, select that companion, and open the same project folder.
 4. Open a `.v`, `.sv`, `.vhd` or `.vhdl` file and run **RTL Graph: Open Current Module**. The circuit appears after **15 seconds of inactivity**.
 
-The app includes its runtime; Node, pnpm and a terminal are unnecessary for installation. **0.9.2 is an unsigned testing preview**. Windows may show an unknown-publisher/SmartScreen prompt. See [installation and checksum verification](docs/distribution.md).
+The app includes its runtime; Node, pnpm and a terminal are unnecessary for installation. **0.9.3 is an unsigned testing preview**. Windows may show an unknown-publisher/SmartScreen prompt. See [installation and checksum verification](docs/distribution.md).
 
 ## What you can do
 
@@ -26,7 +26,7 @@ The app includes its runtime; Node, pnpm and a terminal are unnecessary for inst
 - Inspect named signals and widths, sample combinational inputs and view local waveforms.
 - Resize or collapse the inspector and simulation dock, navigate with the keyboard, and recover unsaved source or graph drafts as reviewable copies.
 
-**Current scope:** bounded, unsigned combinational circuits within the [supported syntax](docs/supported-syntax.md). Clocked logic, full HDL standards, synthesis and testbenches are outside this version. Unsupported source produces a diagnostic; the last valid graph stays visible. Review [real-project compatibility](docs/compatibility.md) before trying a larger design.
+**Current scope:** bounded combinational circuits, with unsigned nets and explicit Verilog/SystemVerilog signed expression casts, within the [supported syntax](docs/supported-syntax.md). Clocked logic, full HDL standards, synthesis and testbenches are outside this version. Unsupported source produces a diagnostic; the last valid graph stays visible. Review [real-project compatibility](docs/compatibility.md) before trying a larger design.
 
 ## Documentation
 

@@ -977,6 +977,63 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     service.simulate(aluURI, { OPc: '15', OPd: '1', opcode: '12' }).signals.result.value,
     '0xfff0',
   );
+  const signedSource = readFileSync(join(root, 'fixtures/alu-int16-signed.v'), 'utf8');
+  ws.send(
+    JSON.stringify({
+      type: 'document.change',
+      uri: aluURI,
+      version: 2,
+      origin: 'user',
+      text: signedSource,
+    }),
+  );
+  await until(
+    () =>
+      service.states.get(aluURI)?.status === 'Synced' &&
+      service.states.get(aluURI)?.graph?.nodes.some((n) => n.op === '>>>') === true,
+  );
+  const signedGraph = service.states.get(aluURI)!.graph!;
+  const cast = signedGraph.nodes.find((n) => n.kind === 'convert')!;
+  const arithmeticShift = signedGraph.nodes.find((n) => n.op === '>>>')!;
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelectorAll('[data-id="${cast.id}"] .react-flow__handle.target').length===1 && document.querySelector('[data-id="${arithmeticShift.id}"] .node-width')?.textContent.includes('zero fill')`,
+    ),
+  );
+  assert.equal(
+    service.simulate(aluURI, { OPc: '32768', OPd: '1', opcode: '5' }).signals.result.value,
+    '0x0000',
+  );
+  assert.equal(
+    service.simulate(aluURI, { OPc: '32768', OPd: '1', opcode: '6' }).signals.result.value,
+    '0x0001',
+  );
+  assert.equal(
+    service.simulate(aluURI, { OPc: '32768', OPd: '1', opcode: '7' }).signals.result.value,
+    '0x4000',
+  );
+  ws.send(
+    JSON.stringify({
+      type: 'document.change',
+      uri: aluURI,
+      version: 3,
+      origin: 'user',
+      text: signedSource.replace('($signed(OPc) >>> OPd)', '$unsigned($signed(OPc) >>> OPd)'),
+    }),
+  );
+  await until(
+    () =>
+      service.states.get(aluURI)?.status === 'Synced' && service.states.get(aluURI)?.version === 3,
+  );
+  assert.equal(
+    service.simulate(aluURI, { OPc: '32768', OPd: '1', opcode: '7' }).signals.result.value,
+    '0xc000',
+  );
+  await win.webContents.executeJavaScript(
+    `document.querySelector('[aria-label="Fit entire circuit"]').click()`,
+  );
+  await sleep(500);
+  writeFileSync(join(output, 'signed-alu.png'), (await win.webContents.capturePage()).toPNG());
   writeFileSync(
     join(output, 'alu-smoke.json'),
     JSON.stringify(
@@ -986,6 +1043,10 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
         unarySocket: true,
         shiftSimulation: true,
         notSimulation: true,
+        signedCasts: true,
+        signedComparisons: true,
+        arithmeticShift: true,
+        unsignedMuxCoercion: true,
         autoLayout: {
           width: layoutWidth,
           height: layoutHeight,

@@ -34,6 +34,10 @@ export async function checkPackagedApp(
       ext: 'alu.v',
       text: "module adder(input [7:0] a,b,output [7:0] y);assign y=(a==8'd2)?~(a<<b):(a>>b);endmodule",
     },
+    {
+      ext: 'signed.v',
+      text: "module adder(input [7:0] a,b,output [7:0] y);assign y=(a==8'd2)?($signed(a)<$signed(b)):$unsigned($signed(a)>>>b);endmodule",
+    },
   ];
   ws.send(JSON.stringify({ ...config, type: 'hello', editor: 'vscode' }));
   for (const document of documents)
@@ -60,8 +64,10 @@ export async function checkPackagedApp(
   for (const uri of service.states.keys())
     assert.equal(
       service.simulate(uri, { a: '2', b: '3' }).signals.y.value,
-      uri.endsWith('alu.v') ? '0xef' : '0x05',
+      uri.endsWith('alu.v') ? '0xef' : uri.endsWith('signed.v') ? '0x01' : '0x05',
     );
+  const signedURI = pathToFileURL(join(workspace, 'check.signed.v')).href;
+  assert.equal(service.simulate(signedURI, { a: '128', b: '1' }).signals.y.value, '0xc0');
   const snapshot = await win.webContents.executeJavaScript(
     `window.mira.command({type:'snapshot'})`,
   );

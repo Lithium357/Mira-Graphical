@@ -45,8 +45,11 @@ const names: Record<Operator, string> = {
   '^': 'XOR',
   '<<': 'SHL',
   '>>': 'SHR',
+  '>>>': 'ASHR',
   '==': 'EQ',
   '!=': 'NE',
+  '===': 'CASE EQ',
+  '!==': 'CASE NE',
   '<': 'LT',
   '<=': 'LE',
   '>': 'GT',
@@ -129,6 +132,7 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
           </>
         )}
         {data.kind === 'op' ? ' · RTL expression' : ''}
+        {data.signed ? ' · signed' : data.op === '>>>' ? ' · zero fill' : ''}
       </div>
       {data.assignmentTarget ? (
         <div className="node-result">→ {String(data.assignmentTarget)}</div>

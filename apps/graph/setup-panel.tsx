@@ -62,7 +62,7 @@ export function SetupGuide({ workspace }: { workspace: string }) {
           ) : (
             <>
               Install the companion: Extensions → … → Install from VSIX →{' '}
-              <code>mira-graphical-0.9.2.vsix</code> from <code>dist/packages</code>.
+              <code>mira-graphical-0.9.3.vsix</code> from <code>dist/packages</code>.
             </>
           )}
         </li>
@@ -94,8 +94,9 @@ export function SetupGuide({ workspace }: { workspace: string }) {
           palette. Escape closes the inspector or dialog. Pane dividers support arrow keys.
         </p>
         <p>
-          The first release supports unsigned combinational subsets. Unsupported syntax appears as a
-          diagnostic. Use Recovery to inspect checkpointed text after a crash.
+          The first release supports bounded combinational subsets with explicit signed expression
+          casts. Unsupported syntax appears as a diagnostic. Use Recovery to inspect checkpointed
+          text after a crash.
         </p>
       </details>
     </section>

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.3
+
+- Added Verilog/SystemVerilog `$signed(...)`, `$unsigned(...)` and arithmetic right shift `>>>`, including two's-complement comparisons, sign extension, context sizing and unknown sign-bit propagation. Signed declarations and signed based literals remain outside this bounded subset.
+- Fixed the reported ALU's signed comparison/shift arms failing at `$`. Casts appear as single-input nodes and preserve their syntax through rewiring, copy/paste and guarded operator edits. Upgrade both desktop and the bundled VS Code companion.
+- Flagged unsigned `>>>` coercion, including the reported unsigned ternary chain. `$unsigned($signed(OPc) >>> OPd)` isolates a signed shift before it enters that chain; the app follows the source rather than rewriting it.
+- Preserved independent signedness and unknown-condition behavior for SystemVerilog procedural `if` arms, including copied muxes. Added `===`/`!==` case comparisons so copied procedural tests retain their known/unknown truth behavior.
+- Added the extended ALU fixture and 11,234 Icarus output comparisons across unsigned/signed/isolated ALUs, mixed widths, unknown values and procedural copies. Added actual desktop, packaged runtime and companion/native Undo checks for signed casts and shifts.
+
 ## 0.9.2
 
 - Replaced declaration-order columns with deterministic dependency layout: constants stay near consumers, neighbouring layers reduce crossings, and long mux chains fold into rows with each stage's private comparison and operation.

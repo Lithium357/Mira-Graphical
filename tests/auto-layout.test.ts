@@ -53,6 +53,7 @@ test('small circuits, hierarchy, and empty modules keep finite separated positio
     'hierarchy.sv',
     'hierarchy.vhd',
     'alu-int16.v',
+    'alu-int16-signed.v',
   ]) {
     const ast = parse(readFileSync(`fixtures/${fixture}`, 'utf8'));
     for (const module of Object.values(ast.library)) check(project(module));
