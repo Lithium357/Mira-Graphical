@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 export function SetupGuide({ workspace }: { workspace: string }) {
   const [connected, setConnected] = useState(false);
   const [message, setMessage] = useState('Checking local connection…');
+  const [packaged, setPackaged] = useState(false);
   useEffect(() => {
     let active = true;
     const check = async () => {
@@ -10,6 +11,7 @@ export function SetupGuide({ workspace }: { workspace: string }) {
         const snapshot = await window.mira.command({ type: 'snapshot' });
         if (active) {
           setConnected(snapshot.editorConnected === true);
+          setPackaged(snapshot.packaged === true);
           setMessage(snapshot.editorConnected ? 'VS Code connected' : 'Waiting for VS Code');
         }
       } catch {
@@ -29,11 +31,40 @@ export function SetupGuide({ workspace }: { workspace: string }) {
       <p>
         <strong>Workspace:</strong> <code>{workspace}</code>
       </p>
+      <button
+        onClick={() =>
+          void window.mira.command({ type: 'chooseWorkspace' }).catch((e) => setMessage(String(e)))
+        }
+      >
+        Choose project folder…
+      </button>
+      {packaged && (
+        <button
+          onClick={() =>
+            void window.mira
+              .command({ type: 'installCompanion' })
+              .catch((e) => setMessage(String(e)))
+          }
+        >
+          Show VS Code extension…
+        </button>
+      )}
       <ol>
         <li>In VS Code, open this same folder and trust it when appropriate.</li>
         <li>
-          Install the companion: Extensions → … → Install from VSIX →{' '}
-          <code>mira-graphical-0.7.0.vsix</code> from <code>dist/packages</code>.
+          {packaged ? (
+            <>
+              Install the companion: Extensions → … → Install from VSIX → Use{' '}
+              <strong>Show VS Code extension…</strong> above to locate the VSIX, then select it with
+              Extensions: Install from VSIX in VS Code. The file is{' '}
+              <code>resources/companion/mira-graphical.vsix</code> inside the app's installation
+              folder.
+            </>
+          ) : (
+            <>
+              <code>mira-graphical-0.8.0.vsix</code> from <code>dist/packages</code>.
+            </>
+          )}
         </li>
         <li>
           Open a <code>.v</code>, <code>.sv</code>, <code>.vhd</code> or <code>.vhdl</code> file
@@ -50,7 +81,7 @@ export function SetupGuide({ workspace }: { workspace: string }) {
         <p>
           {connected
             ? 'Connected with no graph? Share the active file and check diagnostics after the countdown.'
-            : 'Start Mira with --workspace pointing to the folder open in VS Code. After restarting Mira, run RTL Graph: Connect/Disconnect, then share the file again.'}
+            : 'Choose the same project folder in Mira and VS Code. After restarting Mira, run RTL Graph: Connect/Disconnect, then share the file again.'}
         </p>
         <p>
           For multi-root workspaces, Open Current Module connects to the active file’s folder. Check

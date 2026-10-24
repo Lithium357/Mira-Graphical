@@ -1059,7 +1059,7 @@ function App() {
         <div className="header-right">
           <button onClick={() => setSetupOpen(true)}>Setup help</button>
           <button onClick={() => setRecoveryOpen(true)}>Recovery</button>
-          <span className="version">0.7 · CIRCUIT WORKBENCH</span>
+          <span className="version">0.8 · CIRCUIT WORKBENCH</span>
           <span
             className={`status ${(state?.status ?? 'Disconnected').replaceAll(' ', '-')}`}
             role="status"

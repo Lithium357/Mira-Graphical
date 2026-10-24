@@ -1,4 +1,4 @@
-# Verification report — 0.7.0
+# Verification report — 0.8.0
 
 Windows verification with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an isolated official VS Code 1.143.1 runtime. Linux/macOS app releases have not been validated.
 
@@ -6,7 +6,7 @@ Windows verification with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an iso
 
 - `pnpm test`: **101 tests, 0 failures** (100 passed locally; the file-symlink case skips when Windows denies that privilege). Includes native HDL parsing, typed arithmetic, construction, scoped patches, hierarchy, clipboard safety, simulation, durable recovery, scheduling, authenticated WebSocket integration and layout persistence. The Ubuntu CI job also runs the complete unit suite so symlink refusal is exercised on Linux.
 - `pnpm lint`, `pnpm build`, `pnpm format:check`: passed.
-- `pnpm run licenses`: **211 installed package versions**, no unclassified licenses. Two exact-version, exact-license-hash Microsoft helpers are development-only exceptions, never runtime/VSIX contents; signing scripts are disabled. See [license scope](licenses.md).
+- `pnpm run licenses`: **418 installed package versions** on Windows after adding the installer packager, no unclassified licenses. Two exact-version, exact-license-hash Microsoft helpers are development-only exceptions, never runtime/VSIX contents; signing scripts are disabled. See [license scope](licenses.md).
 - `pnpm audit --json`: **0 advisories**.
 - Full `pnpm smoke`: desktop interactions, isolated VSIX installation and both real editor/service passes passed.
 - Icarus Verilog 12.0 differential check: **264 input vectors × 11 outputs = 2904 matching bit-for-bit comparisons**. Covers arithmetic overflow/context, nested arithmetic, muxes, concatenation/slice ordering, named-port hierarchy and selected unknown-bit cases. This is regression evidence, not formal equivalence for arbitrary HDL.
@@ -65,7 +65,11 @@ The initial disconnected workspace asserts visible setup/VSIX guidance before sh
 
 Unsigned zero-delay combinational simulation is covered; sequential timing, signedness, source x/z literals, parameters and SystemVerilog outside the documented subset remain unsupported. Undriven signals use x, without a separate z state. Instance dependency checks are conservative. See [exact syntax and limits](supported-syntax.md).
 
-Monitor geometry/restoration has automated coverage; the app is a separate movable Windows window. Screen-reader behavior, touch/pen interaction, other operating systems, live cross-file elaboration and automatic recovery restore remain unverified or outside this version. Desktop installers/signing are deliberately deferred.
+Monitor geometry/restoration has automated coverage; the app is a separate movable Windows window. Screen-reader behavior, touch/pen interaction, other operating systems, live cross-file elaboration and automatic recovery restore remain unverified or outside this version. Signing is deliberately deferred; Windows now has an unsigned installer.
+
+## Packaged Windows application
+
+`pnpm test:installer` launches the actual bundled EXE with an isolated workspace/profile. It authenticates to the included local service, shares Verilog/SystemVerilog/VHDL buffers, waits for real projection debounce, simulates each result, and verifies the renderer plus sandboxed preload IPC. It checks the presence of the companion, corresponding source, GPL/dependency notices and Electron/Chromium notices. In the separate Windows installer CI job, it additionally installs silently into a disposable directory, repeats the actual-EXE checks, uninstalls, and checks removal of the executable. CI verifies the setup's Authenticode status is NotSigned. The result is `installer-smoke.json` in the `windows-installer` artifact.
 
 ## Running again
 

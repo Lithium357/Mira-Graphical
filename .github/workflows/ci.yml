@@ -39,6 +39,35 @@ jobs:
             dist/packages/SHA256SUMS
             test-results/project-soak.json
             test-results/accessibility-smoke.json
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm package:windows
+      - run: pnpm test:installer
+      - shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist/windows/Mira-Graphical-Setup-*-x64.exe
+          if ((Get-AuthenticodeSignature $installer.FullName).Status -ne 'NotSigned') { throw 'Installer must be unsigned' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-installer
+          compression-level: 0
+          path: |
+            dist/windows/Mira-Graphical-Setup-*-x64.exe
+            dist/windows/Mira-Graphical-Source.zip
+            dist/windows/manifest.json
+            dist/windows/SHA256SUMS
+            test-results/installer-smoke.json
   hdl-reference:
     runs-on: ubuntu-latest
     steps:

@@ -1,6 +1,6 @@
 # Launch readiness
 
-The intended first release is the documented unsigned combinational HDL workbench. Full HDL standards, clocked simulation and synthesis are outside the current product scope. Installer creation and signing remain deferred at the project owner's request.
+The intended first release is the documented unsigned combinational HDL workbench. Full HDL standards, clocked simulation and synthesis are outside the current product scope. The owner authorized an unsigned Windows installer; signing remains deferred.
 
 Completed release foundations:
 
@@ -20,6 +20,6 @@ Remaining work before declaring 1.0:
 - Complete human screen-reader acceptance. Native keyboard events and the exposed accessibility tree are automated evidence; they do not certify NVDA/JAWS spoken behavior or usability.
 - Conduct longer wall-clock/desktop-rendering stress and user editing sessions. The repeatable service soak accelerates 15-second debounce intervals; it does not measure days of operation, power-loss durability or large-canvas frame rates.
 - Validate the first-run wording with a person using a fresh profile. Isolated-profile installation and automated setup checks pass, but a human usability trial is distinct.
-- Select the final green-commit artifact and attach the release notes, manifests and checksums according to [distribution instructions](distribution.md). Keep installer/signing deferred.
+- Select the final green-commit artifact and attach the release notes, manifests and checksums according to [distribution instructions](distribution.md). Signing remains deferred.
 
 Windows is the verified desktop platform. Portable core tests on Linux do not certify the Linux/macOS Electron application. Passing CI provides regression evidence, not full HDL conformance or a declaration that 1.0 is ready to ship.

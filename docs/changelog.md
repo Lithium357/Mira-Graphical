@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0
+
+- Added an unsigned per-user Windows x64 NSIS installer with desktop/Start menu shortcuts and uninstallation.
+- Bundled the runtime, UI, VS Code VSIX, dependency/Electron/Chromium notices and corresponding project source. Running the app needs no development tools.
+- Added first-launch project-folder selection, remembered workspace, a folder switcher and a bundled-extension reveal action in Setup help.
+- Added the Mira Windows icon and explicit unsigned build configuration.
+- Added packaged-executable checks for all three languages, renderer and IPC, plus CI installation/launch/uninstall verification and installer checksums.
+
 ## 0.7.0
 
 - Added workspace setup help with live connection status, VSIX installation steps, reconnect troubleshooting and keyboard guidance. Connection errors now name the workspace and the next action.

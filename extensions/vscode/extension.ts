@@ -48,7 +48,7 @@ async function connect(folder: vscode.WorkspaceFolder) {
       throw new Error('Invalid descriptor');
   } catch {
     throw new Error(
-      `Start Mira Graphical for workspace "${folder.uri.fsPath}" before connecting. Use --workspace with this folder, then run RTL Graph: Open Current Module again. The local connection descriptor is missing or invalid.`,
+      `Start Mira Graphical for workspace "${folder.uri.fsPath}" before connecting. Select this folder with Choose project folder in Mira's Setup help, then run RTL Graph: Open Current Module again. The local connection descriptor is missing or invalid.`,
     );
   }
   const ws = new WebSocket(`ws://127.0.0.1:${config.port}`, {

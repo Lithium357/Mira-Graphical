@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { app, BrowserWindow, ipcMain, dialog, screen, clipboard } from 'electron';
-import { readFileSync, writeFileSync, renameSync, existsSync, lstatSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  statSync,
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { SyncService } from '../../packages/core/service.js';
@@ -12,6 +20,13 @@ import {
 } from '../../packages/protocol/index.js';
 import { restoreBounds } from './window-state.js';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const packageCheck = app.isPackaged && process.argv.includes('--package-check');
+const workspaceArgument = process.argv.find((a) => a.startsWith('--workspace='))?.slice(12);
+if (packageCheck && workspaceArgument) {
+  const profile = join(resolve(workspaceArgument), '.mira-test-profile');
+  mkdirSync(profile, { recursive: true });
+  app.setPath('userData', profile);
+}
 let service: SyncService | undefined;
 let window: BrowserWindow | undefined;
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -23,9 +38,32 @@ else {
   app
     .whenReady()
     .then(async () => {
-      const workspace = resolve(
-        process.argv.find((a) => a.startsWith('--workspace='))?.slice(12) ?? process.cwd(),
-      );
+      if (process.platform === 'win32') app.setAppUserModelId('com.lithium357.miragraphical');
+      const preferences = join(app.getPath('userData'), 'workspace.json');
+      let remembered: string | undefined;
+      try {
+        const saved = JSON.parse(readFileSync(preferences, 'utf8'));
+        if (typeof saved.workspace === 'string' && statSync(saved.workspace).isDirectory())
+          remembered = saved.workspace;
+      } catch {}
+      let folder = workspaceArgument ?? (app.isPackaged ? remembered : process.cwd());
+      if (!folder) {
+        const selection = await dialog.showOpenDialog({
+          title: 'Choose your HDL project folder',
+          properties: ['openDirectory'],
+        });
+        folder = selection.filePaths[0];
+        if (!folder) {
+          app.quit();
+          return;
+        }
+      }
+      const workspace = resolve(folder);
+      if (!statSync(workspace).isDirectory()) throw new Error('Choose an existing project folder.');
+      if (app.isPackaged && !packageCheck) {
+        mkdirSync(dirname(preferences), { recursive: true });
+        writeFileSync(preferences, JSON.stringify({ workspace }));
+      }
       service = new SyncService(workspace);
       await service.ready();
       const windowFile = join(service.metadata, 'window.json');
@@ -45,9 +83,10 @@ else {
         ...restored,
         minWidth: Math.min(900, available.width),
         minHeight: Math.min(600, available.height),
-        show: !process.argv.includes('--smoke'),
+        show: !packageCheck && !process.argv.includes('--smoke'),
         backgroundColor: '#0b1220',
         title: 'Mira Graphical',
+        icon: app.isPackaged ? join(root, 'icon.ico') : undefined,
         webPreferences: {
           // Smoke runs keep pane preferences and browser storage out of the user's session.
           partition: process.argv.includes('--smoke') ? 'mira-smoke' : undefined,
@@ -77,11 +116,35 @@ else {
       win.on('close', saveWindow);
       win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
       win.webContents.on('will-navigate', (event) => event.preventDefault());
-      ipcMain.handle('mira:command', (event, command: unknown) => {
+      ipcMain.handle('mira:command', async (event, command: unknown) => {
         if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame)
           throw new Error('Unauthorized renderer.');
         if (!command || typeof command !== 'object') throw new Error('Invalid command.');
         const c = command as Record<string, unknown>;
+        if (c.type === 'chooseWorkspace') {
+          const selection = await dialog.showOpenDialog(win, {
+            title: 'Choose your HDL project folder',
+            defaultPath: workspace,
+            properties: ['openDirectory'],
+          });
+          if (selection.canceled || !selection.filePaths[0]) return;
+          app.relaunch({
+            args: [
+              ...process.argv.slice(1).filter((a) => !a.startsWith('--workspace=')),
+              `--workspace=${selection.filePaths[0]}`,
+            ],
+          });
+          app.quit();
+          return;
+        }
+        if (c.type === 'installCompanion') {
+          const source = join(process.resourcesPath, 'companion', 'mira-graphical.vsix');
+          if (!app.isPackaged || !existsSync(source))
+            throw new Error('Build the companion with pnpm package:extension.');
+          const { shell } = await import('electron');
+          shell.showItemInFolder(source);
+          return;
+        }
         if (c.type === 'copyText' && typeof c.text === 'string' && c.text.length <= 1_000_000) {
           return clipboard.writeText(c.text);
         }
@@ -90,6 +153,7 @@ else {
             workspace,
             states: [...service!.states.values()],
             editorConnected: service!.editorConnected,
+            packaged: app.isPackaged,
           };
         if (c.type === 'recoveryList') return service!.recovery.list();
         if (c.type === 'recoveryRead' && typeof c.id === 'string')
@@ -159,8 +223,12 @@ else {
         if (!win.isDestroyed()) win.webContents.send('mira:states', states);
       });
       await win.loadFile(join(root, 'apps/graph/dist/index.html'));
-      if (!process.argv.includes('--smoke')) win.show();
-      if (process.argv.includes('--smoke')) {
+      if (packageCheck) {
+        const { checkPackagedApp } = await import('./package-check.js');
+        await checkPackagedApp(service, win, workspace);
+        app.quit();
+      } else if (!process.argv.includes('--smoke')) win.show();
+      if (process.env.MIRA_SMOKE_BUILD !== 'false' && process.argv.includes('--smoke')) {
         const { desktopSmoke } = await import('../../scripts/desktop-smoke.js');
         try {
           if (process.argv.includes('--accessibility-only')) {
@@ -190,6 +258,14 @@ else {
       }
     })
     .catch((error) => {
+      if (packageCheck && workspaceArgument) {
+        writeFileSync(
+          join(resolve(workspaceArgument), 'package-check.json'),
+          JSON.stringify({ passed: false, error: String(error) }),
+        );
+        app.exit(1);
+        return;
+      }
       dialog.showErrorBox('Mira Graphical could not start', String(error));
       app.quit();
     });

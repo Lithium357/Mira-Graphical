@@ -14,7 +14,7 @@
     "version": "1.11.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@azure+core-auth@1.11.0/node_modules/@azure/core-auth/LICENSE"
+      "node_modules/.pnpm/@azure+core-auth@1.11.0_supports-color@7.2.0/node_modules/@azure/core-auth/LICENSE"
     ]
   },
   {
@@ -23,7 +23,7 @@
     "version": "1.11.1",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@azure+core-client@1.11.1/node_modules/@azure/core-client/LICENSE"
+      "node_modules/.pnpm/@azure+core-client@1.11.1_supports-color@7.2.0/node_modules/@azure/core-client/LICENSE"
     ]
   },
   {
@@ -41,7 +41,7 @@
     "version": "1.25.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0/node_modules/@azure/core-rest-pipeline/LICENSE"
+      "node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0_supports-color@7.2.0/node_modules/@azure/core-rest-pipeline/LICENSE"
     ]
   },
   {
@@ -59,7 +59,7 @@
     "version": "1.14.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@azure+core-util@1.14.0/node_modules/@azure/core-util/LICENSE"
+      "node_modules/.pnpm/@azure+core-util@1.14.0_supports-color@7.2.0/node_modules/@azure/core-util/LICENSE"
     ]
   },
   {
@@ -68,7 +68,7 @@
     "version": "4.14.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@azure+identity@4.14.0/node_modules/@azure/identity/LICENSE"
+      "node_modules/.pnpm/@azure+identity@4.14.0_supports-color@7.2.0/node_modules/@azure/identity/LICENSE"
     ]
   },
   {
@@ -77,7 +77,7 @@
     "version": "1.4.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@azure+logger@1.4.0/node_modules/@azure/logger/LICENSE"
+      "node_modules/.pnpm/@azure+logger@1.4.0_supports-color@7.2.0/node_modules/@azure/logger/LICENSE"
     ]
   },
   {
@@ -170,11 +170,74 @@
   },
   {
     "runtime": false,
+    "name": "@electron/asar",
+    "version": "3.4.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@electron+asar@3.4.1/node_modules/@electron/asar/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@electron/fuses",
+    "version": "1.8.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@electron+fuses@1.8.0/node_modules/@electron/fuses/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@electron/get",
+    "version": "3.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@electron+get@3.1.0_supports-color@7.2.0/node_modules/@electron/get/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "@electron/get",
     "version": "5.1.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@electron+get@5.1.0/node_modules/@electron/get/LICENSE"
+      "node_modules/.pnpm/@electron+get@5.1.0_supports-color@7.2.0/node_modules/@electron/get/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@electron/notarize",
+    "version": "2.5.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@electron+notarize@2.5.0_supports-color@7.2.0/node_modules/@electron/notarize/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@electron/osx-sign",
+    "version": "1.3.3",
+    "license": "BSD-2-Clause",
+    "files": [
+      "node_modules/.pnpm/@electron+osx-sign@1.3.3_supports-color@7.2.0/node_modules/@electron/osx-sign/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@electron/rebuild",
+    "version": "4.2.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@electron+rebuild@4.2.1_supports-color@7.2.0/node_modules/@electron/rebuild/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@electron/universal",
+    "version": "2.0.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@electron+universal@2.0.3_supports-color@7.2.0/node_modules/@electron/universal/LICENSE"
     ]
   },
   {
@@ -183,6 +246,33 @@
     "version": "0.28.2",
     "license": "MIT",
     "files": []
+  },
+  {
+    "runtime": false,
+    "name": "@isaacs/fs-minipass",
+    "version": "4.0.1",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/@isaacs+fs-minipass@4.0.1/node_modules/@isaacs/fs-minipass/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@malept/cross-spawn-promise",
+    "version": "2.0.0",
+    "license": "Apache-2.0",
+    "files": [
+      "node_modules/.pnpm/@malept+cross-spawn-promise@2.0.0/node_modules/@malept/cross-spawn-promise/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@malept/flatpak-bundler",
+    "version": "0.4.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@malept+flatpak-bundler@0.4.0_supports-color@7.2.0/node_modules/@malept/flatpak-bundler/LICENSE"
+    ]
   },
   {
     "runtime": false,
@@ -202,11 +292,56 @@
   },
   {
     "runtime": false,
+    "name": "@noble/hashes",
+    "version": "1.8.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@noble+hashes@1.8.0/node_modules/@noble/hashes/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "@oxc-project/types",
     "version": "0.155.0",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/@oxc-project+types@0.155.0/node_modules/@oxc-project/types/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@peculiar/asn1-schema",
+    "version": "2.11.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@peculiar+asn1-schema@2.11.0/node_modules/@peculiar/asn1-schema/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@peculiar/json-schema",
+    "version": "1.1.12",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@peculiar+json-schema@1.1.12/node_modules/@peculiar/json-schema/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@peculiar/utils",
+    "version": "2.0.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@peculiar+utils@2.0.3/node_modules/@peculiar/utils/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@peculiar/webcrypto",
+    "version": "1.7.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@peculiar+webcrypto@1.7.1/node_modules/@peculiar/webcrypto/LICENSE.md"
     ]
   },
   {
@@ -231,7 +366,7 @@
     "version": "10.2.2",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@secretlint+core@10.2.2/node_modules/@secretlint/core/LICENSE"
+      "node_modules/.pnpm/@secretlint+core@10.2.2_supports-color@7.2.0/node_modules/@secretlint/core/LICENSE"
     ]
   },
   {
@@ -277,6 +412,33 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/@secretlint+types@10.2.2/node_modules/@secretlint/types/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@sindresorhus/is",
+    "version": "4.6.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@sindresorhus+is@4.6.0/node_modules/@sindresorhus/is/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@szmarczak/http-timer",
+    "version": "4.0.6",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@szmarczak+http-timer@4.0.6/node_modules/@szmarczak/http-timer/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@types/cacheable-request",
+    "version": "6.0.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@types+cacheable-request@6.0.3/node_modules/@types/cacheable-request/LICENSE"
     ]
   },
   {
@@ -335,6 +497,51 @@
   },
   {
     "runtime": false,
+    "name": "@types/debug",
+    "version": "4.1.13",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@types+debug@4.1.13/node_modules/@types/debug/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@types/fs-extra",
+    "version": "9.0.13",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@types+fs-extra@9.0.13/node_modules/@types/fs-extra/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@types/http-cache-semantics",
+    "version": "4.2.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@types+http-cache-semantics@4.2.0/node_modules/@types/http-cache-semantics/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@types/keyv",
+    "version": "3.1.4",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@types+keyv@3.1.4/node_modules/@types/keyv/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@types/ms",
+    "version": "2.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@types+ms@2.1.0/node_modules/@types/ms/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "@types/node",
     "version": "22.15.30",
     "license": "MIT",
@@ -371,6 +578,15 @@
   },
   {
     "runtime": false,
+    "name": "@types/responselike",
+    "version": "1.0.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@types+responselike@1.0.3/node_modules/@types/responselike/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "@types/vscode",
     "version": "1.96.0",
     "license": "MIT",
@@ -393,7 +609,7 @@
     "version": "0.3.9",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9/node_modules/@typespec/ts-http-runtime/LICENSE"
+      "node_modules/.pnpm/@typespec+ts-http-runtime@0.3.9_supports-color@7.2.0/node_modules/@typespec/ts-http-runtime/LICENSE"
     ]
   },
   {
@@ -402,7 +618,7 @@
     "version": "3.1.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@vscode+test-electron@3.1.0/node_modules/@vscode/test-electron/LICENSE"
+      "node_modules/.pnpm/@vscode+test-electron@3.1.0_supports-color@7.2.0/node_modules/@vscode/test-electron/LICENSE"
     ]
   },
   {
@@ -411,7 +627,7 @@
     "version": "4.0.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@vscode+vsce@4.0.0/node_modules/@vscode/vsce/LICENSE"
+      "node_modules/.pnpm/@vscode+vsce@4.0.0_supports-color@7.2.0/node_modules/@vscode/vsce/LICENSE"
     ]
   },
   {
@@ -430,6 +646,15 @@
     "license": "SEE LICENSE IN LICENSE.txt",
     "files": [
       "node_modules/.pnpm/@vscode+vsce-sign-win32-x64@2.0.6/node_modules/@vscode/vsce-sign-win32-x64/LICENSE.txt"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "@xmldom/xmldom",
+    "version": "0.8.15",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/@xmldom+xmldom@0.8.15/node_modules/@xmldom/xmldom/LICENSE"
     ]
   },
   {
@@ -452,6 +677,15 @@
   },
   {
     "runtime": false,
+    "name": "abbrev",
+    "version": "4.0.0",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/abbrev@4.0.0/node_modules/abbrev/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "agent-base",
     "version": "7.1.4",
     "license": "MIT",
@@ -461,11 +695,108 @@
   },
   {
     "runtime": false,
+    "name": "ajv",
+    "version": "8.20.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "ansi-regex",
+    "version": "5.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/ansi-regex@5.0.1/node_modules/ansi-regex/license"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "ansi-regex",
     "version": "6.4.0",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/ansi-regex@6.4.0/node_modules/ansi-regex/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "ansi-styles",
+    "version": "4.3.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/ansi-styles@4.3.0/node_modules/ansi-styles/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "app-builder-lib",
+    "version": "26.18.0",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "argparse",
+    "version": "2.0.1",
+    "license": "Python-2.0",
+    "files": [
+      "node_modules/.pnpm/argparse@2.0.1/node_modules/argparse/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "asn1js",
+    "version": "3.1.0",
+    "license": "BSD-3-Clause",
+    "files": [
+      "node_modules/.pnpm/asn1js@3.1.0/node_modules/asn1js/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "async",
+    "version": "3.2.6",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/async@3.2.6/node_modules/async/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "async-exit-hook",
+    "version": "2.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/async-exit-hook@2.0.1/node_modules/async-exit-hook/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "asynckit",
+    "version": "0.4.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "at-least-node",
+    "version": "1.0.0",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/at-least-node@1.0.0/node_modules/at-least-node/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "aws4",
+    "version": "1.13.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/aws4@1.13.2/node_modules/aws4/LICENSE"
     ]
   },
   {
@@ -480,10 +811,28 @@
   {
     "runtime": false,
     "name": "balanced-match",
+    "version": "1.0.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/balanced-match@1.0.2/node_modules/balanced-match/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "balanced-match",
     "version": "4.0.4",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/balanced-match@4.0.4/node_modules/balanced-match/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "base64-js",
+    "version": "1.5.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/base64-js@1.5.1/node_modules/base64-js/LICENSE"
     ]
   },
   {
@@ -497,12 +846,48 @@
   },
   {
     "runtime": false,
+    "name": "bluebird",
+    "version": "3.7.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/bluebird@3.7.2/node_modules/bluebird/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "boolean",
+    "version": "3.2.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/boolean@3.2.0/node_modules/boolean/LICENSE.txt"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "boundary",
     "version": "2.0.0",
     "license": "BSD-2-Clause",
     "files": [
       "node_modules/.pnpm/boundary@2.0.0/node_modules/boundary/LICENSE.BSD",
       "node_modules/.pnpm/boundary@2.0.0/node_modules/boundary/LICENSE.LIBCXX"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "brace-expansion",
+    "version": "1.1.21",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/brace-expansion@1.1.21/node_modules/brace-expansion/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "brace-expansion",
+    "version": "2.1.7",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/brace-expansion@2.1.7/node_modules/brace-expansion/LICENSE"
     ]
   },
   {
@@ -534,11 +919,65 @@
   },
   {
     "runtime": false,
+    "name": "buffer-from",
+    "version": "1.1.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/buffer-from@1.1.2/node_modules/buffer-from/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "builder-util",
+    "version": "26.16.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/builder-util@26.16.0_supports-color@7.2.0/node_modules/builder-util/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "builder-util-runtime",
+    "version": "9.7.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/builder-util-runtime@9.7.0_supports-color@7.2.0/node_modules/builder-util-runtime/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "bundle-name",
     "version": "4.1.1",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/bundle-name@4.1.1/node_modules/bundle-name/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "bytestreamjs",
+    "version": "2.0.1",
+    "license": "BSD-3-Clause",
+    "files": [
+      "node_modules/.pnpm/bytestreamjs@2.0.1/node_modules/bytestreamjs/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "cacheable-lookup",
+    "version": "5.0.4",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/cacheable-lookup@5.0.4/node_modules/cacheable-lookup/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "cacheable-request",
+    "version": "7.0.4",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/cacheable-request@7.0.4/node_modules/cacheable-request/LICENSE"
     ]
   },
   {
@@ -562,6 +1001,15 @@
   {
     "runtime": false,
     "name": "chalk",
+    "version": "4.1.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/chalk@4.1.2/node_modules/chalk/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "chalk",
     "version": "5.6.2",
     "license": "MIT",
     "files": [
@@ -575,6 +1023,40 @@
     "license": "Apache-2.0",
     "files": [
       "node_modules/.pnpm/chevrotain@13.2.0/node_modules/chevrotain/LICENSE.txt"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "chownr",
+    "version": "3.0.0",
+    "license": "BlueOak-1.0.0",
+    "files": [
+      "node_modules/.pnpm/chownr@3.0.0/node_modules/chownr/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "chromium-pickle-js",
+    "version": "0.2.0",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "ci-info",
+    "version": "4.3.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/ci-info@4.3.1/node_modules/ci-info/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "ci-info",
+    "version": "4.4.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/ci-info@4.4.0/node_modules/ci-info/LICENSE"
     ]
   },
   {
@@ -606,11 +1088,56 @@
   },
   {
     "runtime": false,
+    "name": "cliui",
+    "version": "8.0.1",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/cliui@8.0.1/node_modules/cliui/LICENSE.txt"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "clone-response",
+    "version": "1.0.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/clone-response@1.0.3/node_modules/clone-response/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "cockatiel",
     "version": "3.2.1",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/cockatiel@3.2.1/node_modules/cockatiel/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "color-convert",
+    "version": "2.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/color-convert@2.0.1/node_modules/color-convert/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "color-name",
+    "version": "1.1.4",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/color-name@1.1.4/node_modules/color-name/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "combined-stream",
+    "version": "1.0.8",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/combined-stream@1.0.8/node_modules/combined-stream/License"
     ]
   },
   {
@@ -624,11 +1151,45 @@
   },
   {
     "runtime": false,
+    "name": "commander",
+    "version": "5.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/commander@5.1.0/node_modules/commander/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "compare-version",
+    "version": "0.1.2",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "concat-map",
+    "version": "0.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/concat-map@0.0.1/node_modules/concat-map/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "core-util-is",
     "version": "1.0.3",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/core-util-is@1.0.3/node_modules/core-util-is/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "cross-spawn",
+    "version": "7.0.6",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/LICENSE"
     ]
   },
   {
@@ -727,7 +1288,16 @@
     "version": "4.4.3",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/debug@4.4.3/node_modules/debug/LICENSE"
+      "node_modules/.pnpm/debug@4.4.3_supports-color@7.2.0/node_modules/debug/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "decompress-response",
+    "version": "6.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/decompress-response@6.0.0/node_modules/decompress-response/license"
     ]
   },
   {
@@ -750,11 +1320,47 @@
   },
   {
     "runtime": false,
+    "name": "defer-to-connect",
+    "version": "2.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/defer-to-connect@2.0.1/node_modules/defer-to-connect/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "define-data-property",
+    "version": "1.1.4",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/define-data-property@1.1.4/node_modules/define-data-property/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "define-lazy-prop",
     "version": "3.0.0",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/define-lazy-prop@3.0.0/node_modules/define-lazy-prop/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "define-properties",
+    "version": "1.2.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/define-properties@1.2.1/node_modules/define-properties/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "delayed-stream",
+    "version": "1.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/delayed-stream@1.0.0/node_modules/delayed-stream/License"
     ]
   },
   {
@@ -768,11 +1374,63 @@
   },
   {
     "runtime": false,
+    "name": "detect-node",
+    "version": "2.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/detect-node@2.1.0/node_modules/detect-node/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "dir-compare",
+    "version": "4.2.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/dir-compare@4.2.0/node_modules/dir-compare/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "dmg-builder",
+    "version": "26.18.0",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "dotenv",
+    "version": "16.6.1",
+    "license": "BSD-2-Clause",
+    "files": [
+      "node_modules/.pnpm/dotenv@16.6.1/node_modules/dotenv/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "dotenv-expand",
+    "version": "11.0.7",
+    "license": "BSD-2-Clause",
+    "files": [
+      "node_modules/.pnpm/dotenv-expand@11.0.7/node_modules/dotenv-expand/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "dunder-proto",
     "version": "1.0.1",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/dunder-proto@1.0.1/node_modules/dunder-proto/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "duplexer2",
+    "version": "0.1.4",
+    "license": "BSD-3-Clause",
+    "files": [
+      "node_modules/.pnpm/duplexer2@0.1.4/node_modules/duplexer2/LICENSE.md"
     ]
   },
   {
@@ -795,11 +1453,38 @@
   },
   {
     "runtime": false,
+    "name": "ejs",
+    "version": "3.1.10",
+    "license": "Apache-2.0",
+    "files": [
+      "node_modules/.pnpm/ejs@3.1.10/node_modules/ejs/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "electron",
     "version": "45.0.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/electron@45.0.0/node_modules/electron/LICENSE"
+      "node_modules/.pnpm/electron@45.0.0_supports-color@7.2.0/node_modules/electron/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "electron-builder",
+    "version": "26.18.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/electron-builder@26.18.0_el_b54646fb26ac5ed75bfc7807a09442f6/node_modules/electron-builder/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "electron-publish",
+    "version": "26.18.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/electron-publish@26.18.0_supports-color@7.2.0/node_modules/electron-publish/LICENSE"
     ]
   },
   {
@@ -808,6 +1493,22 @@
     "version": "10.6.0",
     "license": "MIT",
     "files": []
+  },
+  {
+    "runtime": false,
+    "name": "emoji-regex",
+    "version": "8.0.0",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "end-of-stream",
+    "version": "1.4.5",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/end-of-stream@1.4.5/node_modules/end-of-stream/LICENSE"
+    ]
   },
   {
     "runtime": false,
@@ -821,11 +1522,27 @@
   {
     "runtime": false,
     "name": "env-paths",
+    "version": "2.2.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/env-paths@2.2.1/node_modules/env-paths/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "env-paths",
     "version": "3.0.0",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/env-paths@3.0.0/node_modules/env-paths/license"
     ]
+  },
+  {
+    "runtime": false,
+    "name": "err-code",
+    "version": "2.0.3",
+    "license": "MIT",
+    "files": []
   },
   {
     "runtime": false,
@@ -856,11 +1573,74 @@
   },
   {
     "runtime": false,
+    "name": "es-set-tostringtag",
+    "version": "2.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/es-set-tostringtag@2.1.0/node_modules/es-set-tostringtag/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "es6-error",
+    "version": "4.1.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/es6-error@4.1.1/node_modules/es6-error/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "esbuild",
     "version": "0.28.2",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "escalade",
+    "version": "3.2.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/escalade@3.2.0/node_modules/escalade/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "escape-string-regexp",
+    "version": "4.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/escape-string-regexp@4.0.0/node_modules/escape-string-regexp/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "exponential-backoff",
+    "version": "3.1.3",
+    "license": "Apache-2.0",
+    "files": [
+      "node_modules/.pnpm/exponential-backoff@3.1.3/node_modules/exponential-backoff/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "fast-deep-equal",
+    "version": "3.1.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/fast-deep-equal@3.1.3/node_modules/fast-deep-equal/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "fast-uri",
+    "version": "3.1.9",
+    "license": "BSD-3-Clause",
+    "files": [
+      "node_modules/.pnpm/fast-uri@3.1.9/node_modules/fast-uri/LICENSE"
     ]
   },
   {
@@ -874,11 +1654,90 @@
   },
   {
     "runtime": false,
+    "name": "filelist",
+    "version": "1.0.6",
+    "license": "Apache-2.0",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "form-data",
+    "version": "4.0.6",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/form-data@4.0.6/node_modules/form-data/License"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "fs-extra",
+    "version": "10.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/fs-extra@10.1.0/node_modules/fs-extra/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "fs-extra",
+    "version": "11.3.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/fs-extra@11.3.1/node_modules/fs-extra/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "fs-extra",
+    "version": "11.4.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/fs-extra@11.4.1/node_modules/fs-extra/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "fs-extra",
+    "version": "8.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/fs-extra@8.1.0/node_modules/fs-extra/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "fs-extra",
+    "version": "9.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/fs-extra@9.1.0/node_modules/fs-extra/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "fs.realpath",
+    "version": "1.0.0",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/fs.realpath@1.0.0/node_modules/fs.realpath/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "function-bind",
     "version": "1.1.2",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/function-bind@1.1.2/node_modules/function-bind/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "get-caller-file",
+    "version": "2.0.5",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/get-caller-file@2.0.5/node_modules/get-caller-file/LICENSE.md"
     ]
   },
   {
@@ -910,11 +1769,56 @@
   },
   {
     "runtime": false,
+    "name": "get-stream",
+    "version": "5.2.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/get-stream@5.2.0/node_modules/get-stream/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "glob",
+    "version": "7.2.3",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/glob@7.2.3/node_modules/glob/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "global-agent",
+    "version": "3.0.0",
+    "license": "BSD-3-Clause",
+    "files": [
+      "node_modules/.pnpm/global-agent@3.0.0/node_modules/global-agent/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "globalthis",
+    "version": "1.0.4",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/globalthis@1.0.4/node_modules/globalthis/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "gopd",
     "version": "1.2.0",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/gopd@1.2.0/node_modules/gopd/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "got",
+    "version": "11.8.6",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/got@11.8.6/node_modules/got/license"
     ]
   },
   {
@@ -928,11 +1832,38 @@
   },
   {
     "runtime": false,
+    "name": "has-flag",
+    "version": "4.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/has-flag@4.0.0/node_modules/has-flag/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "has-property-descriptors",
+    "version": "1.0.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/has-property-descriptors@1.0.2/node_modules/has-property-descriptors/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "has-symbols",
     "version": "1.1.0",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/has-symbols@1.1.0/node_modules/has-symbols/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "has-tostringtag",
+    "version": "1.0.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/has-tostringtag@1.0.2/node_modules/has-tostringtag/LICENSE"
     ]
   },
   {
@@ -955,11 +1886,29 @@
   },
   {
     "runtime": false,
+    "name": "http-cache-semantics",
+    "version": "4.3.0",
+    "license": "BSD-2-Clause",
+    "files": [
+      "node_modules/.pnpm/http-cache-semantics@4.3.0/node_modules/http-cache-semantics/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "http-proxy-agent",
     "version": "7.0.2",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/http-proxy-agent@7.0.2/node_modules/http-proxy-agent/LICENSE"
+      "node_modules/.pnpm/http-proxy-agent@7.0.2_supports-color@7.2.0/node_modules/http-proxy-agent/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "http2-wrapper",
+    "version": "1.0.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/http2-wrapper@1.0.3/node_modules/http2-wrapper/LICENSE"
     ]
   },
   {
@@ -968,7 +1917,7 @@
     "version": "7.0.6",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/https-proxy-agent@7.0.6/node_modules/https-proxy-agent/LICENSE"
+      "node_modules/.pnpm/https-proxy-agent@7.0.6_supports-color@7.2.0/node_modules/https-proxy-agent/LICENSE"
     ]
   },
   {
@@ -978,6 +1927,15 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/immediate@3.0.6/node_modules/immediate/LICENSE.txt"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "inflight",
+    "version": "1.0.6",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/inflight@1.0.6/node_modules/inflight/LICENSE"
     ]
   },
   {
@@ -996,6 +1954,15 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/is-docker@3.0.0/node_modules/is-docker/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "is-fullwidth-code-point",
+    "version": "3.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/is-fullwidth-code-point@3.0.0/node_modules/is-fullwidth-code-point/license"
     ]
   },
   {
@@ -1061,6 +2028,51 @@
   },
   {
     "runtime": false,
+    "name": "isbinaryfile",
+    "version": "4.0.10",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/isbinaryfile@4.0.10/node_modules/isbinaryfile/LICENSE.txt"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "isbinaryfile",
+    "version": "5.0.7",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/isbinaryfile@5.0.7/node_modules/isbinaryfile/LICENSE.txt"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "isexe",
+    "version": "2.0.0",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "isexe",
+    "version": "3.1.5",
+    "license": "BlueOak-1.0.0",
+    "files": [
+      "node_modules/.pnpm/isexe@3.1.5/node_modules/isexe/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "isexe",
+    "version": "4.0.0",
+    "license": "BlueOak-1.0.0",
+    "files": [
+      "node_modules/.pnpm/isexe@4.0.0/node_modules/isexe/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "istextorbinary",
     "version": "9.5.0",
     "license": "Artistic-2.0",
@@ -1070,11 +2082,90 @@
   },
   {
     "runtime": false,
+    "name": "jake",
+    "version": "10.9.4",
+    "license": "Apache-2.0",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "jiti",
+    "version": "2.7.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/jiti@2.7.0/node_modules/jiti/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "js-yaml",
+    "version": "4.3.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/js-yaml@4.3.2/node_modules/js-yaml/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "json-buffer",
+    "version": "3.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/json-buffer@3.0.1/node_modules/json-buffer/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "json-schema-traverse",
+    "version": "1.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/json-schema-traverse@1.0.0/node_modules/json-schema-traverse/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "json-stringify-safe",
+    "version": "5.0.1",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/json-stringify-safe@5.0.1/node_modules/json-stringify-safe/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "json5",
+    "version": "2.2.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/json5@2.2.3/node_modules/json5/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "jsonc-parser",
     "version": "3.3.1",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "jsonfile",
+    "version": "4.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/jsonfile@4.0.0/node_modules/jsonfile/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "jsonfile",
+    "version": "6.2.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/jsonfile@6.2.1/node_modules/jsonfile/LICENSE"
     ]
   },
   {
@@ -1115,6 +2206,20 @@
   },
   {
     "runtime": false,
+    "name": "keyv",
+    "version": "4.5.4",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "lazy-val",
+    "version": "1.0.5",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
     "name": "lie",
     "version": "3.3.0",
     "license": "MIT",
@@ -1138,6 +2243,15 @@
     "license": "MPL-2.0",
     "files": [
       "node_modules/.pnpm/lightningcss-win32-x64-msvc@1.33.0/node_modules/lightningcss-win32-x64-msvc/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "lodash",
+    "version": "4.18.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/lodash@4.18.1/node_modules/lodash/LICENSE"
     ]
   },
   {
@@ -1214,6 +2328,15 @@
   },
   {
     "runtime": false,
+    "name": "lowercase-keys",
+    "version": "2.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/lowercase-keys@2.0.0/node_modules/lowercase-keys/license"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "lru-cache",
     "version": "6.0.0",
     "license": "ISC",
@@ -1228,6 +2351,15 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/marked@18.1.1/node_modules/marked/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "matcher",
+    "version": "3.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/matcher@3.0.0/node_modules/matcher/license"
     ]
   },
   {
@@ -1250,6 +2382,33 @@
   },
   {
     "runtime": false,
+    "name": "mime",
+    "version": "2.6.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/mime@2.6.0/node_modules/mime/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "mime-db",
+    "version": "1.52.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/mime-db@1.52.0/node_modules/mime-db/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "mime-types",
+    "version": "2.1.35",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/mime-types@2.1.35/node_modules/mime-types/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "mimic-function",
     "version": "5.0.1",
     "license": "MIT",
@@ -1259,11 +2418,83 @@
   },
   {
     "runtime": false,
+    "name": "mimic-response",
+    "version": "1.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/mimic-response@1.0.1/node_modules/mimic-response/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "mimic-response",
+    "version": "3.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/mimic-response@3.1.0/node_modules/mimic-response/license"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "minimatch",
     "version": "10.2.6",
     "license": "BlueOak-1.0.0",
     "files": [
       "node_modules/.pnpm/minimatch@10.2.6/node_modules/minimatch/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "minimatch",
+    "version": "3.1.5",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/minimatch@3.1.5/node_modules/minimatch/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "minimatch",
+    "version": "5.1.9",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/minimatch@5.1.9/node_modules/minimatch/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "minimatch",
+    "version": "9.0.9",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/minimatch@9.0.9/node_modules/minimatch/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "minimist",
+    "version": "1.2.8",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/minimist@1.2.8/node_modules/minimist/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "minipass",
+    "version": "7.1.3",
+    "license": "BlueOak-1.0.0",
+    "files": [
+      "node_modules/.pnpm/minipass@7.1.3/node_modules/minipass/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "minizlib",
+    "version": "3.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/minizlib@3.1.0/node_modules/minizlib/LICENSE"
     ]
   },
   {
@@ -1295,11 +2526,81 @@
   },
   {
     "runtime": false,
+    "name": "node-abi",
+    "version": "4.39.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/node-abi@4.39.0/node_modules/node-abi/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "node-api-version",
+    "version": "0.2.1",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "node-gyp",
+    "version": "12.4.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/node-gyp@12.4.0/node_modules/node-gyp/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "node-int64",
+    "version": "0.4.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/node-int64@0.4.0/node_modules/node-int64/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "nopt",
+    "version": "9.0.0",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/nopt@9.0.0/node_modules/nopt/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "normalize-url",
+    "version": "6.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/normalize-url@6.1.0/node_modules/normalize-url/license"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "object-inspect",
     "version": "1.13.4",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/object-inspect@1.13.4/node_modules/object-inspect/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "object-keys",
+    "version": "1.1.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/object-keys@1.1.1/node_modules/object-keys/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "once",
+    "version": "1.4.0",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/once@1.4.0/node_modules/once/LICENSE"
     ]
   },
   {
@@ -1331,6 +2632,24 @@
   },
   {
     "runtime": false,
+    "name": "p-cancelable",
+    "version": "2.1.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/p-cancelable@2.1.1/node_modules/p-cancelable/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "p-limit",
+    "version": "3.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/p-limit@3.1.0/node_modules/p-limit/license"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "pako",
     "version": "1.0.11",
     "license": "(MIT AND Zlib)",
@@ -1345,6 +2664,33 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/parse5@8.0.1/node_modules/parse5/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "path-is-absolute",
+    "version": "1.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/path-is-absolute@1.0.1/node_modules/path-is-absolute/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "path-key",
+    "version": "3.1.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/path-key@3.1.1/node_modules/path-key/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "pe-library",
+    "version": "0.4.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/pe-library@0.4.1/node_modules/pe-library/LICENSE"
     ]
   },
   {
@@ -1376,6 +2722,24 @@
   },
   {
     "runtime": false,
+    "name": "pkijs",
+    "version": "3.4.3",
+    "license": "BSD-3-Clause",
+    "files": [
+      "node_modules/.pnpm/pkijs@3.4.3/node_modules/pkijs/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "plist",
+    "version": "3.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/plist@3.1.0/node_modules/plist/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "postcss",
     "version": "8.5.31",
     "license": "MIT",
@@ -1403,6 +2767,15 @@
   },
   {
     "runtime": false,
+    "name": "proc-log",
+    "version": "6.1.0",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/proc-log@6.1.0/node_modules/proc-log/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "process-nextick-args",
     "version": "2.0.1",
     "license": "MIT",
@@ -1421,6 +2794,15 @@
   },
   {
     "runtime": false,
+    "name": "promise-retry",
+    "version": "2.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/promise-retry@2.0.1/node_modules/promise-retry/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "proper-lockfile",
     "version": "4.1.2",
     "license": "MIT",
@@ -1430,11 +2812,47 @@
   },
   {
     "runtime": false,
+    "name": "pump",
+    "version": "3.0.4",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/pump@3.0.4/node_modules/pump/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "pvtsutils",
+    "version": "1.3.6",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/pvtsutils@1.3.6/node_modules/pvtsutils/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "pvutils",
+    "version": "1.2.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/pvutils@1.2.0/node_modules/pvutils/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "qs",
     "version": "6.16.1",
     "license": "BSD-3-Clause",
     "files": [
       "node_modules/.pnpm/qs@6.16.1/node_modules/qs/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "quick-lru",
+    "version": "5.1.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/quick-lru@5.1.1/node_modules/quick-lru/license"
     ]
   },
   {
@@ -1466,11 +2884,63 @@
   },
   {
     "runtime": false,
+    "name": "read-binary-file-arch",
+    "version": "1.0.6",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
     "name": "readable-stream",
     "version": "2.3.8",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/readable-stream@2.3.8/node_modules/readable-stream/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "require-directory",
+    "version": "2.1.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/require-directory@2.1.1/node_modules/require-directory/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "require-from-string",
+    "version": "2.0.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/require-from-string@2.0.2/node_modules/require-from-string/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "resedit",
+    "version": "1.7.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/resedit@1.7.2/node_modules/resedit/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "resolve-alpn",
+    "version": "1.2.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/resolve-alpn@1.2.1/node_modules/resolve-alpn/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "responselike",
+    "version": "2.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/responselike@2.0.1/node_modules/responselike/LICENSE"
     ]
   },
   {
@@ -1489,6 +2959,15 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/retry@0.12.0/node_modules/retry/License"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "roarr",
+    "version": "2.15.4",
+    "license": "BSD-3-Clause",
+    "files": [
+      "node_modules/.pnpm/roarr@2.15.4/node_modules/roarr/LICENSE"
     ]
   },
   {
@@ -1520,6 +2999,15 @@
   },
   {
     "runtime": false,
+    "name": "sanitize-filename",
+    "version": "1.6.4",
+    "license": "WTFPL OR ISC",
+    "files": [
+      "node_modules/.pnpm/sanitize-filename@1.6.4/node_modules/sanitize-filename/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "sax",
     "version": "1.6.1",
     "license": "BlueOak-1.0.0",
@@ -1539,10 +3027,55 @@
   {
     "runtime": false,
     "name": "semver",
+    "version": "5.7.2",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/semver@5.7.2/node_modules/semver/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "semver",
+    "version": "6.3.1",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/semver@6.3.1/node_modules/semver/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "semver",
+    "version": "7.7.4",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/semver@7.7.4/node_modules/semver/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "semver",
     "version": "7.8.5",
     "license": "ISC",
     "files": [
       "node_modules/.pnpm/semver@7.8.5/node_modules/semver/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "semver-compare",
+    "version": "1.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/semver-compare@1.0.0/node_modules/semver-compare/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "serialize-error",
+    "version": "7.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/serialize-error@7.0.1/node_modules/serialize-error/license"
     ]
   },
   {
@@ -1552,6 +3085,24 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/setimmediate@1.0.5/node_modules/setimmediate/LICENSE.txt"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "shebang-command",
+    "version": "2.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "shebang-regex",
+    "version": "3.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex/license"
     ]
   },
   {
@@ -1610,11 +3161,56 @@
   },
   {
     "runtime": false,
+    "name": "simple-update-notifier",
+    "version": "2.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/simple-update-notifier@2.0.0/node_modules/simple-update-notifier/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "source-map",
+    "version": "0.6.1",
+    "license": "BSD-3-Clause",
+    "files": [
+      "node_modules/.pnpm/source-map@0.6.1/node_modules/source-map/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "source-map-js",
     "version": "1.2.2",
     "license": "BSD-3-Clause",
     "files": [
       "node_modules/.pnpm/source-map-js@1.2.2/node_modules/source-map-js/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "source-map-support",
+    "version": "0.5.21",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/source-map-support@0.5.21/node_modules/source-map-support/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "sprintf-js",
+    "version": "1.1.3",
+    "license": "BSD-3-Clause",
+    "files": [
+      "node_modules/.pnpm/sprintf-js@1.1.3/node_modules/sprintf-js/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "stat-mode",
+    "version": "1.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/stat-mode@1.0.0/node_modules/stat-mode/LICENSE"
     ]
   },
   {
@@ -1638,10 +3234,28 @@
   {
     "runtime": false,
     "name": "string-width",
+    "version": "4.2.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/string-width@4.2.3/node_modules/string-width/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "string-width",
     "version": "7.2.0",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/string-width@7.2.0/node_modules/string-width/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "strip-ansi",
+    "version": "6.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/strip-ansi@6.0.1/node_modules/strip-ansi/license"
     ]
   },
   {
@@ -1668,8 +3282,33 @@
     "version": "3.0.1",
     "license": "Apache-2.0",
     "files": [
-      "node_modules/.pnpm/sumchecker@3.0.1/node_modules/sumchecker/LICENSE"
+      "node_modules/.pnpm/sumchecker@3.0.1_supports-color@7.2.0/node_modules/sumchecker/LICENSE"
     ]
+  },
+  {
+    "runtime": false,
+    "name": "supports-color",
+    "version": "7.2.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/supports-color@7.2.0/node_modules/supports-color/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "tar",
+    "version": "7.5.22",
+    "license": "BlueOak-1.0.0",
+    "files": [
+      "node_modules/.pnpm/tar@7.5.22/node_modules/tar/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "temp-file",
+    "version": "3.4.0",
+    "license": "MIT",
+    "files": []
   },
   {
     "runtime": false,
@@ -1682,12 +3321,42 @@
   },
   {
     "runtime": false,
+    "name": "tiny-async-pool",
+    "version": "1.3.0",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
     "name": "tinyglobby",
     "version": "0.2.17",
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/tinyglobby@0.2.17/node_modules/tinyglobby/LICENSE"
     ]
+  },
+  {
+    "runtime": false,
+    "name": "tmp",
+    "version": "0.2.7",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/tmp@0.2.7/node_modules/tmp/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "tmp-promise",
+    "version": "3.0.3",
+    "license": "MIT",
+    "files": []
+  },
+  {
+    "runtime": false,
+    "name": "truncate-utf8-bytes",
+    "version": "1.0.2",
+    "license": "WTFPL",
+    "files": []
   },
   {
     "runtime": false,
@@ -1714,6 +3383,15 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/tunnel@0.0.6/node_modules/tunnel/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "type-fest",
+    "version": "0.13.1",
+    "license": "(MIT OR CC0-1.0)",
+    "files": [
+      "node_modules/.pnpm/type-fest@0.13.1/node_modules/type-fest/license"
     ]
   },
   {
@@ -1746,6 +3424,15 @@
   {
     "runtime": false,
     "name": "undici",
+    "version": "6.29.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/undici@6.29.1/node_modules/undici/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "undici",
     "version": "7.30.1",
     "license": "MIT",
     "files": [
@@ -1772,6 +3459,33 @@
   },
   {
     "runtime": false,
+    "name": "universalify",
+    "version": "0.1.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/universalify@0.1.2/node_modules/universalify/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "universalify",
+    "version": "2.0.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/universalify@2.0.1/node_modules/universalify/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "unzipper",
+    "version": "0.12.5",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/unzipper@0.12.5/node_modules/unzipper/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "url-join",
     "version": "4.0.1",
     "license": "MIT",
@@ -1786,6 +3500,16 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/use-sync-external-store@1.7.0_react@19.3.1/node_modules/use-sync-external-store/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "utf8-byte-length",
+    "version": "1.0.5",
+    "license": "(WTFPL OR MIT)",
+    "files": [
+      "node_modules/.pnpm/utf8-byte-length@1.0.5/node_modules/utf8-byte-length/LICENSE.MIT.txt",
+      "node_modules/.pnpm/utf8-byte-length@1.0.5/node_modules/utf8-byte-length/LICENSE.WTFPL.txt"
     ]
   },
   {
@@ -1812,7 +3536,61 @@
     "version": "8.3.5",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/vite@8.3.5_@types+node@22.15.30_esbuild@0.28.2_tsx@4.23.15/node_modules/vite/LICENSE.md"
+      "node_modules/.pnpm/vite@8.3.5_@types+node@22.1_c14dcc773d68a90179e2bebc092f70e1/node_modules/vite/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "webcrypto-core",
+    "version": "1.9.2",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/webcrypto-core@1.9.2/node_modules/webcrypto-core/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "which",
+    "version": "2.0.2",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/which@2.0.2/node_modules/which/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "which",
+    "version": "5.0.0",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/which@5.0.0/node_modules/which/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "which",
+    "version": "6.0.1",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/which@6.0.1/node_modules/which/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "wrap-ansi",
+    "version": "7.0.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/wrap-ansi@7.0.0/node_modules/wrap-ansi/license"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "wrappy",
+    "version": "1.0.2",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/wrappy@1.0.2/node_modules/wrappy/LICENSE"
     ]
   },
   {
@@ -1853,11 +3631,56 @@
   },
   {
     "runtime": false,
+    "name": "xmlbuilder",
+    "version": "15.1.1",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/xmlbuilder@15.1.1/node_modules/xmlbuilder/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "y18n",
+    "version": "5.0.8",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/y18n@5.0.8/node_modules/y18n/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
     "name": "yallist",
     "version": "4.0.0",
     "license": "ISC",
     "files": [
       "node_modules/.pnpm/yallist@4.0.0/node_modules/yallist/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "yallist",
+    "version": "5.0.0",
+    "license": "BlueOak-1.0.0",
+    "files": [
+      "node_modules/.pnpm/yallist@5.0.0/node_modules/yallist/LICENSE.md"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "yargs",
+    "version": "17.7.3",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/yargs@17.7.3/node_modules/yargs/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "yargs-parser",
+    "version": "21.1.1",
+    "license": "ISC",
+    "files": [
+      "node_modules/.pnpm/yargs-parser@21.1.1/node_modules/yargs-parser/LICENSE.txt"
     ]
   },
   {
@@ -1876,6 +3699,15 @@
     "license": "MIT",
     "files": [
       "node_modules/.pnpm/yazl@2.5.1/node_modules/yazl/LICENSE"
+    ]
+  },
+  {
+    "runtime": false,
+    "name": "yocto-queue",
+    "version": "0.1.0",
+    "license": "MIT",
+    "files": [
+      "node_modules/.pnpm/yocto-queue@0.1.0/node_modules/yocto-queue/license"
     ]
   },
   {

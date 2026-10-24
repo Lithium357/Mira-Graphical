@@ -5,6 +5,7 @@ packages:
 allowBuilds:
   '@vscode/vsce-sign': false
   electron: true
+  electron-winstaller: false
   esbuild: true
 overrides:
   # VSCE's Azure identity dependency still requests MSAL 6; auth-code flow is affected by GHSA-xcx6-jx8p-x3h5.
