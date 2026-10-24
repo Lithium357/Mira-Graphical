@@ -2,7 +2,7 @@
 
 A local, bidirectional Verilog, SystemVerilog and VHDL graph companion. Write RTL in VS Code; construct, wire and inspect supported circuits in a separate desktop window. Semantic edits synchronize after **15 seconds of inactivity**. Original code is **GPL-3.0-only**.
 
-Version 0.6.0 adds durable live-buffer/draft recovery and native VS Code recovery copies/comparisons. Verilog, SystemVerilog and VHDL support source synchronization, construction, wiring, hierarchy, clipboard actions and local simulation within the [documented subset](docs/supported-syntax.md). Clocked logic, testbenches and full language standards remain outside this version. See the [launch readiness checklist](docs/launch-readiness.md).
+Version 0.7.0 adds guided workspace setup, keyboard component navigation, process-crash/project-scale validation and unsigned artifact checksums. Durable live-buffer/draft recovery and native VS Code recovery review remain available. Verilog, SystemVerilog and VHDL support source synchronization, construction, wiring, hierarchy, clipboard actions and local simulation within the [documented subset](docs/supported-syntax.md). Clocked logic, testbenches and full language standards remain outside this version. See the [launch readiness checklist](docs/launch-readiness.md).
 
 ## Install and run
 
@@ -28,7 +28,7 @@ To run the companion extension from source:
 
 Only explicitly shared documents participate. Use **RTL Graph: Connect/Disconnect** to disconnect; use **RTL Graph: Show Sync Status** for details. After a service restart, reconnect and run Open Current Module again to negotiate the current buffer. One desktop workspace and one VS Code adapter connection are supported at a time, with multiple shared document sessions. No extension marketplace publishing or native desktop installer is provided yet.
 
-To use the packaged companion, run `pnpm package:extension`, then choose **Extensions: Install from VSIX…** in VS Code and select `dist/packages/mira-graphical-0.6.0.vsix`. Keep the desktop app running for the same workspace and share a `.v`, `.sv`, `.vhd` or `.vhdl` file with Open Current Module. The official [VS Code packaging tool](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#packaging-extensions) creates the unsigned VSIX; this does not publish to the Marketplace or create/sign a desktop installer. CI uploads the VSIX with its test artifacts.
+To use the packaged companion, run `pnpm package:extension`, then choose **Extensions: Install from VSIX…** in VS Code and select `dist/packages/mira-graphical-0.7.0.vsix`. Keep the desktop app running for the same workspace and share a `.v`, `.sv`, `.vhd` or `.vhdl` file with Open Current Module. The official [VS Code packaging tool](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#packaging-extensions) creates the unsigned VSIX; this does not publish to the Marketplace or create/sign a desktop installer. CI uploads the VSIX with its test artifacts. **Setup help** in the app shows workspace, connection status and troubleshooting. See [distribution and checksum verification](docs/distribution.md) and [external-project compatibility limits](docs/compatibility.md).
 
 ## Adder demo
 

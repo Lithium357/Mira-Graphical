@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { runTests, runVSCodeCommand } from '@vscode/test-electron';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 import { SyncService } from '../packages/core/service.js';
 const root = process.cwd();
 const output = join(root, 'test-results');
@@ -54,6 +55,23 @@ async function launch(exe: string, args: string[], env = process.env) {
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 await launch(process.execPath, ['scripts/package-extension.mjs'], env);
+const packageInventory = JSON.parse(readFileSync('dist/packages/manifest.json', 'utf8'));
+assert.equal(packageInventory.version, JSON.parse(readFileSync('package.json', 'utf8')).version);
+assert.equal(packageInventory.package, `mira-graphical-${packageInventory.version}.vsix`);
+const packageBytes = readFileSync(join('dist/packages', packageInventory.package));
+assert.equal(packageInventory.bytes, packageBytes.length);
+assert.equal(packageInventory.sha256, createHash('sha256').update(packageBytes).digest('hex'));
+for (const line of readFileSync('dist/packages/SHA256SUMS', 'utf8').trim().split('\n')) {
+  const [expected, name] = line.split('  ');
+  assert(/^[a-f0-9]{64}$/.test(expected));
+  assert([packageInventory.package, 'manifest.json'].includes(name));
+  assert.equal(
+    createHash('sha256')
+      .update(readFileSync(join('dist/packages', name)))
+      .digest('hex'),
+    expected,
+  );
+}
 await launch(electron, ['.', '--smoke', `--workspace=${workspace}`], env);
 const installed = join(output, `vsix-installed-${stamp}`),
   profile = join(output, `vsix-profile-${stamp}`);
@@ -99,7 +117,7 @@ for (let pass = 0; pass < 2; pass++) {
   let edited = false,
     comboEdited = false,
     hierarchyEdited = false;
-  service.subscribe((states) => {
+  const unsubscribe = service.subscribe((states) => {
     writeSmokeState(
       'smoke-states.json',
       states.map((s) => ({ uri: s.uri, version: s.version, status: s.status })),
@@ -284,6 +302,8 @@ for (let pass = 0; pass < 2; pass++) {
       `VS CODE SMOKE PASS ${pass + 1}: unsaved buffer, minimal patches, native undo, disk unchanged${pass ? ' · restart and persisted identity verified' : ''}.`,
     );
   } finally {
+    // The editor has exited and assertions are complete; teardown must not rewrite its watched files.
+    unsubscribe();
     await service.close();
   }
 }

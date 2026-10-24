@@ -2,6 +2,8 @@
 import { createVSIX, listFiles, PackageManager } from '@vscode/vsce';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 const cwd = resolve('extensions/vscode');
 const manifest = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
 const files = await listFiles({ cwd, packageManager: PackageManager.None });
@@ -20,12 +22,34 @@ if (
 mkdirSync('dist/packages', { recursive: true });
 const packagePath = resolve(`dist/packages/mira-graphical-${manifest.version}.vsix`);
 await createVSIX({ cwd, packagePath, dependencies: false, githubBranch: 'main' });
+const name = `mira-graphical-${manifest.version}.vsix`;
+const bytes = readFileSync(packagePath);
+const sha256 = createHash('sha256').update(bytes).digest('hex');
+const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const dirty = !!execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], {
+  encoding: 'utf8',
+}).trim();
 writeFileSync(
   'dist/packages/manifest.json',
   JSON.stringify(
-    { version: manifest.version, package: packagePath, files, signing: false },
+    {
+      schemaVersion: 1,
+      version: manifest.version,
+      revision,
+      dirty,
+      package: name,
+      bytes: bytes.length,
+      sha256,
+      files,
+      signing: false,
+      node: process.version,
+    },
     null,
     2,
   ),
 );
+const manifestHash = createHash('sha256')
+  .update(readFileSync('dist/packages/manifest.json'))
+  .digest('hex');
+writeFileSync('dist/packages/SHA256SUMS', `${sha256}  ${name}\n${manifestHash}  manifest.json\n`);
 console.log(`Verified VSIX file list: ${packagePath}`);

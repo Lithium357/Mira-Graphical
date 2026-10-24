@@ -18,6 +18,12 @@ async function until(f: () => boolean | Promise<boolean>, timeout = 20_000) {
 export async function desktopSmoke(service: SyncService, win: BrowserWindow, root: string) {
   // Exercise construction/selection in a laptop-sized viewport on every host.
   win.setSize(1000, 680);
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.body.innerText.includes('Workspace:')&&document.body.innerText.includes('Install from VSIX')`,
+    ),
+  );
+  assert.equal(service.editorConnected, false, 'Fresh workspace starts disconnected');
   const click = async (label: string) => {
     await until(() =>
       win.webContents.executeJavaScript(
@@ -867,5 +873,11 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   await until(() =>
     win.webContents.executeJavaScript(`!document.querySelector('.recovery-dialog')`),
   );
+  const { accessibilitySmoke } = await import('./accessibility-smoke.js');
+  const selectedURI = await win.webContents.executeJavaScript(
+    `document.querySelector('[aria-label="Shared module"]').value`,
+  );
+  assert(service.sessions.has(selectedURI));
+  await accessibilitySmoke(win, service, selectedURI, output);
   ws.close();
 }

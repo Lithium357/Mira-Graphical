@@ -163,6 +163,18 @@ export function parse(source: string, selected?: string): Module {
   const result = lexer.tokenize(source);
   if (result.errors.length) {
     const e = result.errors[0];
+    if (source[e.offset] === '`')
+      throw new ParseError(
+        `Unsupported preprocessor directive ${source.slice(e.offset).match(/^`[A-Za-z_][A-Za-z_0-9]*/)?.[0] ?? '`'}. Share self-contained modules without directives or macro expansion.`,
+        e.offset,
+        e.offset + e.length,
+      );
+    if (source[e.offset] === '@')
+      throw new ParseError(
+        'Unsupported event control (@). Clocked/event-driven HDL is outside the combinational subset.',
+        e.offset,
+        e.offset + e.length,
+      );
     throw new ParseError(`Unsupported token: ${e.message}`, e.offset, e.offset + e.length);
   }
   if (result.tokens.length > 32768)

@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 import './style.css';
 import { PaneDivider } from './pane-divider.js';
 import { RecoveryPanel } from './recovery-panel.js';
+import { SetupGuide, SetupPanel } from './setup-panel.js';
 import type { State } from '../../packages/core/index.js';
 import { SimulationPanel } from './simulation-panel.js';
 import type { Simulation } from '../../packages/verilog/simulation.js';
@@ -215,6 +216,10 @@ function Diagram({
   useEffect(() => {
     setInspectorOpen(!!selected || adding);
   }, [selected, adding]);
+  useEffect(() => {
+    if (adding && inspectorOpen)
+      inspector.current?.querySelector<HTMLInputElement>('#palette-search')?.focus();
+  }, [adding, inspectorOpen]);
   const pending = state.pendingEdits ?? {};
   const [draft, setDraft] = useState('');
   const keyboardMove = useRef(false);
@@ -332,6 +337,16 @@ function Diagram({
     <div
       className="workspace"
       ref={workspaceElement}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && inspectorOpen) {
+          e.preventDefault();
+          setInspectorOpen(false);
+          setAdding(false);
+          workspaceElement.current
+            ?.querySelector<HTMLButtonElement>('[data-add-component]')
+            ?.focus();
+        }
+      }}
       onPointerDownCapture={(e) => {
         for (const menu of e.currentTarget.querySelectorAll<HTMLDetailsElement>(
           '.toolbar-menu[open]',
@@ -371,6 +386,7 @@ function Diagram({
       >
         <div className="construction-toolbar">
           <button
+            data-add-component
             disabled={!state.canConstruct}
             onClick={() => {
               setAdding(true);
@@ -432,7 +448,11 @@ function Diagram({
               </button>
             </div>
           </details>
-          <button onClick={() => setSimulationOpen((open) => !open)} aria-pressed={simulationOpen}>
+          <button
+            data-simulation-toggle
+            onClick={() => setSimulationOpen((open) => !open)}
+            aria-pressed={simulationOpen}
+          >
             Simulation
           </button>
           <details
@@ -455,6 +475,32 @@ function Diagram({
                 Wire labels
               </label>
               <button onClick={() => void flowInstance.current?.()}>Readable zoom</button>
+              <label htmlFor="component-navigator">Component navigator</label>
+              <select
+                id="component-navigator"
+                value={selected ?? ''}
+                onChange={(e) => {
+                  setSelected(e.target.value || undefined);
+                  setAdding(false);
+                  setInspectorOpen(true);
+                }}
+              >
+                <option value="">Choose a component</option>
+                {graph?.nodes.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.label} · {n.kind} · {n.width} bits
+                  </option>
+                ))}
+              </select>
+              <button
+                disabled={!selected}
+                onClick={() => {
+                  setInspectorOpen(true);
+                  requestAnimationFrame(() => inspector.current?.focus());
+                }}
+              >
+                Inspect component
+              </button>
             </div>
           </details>
           <span className="toolbar-spacer" />
@@ -648,7 +694,12 @@ function Diagram({
             <SimulationPanel
               minimized={simulationMinimized}
               onMinimize={() => setSimulationMinimized((value) => !value)}
-              onClose={() => setSimulationOpen(false)}
+              onClose={() => {
+                setSimulationOpen(false);
+                workspaceElement.current
+                  ?.querySelector<HTMLButtonElement>('[data-simulation-toggle]')
+                  ?.focus();
+              }}
               graph={graph}
               revision={`${state.version}:${state.pendingSteps}`}
               disabled={!state.canConstruct}
@@ -680,13 +731,30 @@ function Diagram({
             ref={inspector}
             style={{ width: rightSize }}
             aria-label="Component inspector"
+            tabIndex={-1}
           >
             <div className="pane-heading">
               <strong>{adding ? 'Add component' : 'Inspector'}</strong>
-              <button aria-label="Close inspector" onClick={() => setInspectorOpen(false)}>
+              <button
+                aria-label="Close inspector"
+                onClick={() => {
+                  setInspectorOpen(false);
+                  setAdding(false);
+                  workspaceElement.current
+                    ?.querySelector<HTMLButtonElement>('[data-add-component]')
+                    ?.focus();
+                }}
+              >
                 ×
               </button>
             </div>
+            {node && (
+              <p className="hint" role="status">
+                {node.label}: {node.kind}, {node.width} bits.{' '}
+                {graph?.edges.filter((e) => e.target === node.id).length ?? 0} incoming connections,{' '}
+                {graph?.edges.filter((e) => e.source === node.id).length ?? 0} outgoing connections.
+              </p>
+            )}
             {node && (
               <div className="node-actions">
                 <button disabled={!state.canConstruct} onClick={() => void copy()}>
@@ -946,6 +1014,7 @@ function Diagram({
   );
 }
 function App() {
+  const [setupOpen, setSetupOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [states, setStates] = useState<State[]>([]);
   const [uri, setUri] = useState('');
@@ -988,8 +1057,9 @@ function App() {
           <span>HDL graph companion</span>
         </div>
         <div className="header-right">
+          <button onClick={() => setSetupOpen(true)}>Setup help</button>
           <button onClick={() => setRecoveryOpen(true)}>Recovery</button>
-          <span className="version">0.6 · CIRCUIT WORKBENCH</span>
+          <span className="version">0.7 · CIRCUIT WORKBENCH</span>
           <span
             className={`status ${(state?.status ?? 'Disconnected').replaceAll(' ', '-')}`}
             role="status"
@@ -1068,12 +1138,7 @@ function App() {
             <br />
             <strong>RTL Graph: Open Current Module</strong>.
           </p>
-          <div className="welcome-steps">
-            <span>1 &nbsp; Start this app for your workspace</span>
-            <span>2 &nbsp; Open the companion extension</span>
-            <span>3 &nbsp; Share a module and wait 15 seconds</span>
-          </div>
-          <p className="hint">Workspace: {workspace}</p>
+          <SetupGuide workspace={workspace} />
         </div>
       )}
       <footer>
@@ -1086,6 +1151,7 @@ function App() {
         <span>GPLv3 · Local first</span>
       </footer>
       {recoveryOpen && <RecoveryPanel onClose={() => setRecoveryOpen(false)} />}
+      {setupOpen && <SetupPanel workspace={workspace} onClose={() => setSetupOpen(false)} />}
     </main>
   );
 }

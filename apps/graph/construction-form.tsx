@@ -105,6 +105,7 @@ export function ConstructionForm({
                 onClick={() => {
                   setComponent(k);
                   setSearch('');
+                  requestAnimationFrame(() => document.getElementById('new-kind')?.focus());
                 }}
               >
                 {k}

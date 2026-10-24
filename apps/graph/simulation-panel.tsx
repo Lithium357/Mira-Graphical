@@ -34,6 +34,10 @@ export function SimulationPanel({
   const [latest, setLatest] = useState<Simulation>();
   const [busy, setBusy] = useState(false);
   const generation = useRef(0);
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    panel.current?.querySelector<HTMLInputElement>('input')?.focus();
+  }, []);
   const callbacks = useRef({ onValues, onError });
   callbacks.current = { onValues, onError };
   useEffect(() => {
@@ -84,10 +88,10 @@ export function SimulationPanel({
     ].join('\n');
   };
   return (
-    <section className="simulation-panel" aria-label="Combinational simulation">
+    <section ref={panel} className="simulation-panel" aria-label="Combinational simulation">
       <div className="simulation-heading">
         <strong>Simulation</strong>
-        <span>
+        <span role="status">
           {samples.length} {samples.length === 1 ? 'sample' : 'samples'} · combinational
         </span>
         <details className="toolbar-menu simulation-tools">

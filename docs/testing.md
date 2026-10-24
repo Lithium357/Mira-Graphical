@@ -1,10 +1,10 @@
-# Verification report — 0.6.0
+# Verification report — 0.7.0
 
 Windows verification with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an isolated official VS Code 1.143.1 runtime. Linux/macOS app releases have not been validated.
 
 ## Automated checks
 
-- `pnpm test`: **99 tests, 0 failures** (98 passed locally; the file-symlink case skips when Windows denies that privilege). Includes native HDL parsing, typed arithmetic, construction, scoped patches, hierarchy, clipboard safety, simulation, durable recovery, scheduling, authenticated WebSocket integration and layout persistence. The Ubuntu CI job also runs the complete unit suite so symlink refusal is exercised on Linux.
+- `pnpm test`: **101 tests, 0 failures** (100 passed locally; the file-symlink case skips when Windows denies that privilege). Includes native HDL parsing, typed arithmetic, construction, scoped patches, hierarchy, clipboard safety, simulation, durable recovery, scheduling, authenticated WebSocket integration and layout persistence. The Ubuntu CI job also runs the complete unit suite so symlink refusal is exercised on Linux.
 - `pnpm lint`, `pnpm build`, `pnpm format:check`: passed.
 - `pnpm run licenses`: **211 installed package versions**, no unclassified licenses. Two exact-version, exact-license-hash Microsoft helpers are development-only exceptions, never runtime/VSIX contents; signing scripts are disabled. See [license scope](licenses.md).
 - `pnpm audit --json`: **0 advisories**.
@@ -51,7 +51,17 @@ Both real VS Code passes additionally exercise `.sv`, `.vhd` and `.vhdl` buffers
 
 The local Windows verification used Icarus extracted into that test directory and run through WSL, without a system-wide installation. To reproduce with another compiler setup, generate with `pnpm test:reference --generate`, compile `test-results/reference/reference.v` with top `tb` and Verilog-2005 mode, write simulator output to `test-results/reference/reference.log`, then run `pnpm test:reference --verify`. CI does not require this optional external compiler.
 
-## Bounds and remaining validation
+## Crash, project-scale and accessibility gates
+
+The hard-kill test spawns a separate Node process with an unsaved source buffer and a pending construction draft, waits for checkpoint completion, then terminates that exact child with SIGKILL. A new store recovers both source and draft after the process exits; the source file remains unchanged. No graceful close/disconnect handler supplies the recovered text. This tests process termination, not power failure or filesystem hardware guarantees.
+
+`pnpm test:soak --cycles=200 --lanes=64` passed 600 guarded source patches and 60 reconnects across Verilog, SystemVerilog and VHDL. Each generated datapath projects 198 nodes. Every cycle checks ACK/source agreement, simulation against an independent lane oracle and bypass behavior; each language also checks its final disk source and recovery checkpoint. Local elapsed time was 38.6 seconds with a peak service-process RSS of 254 MiB. Debounce uses a virtual clock; sockets, parsing, construction proofs, checkpoint I/O and simulation are real. The report is `test-results/project-soak.json`. CI runs a smaller 10-cycle, 32-lane regression. The generator respects the existing 64-part concat limit; exceeding it is not supported. This does not measure renderer frame rates or establish a memory-growth bound over days.
+
+The desktop suite uses native Chromium Tab, Enter, Escape and select-key events to open setup help, verify modal focus trapping/return, select and read a recovery snapshot, select a component through View, focus its inspector, create a wiring transaction, search the palette, sample simulation and return focus after closing it. It also queries Chromium's accessibility tree and asserts exposed region/control/waveform names. `accessibility-smoke.json` records the checks and tree. A focused reproduction is `pnpm exec electron . --smoke --accessibility-only --workspace=<disposable-folder>` after building. Human NVDA/JAWS acceptance remains outstanding.
+
+The initial disconnected workspace asserts visible setup/VSIX guidance before sharing a document. The setup panel reports authenticated editor connectivity separately from shared documents. Existing isolated VSIX/editor passes exercise fresh profiles. See [external compatibility results](compatibility.md) and [artifact/checksum instructions](distribution.md).
+
+## Remaining validation
 
 Unsigned zero-delay combinational simulation is covered; sequential timing, signedness, source x/z literals, parameters and SystemVerilog outside the documented subset remain unsupported. Undriven signals use x, without a separate z state. Instance dependency checks are conservative. See [exact syntax and limits](supported-syntax.md).
 

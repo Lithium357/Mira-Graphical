@@ -85,7 +85,12 @@ else {
         if (c.type === 'copyText' && typeof c.text === 'string' && c.text.length <= 1_000_000) {
           return clipboard.writeText(c.text);
         }
-        if (c.type === 'snapshot') return { workspace, states: [...service!.states.values()] };
+        if (c.type === 'snapshot')
+          return {
+            workspace,
+            states: [...service!.states.values()],
+            editorConnected: service!.editorConnected,
+          };
         if (c.type === 'recoveryList') return service!.recovery.list();
         if (c.type === 'recoveryRead' && typeof c.id === 'string')
           return service!.recovery.inspect(c.id);
@@ -158,7 +163,11 @@ else {
       if (process.argv.includes('--smoke')) {
         const { desktopSmoke } = await import('../../scripts/desktop-smoke.js');
         try {
-          await desktopSmoke(service, win, root);
+          if (process.argv.includes('--accessibility-only')) {
+            const { accessibilityFixtureSmoke } =
+              await import('../../scripts/accessibility-smoke.js');
+            await accessibilityFixtureSmoke(service, win, root);
+          } else await desktopSmoke(service, win, root);
           console.log('DESKTOP SMOKE PASSED');
           app.quit();
         } catch (error) {

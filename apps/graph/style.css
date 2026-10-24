@@ -1082,3 +1082,35 @@ dl,
 .recovery-dialog button[aria-pressed='true']:hover {
   background: #205047;
 }
+.setup-dialog {
+  width: min(720px, calc(100vw - 64px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  background: #101d2e;
+  color: #e2edf8;
+  border: 1px solid #47607c;
+  border-radius: 12px;
+  padding: 24px;
+}
+.setup-dialog::backdrop {
+  background: #0009;
+}
+.setup-guide {
+  text-align: left;
+  max-width: 720px;
+  margin: auto;
+  line-height: 1.6;
+}
+.setup-guide code {
+  overflow-wrap: anywhere;
+}
+.setup-guide li {
+  margin-bottom: 8px;
+}
+.welcome {
+  overflow: auto;
+}
+:focus-visible {
+  outline: 2px solid #78d8ff;
+  outline-offset: 3px;
+}

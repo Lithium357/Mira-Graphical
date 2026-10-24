@@ -92,10 +92,10 @@
   {
     "runtime": false,
     "name": "@azure/msal-common",
-    "version": "16.14.1",
+    "version": "16.14.2",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@azure+msal-common@16.14.1/node_modules/@azure/msal-common/LICENSE"
+      "node_modules/.pnpm/@azure+msal-common@16.14.2/node_modules/@azure/msal-common/LICENSE"
     ]
   },
   {
@@ -110,10 +110,10 @@
   {
     "runtime": false,
     "name": "@azure/msal-node",
-    "version": "6.0.1",
+    "version": "7.1.0",
     "license": "MIT",
     "files": [
-      "node_modules/.pnpm/@azure+msal-node@6.0.1/node_modules/@azure/msal-node/LICENSE"
+      "node_modules/.pnpm/@azure+msal-node@7.1.0/node_modules/@azure/msal-node/LICENSE"
     ]
   },
   {

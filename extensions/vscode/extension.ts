@@ -27,21 +27,30 @@ function disconnect() {
 }
 async function connect(folder: vscode.WorkspaceFolder) {
   disconnect();
-  const bytes = await vscode.workspace.fs.readFile(
-    vscode.Uri.joinPath(folder.uri, '.hdlgraph', 'connection.json'),
-  );
-  const config = JSON.parse(Buffer.from(bytes).toString('utf8'));
+  let config: { protocolVersion: number; port: number; token: string; workspace: string };
   const normalize = (s: string) =>
     process.platform === 'win32' ? resolve(s).toLowerCase() : resolve(s);
-  if (
-    config.protocolVersion !== 1 ||
-    !Number.isInteger(config.port) ||
-    config.port < 1 ||
-    config.port > 65535 ||
-    typeof config.token !== 'string' ||
-    normalize(fileURLToPath(config.workspace)) !== normalize(folder.uri.fsPath)
-  )
-    throw new Error('Invalid connection descriptor. Start the graph app for this workspace.');
+  try {
+    const bytes = await vscode.workspace.fs.readFile(
+      vscode.Uri.joinPath(folder.uri, '.hdlgraph', 'connection.json'),
+    );
+    if (bytes.length > 8192) throw new Error('Oversized descriptor');
+    config = JSON.parse(Buffer.from(bytes).toString('utf8'));
+    if (
+      !config ||
+      config.protocolVersion !== 1 ||
+      !Number.isInteger(config.port) ||
+      config.port < 1 ||
+      config.port > 65535 ||
+      typeof config.token !== 'string' ||
+      normalize(fileURLToPath(config.workspace)) !== normalize(folder.uri.fsPath)
+    )
+      throw new Error('Invalid descriptor');
+  } catch {
+    throw new Error(
+      `Start Mira Graphical for workspace "${folder.uri.fsPath}" before connecting. Use --workspace with this folder, then run RTL Graph: Open Current Module again. The local connection descriptor is missing or invalid.`,
+    );
+  }
   const ws = new WebSocket(`ws://127.0.0.1:${config.port}`, {
     maxPayload: 2 * 1024 * 1024,
     perMessageDeflate: false,
@@ -50,11 +59,19 @@ async function connect(folder: vscode.WorkspaceFolder) {
   await new Promise<void>((ok, fail) => {
     const timer = setTimeout(() => {
       ws.close();
-      fail(new Error('Local connection timed out'));
+      fail(
+        new Error(
+          'Mira did not respond. Restart Mira for this workspace, then run RTL Graph: Open Current Module again.',
+        ),
+      );
     }, 4000);
     ws.once('error', (e) => {
       clearTimeout(timer);
-      fail(e);
+      fail(
+        new Error(
+          `Cannot reach Mira for "${folder.uri.fsPath}" (${(e as NodeJS.ErrnoException).code ?? 'connection error'}). Restart the app for this folder, then run RTL Graph: Open Current Module again.`,
+        ),
+      );
     });
     ws.on('message', (b) => {
       const msg = JSON.parse(b.toString()) as ServiceMessage;

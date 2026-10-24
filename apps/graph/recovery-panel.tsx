@@ -24,8 +24,10 @@ export function RecoveryPanel({ onClose }: { onClose: () => void }) {
     }
   };
   useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
     dialog.current!.showModal();
     void refresh();
+    return () => previous?.focus();
   }, []);
   const select = async (value: string) => {
     const request = ++selection.current;

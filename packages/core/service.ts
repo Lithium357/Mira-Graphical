@@ -73,6 +73,9 @@ export class SyncService {
   readonly server: WebSocketServer;
   private editor?: WebSocket;
   private editorRecovery = false;
+  get editorConnected() {
+    return this.editor?.readyState === WebSocket.OPEN;
+  }
   private owners = new Map<string, WebSocket>();
   private listeners = new Set<(states: State[]) => void>();
   private descriptor?: string;

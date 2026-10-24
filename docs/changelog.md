@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+- Added workspace setup help with live connection status, VSIX installation steps, reconnect troubleshooting and keyboard guidance. Connection errors now name the workspace and the next action.
+- Added a keyboard component navigator under View, inspector connection summaries, palette focus, simulation focus and modal focus restoration. Native keyboard tests cover setup, navigation, wiring, palette and simulation; accessibility-tree assertions preserve exposed control names.
+- Added a process hard-kill recovery test and a reproducible three-language project soak with real authenticated sockets, guarded patches, simulation oracles, repeated reconnects and checkpoint verification.
+- Added pinned external-project compatibility reporting and clearer diagnostics for unsupported preprocessing/event controls. These samples are refused; this release does not broaden the published HDL subset.
+- Added portable package manifests and SHA-256 inventories for the unsigned VSIX. Installer/signing remains deferred.
+- Pinned the packager's development-only MSAL dependency to patched 7.1.0 for GHSA-xcx6-jx8p-x3h5 and added a high-severity CI advisory gate. Azure authentication/publishing is not part of the verified packaging workflow.
+
 ## 0.6.0
 
 - Added immediate durable checkpoints of shared live buffers and pending graph drafts, with previous-session preservation and visible storage-failure warnings.

@@ -263,7 +263,7 @@ SOFTWARE
 
 
 ========================================================================
-@azure/msal-common@16.14.1 — MIT
+@azure/msal-common@16.14.2 — MIT
 
 MIT License
 
@@ -315,7 +315,7 @@ SOFTWARE
 
 
 ========================================================================
-@azure/msal-node@6.0.1 — MIT
+@azure/msal-node@7.1.0 — MIT
 
 MIT License
 

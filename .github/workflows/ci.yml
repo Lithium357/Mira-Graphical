@@ -16,7 +16,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm test
+      - run: pnpm test:soak --cycles=10 --lanes=32
       - run: pnpm run licenses
+      - run: pnpm audit --audit-level=high
       - run: pnpm build
       - run: pnpm smoke
       - uses: actions/upload-artifact@v4
@@ -34,6 +36,9 @@ jobs:
             test-results/*-failure.png
             dist/packages/*.vsix
             dist/packages/manifest.json
+            dist/packages/SHA256SUMS
+            test-results/project-soak.json
+            test-results/accessibility-smoke.json
   hdl-reference:
     runs-on: ubuntu-latest
     steps:
