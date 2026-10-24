@@ -915,7 +915,11 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   // Exercise the public command after a manual move, then inspect actual DOM
   // geometry (including measured card height), rather than just layout data.
   service.move(aluURI, not.id, 9000, 9000);
-  win.hide();
+  // Suspend frames without hiding Chromium itself: executeJavaScript can pause
+  // indefinitely in a hidden native window, which would stall the test driver.
+  await win.webContents.executeJavaScript(
+    `window.__savedLayoutRAF=window.requestAnimationFrame;window.requestAnimationFrame=()=>0;`,
+  );
   await click('Auto layout');
   await until(() => !service.states.get(aluURI)!.layout.nodes[not.id].manuallyPlaced);
   await sleep(500);
@@ -956,7 +960,9 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   })()`),
   );
   writeFileSync(join(output, 'alu-layout.png'), (await win.webContents.capturePage()).toPNG());
-  win.show();
+  await win.webContents.executeJavaScript(
+    `window.requestAnimationFrame=window.__savedLayoutRAF;delete window.__savedLayoutRAF;`,
+  );
   await click('Readable zoom');
   await sleep(500);
   writeFileSync(
