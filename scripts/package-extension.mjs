@@ -26,9 +26,11 @@ const name = `mira-graphical-${manifest.version}.vsix`;
 const bytes = readFileSync(packagePath);
 const sha256 = createHash('sha256').update(bytes).digest('hex');
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-const dirty = !!execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], {
+const changes = execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], {
   encoding: 'utf8',
 }).trim();
+const dirty = !!changes;
+if (process.env.CI && dirty) throw new Error(`CI packaging requires a clean checkout:\n${changes}`);
 writeFileSync(
   'dist/packages/manifest.json',
   JSON.stringify(

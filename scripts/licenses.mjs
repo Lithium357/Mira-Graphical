@@ -103,7 +103,7 @@ for (const p of packages) {
   notices += `\n${'='.repeat(72)}\n${p.name}@${p.version} — ${p.license}\n`;
   for (const file of p.files)
     try {
-      notices += `\n${readFileSync(file, 'utf8')}\n`;
+      notices += `\n${readFileSync(file, 'utf8').replace(/\r\n?/g, '\n')}\n`;
     } catch {}
 }
 writeFileSync('docs/THIRD_PARTY_NOTICES.txt', notices);
