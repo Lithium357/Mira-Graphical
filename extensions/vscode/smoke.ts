@@ -70,7 +70,9 @@ export async function run() {
   assert.equal(doc.getText(), unsaved, 'Native undo restores the source operator');
   const afterUndo = Date.now();
   let reflected = false;
-  while (Date.now() - afterUndo < 20_000) {
+  let lastUndoState: unknown;
+  // A real 15-second debounce also needs room for editor events and loaded Windows runners.
+  while (Date.now() - afterUndo < 45_000) {
     const s = JSON.parse(
       Buffer.from(
         await vscode.workspace.fs.readFile(
@@ -78,13 +80,17 @@ export async function run() {
         ),
       ).toString(),
     );
+    lastUndoState = s;
     if (s.status === 'Synced' && s.version === doc.version && s.op === '-') {
       reflected = true;
       break;
     }
     await sleep(100);
   }
-  assert(reflected, 'Undo must propagate back to the graph after inactivity');
+  assert(
+    reflected,
+    `Undo must propagate back to the graph after inactivity: ${JSON.stringify({ expectedVersion: doc.version, observed: lastUndoState })}`,
+  );
   const comboURI = vscode.Uri.joinPath(folder.uri, 'combinational.v');
   const combo = await vscode.workspace.openTextDocument(comboURI);
   const comboOriginal = combo.getText();
