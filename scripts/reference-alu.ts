@@ -8,7 +8,7 @@ import { parse, project } from '../packages/verilog/index.js';
 import { copyComponents, planTransaction } from '../packages/verilog/construction.js';
 const folder = join('test-results', 'alu-reference');
 const proceduralSource = `module procedural_copy(input logic [3:0] a,input logic [7:0] b,input logic s,output logic [15:0] y);
- always_comb begin if(s) y=$signed(a)>>>b;else y=$unsigned($signed(a)>>>b);end
+ always_comb begin if(s) y=$signed(a)>>b;else y=32'd0;end
 endmodule`;
 const proceduralGraph = project(parse(proceduralSource));
 const procedural = planTransaction(proceduralSource, [

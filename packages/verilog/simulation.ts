@@ -227,11 +227,12 @@ export function simulate(
       const w = Math.max(width(e), context),
         m = mask(w);
       if (e.kind === 'mux') {
+        const muxWidth = e.procedural && context ? context : w;
         const truthySigned = e.procedural ? expressionSigned(e.truthy) : signed;
         const falsySigned = e.procedural ? expressionSigned(e.falsy) : signed;
         const condition = expression(e.condition),
-          truthy = resize(expression(e.truthy, w, truthySigned), w, truthySigned),
-          falsy = resize(expression(e.falsy, w, falsySigned), w, falsySigned);
+          truthy = resize(expression(e.truthy, muxWidth, truthySigned), muxWidth, truthySigned),
+          falsy = resize(expression(e.falsy, muxWidth, falsySigned), muxWidth, falsySigned);
         if (condition.value & condition.known) return truthy;
         if (condition.known === mask(condition.width) || e.procedural) return falsy;
         return {

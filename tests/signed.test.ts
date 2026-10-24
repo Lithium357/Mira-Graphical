@@ -136,3 +136,20 @@ test('reported three signed ALU arms project and retain the last valid module in
     );
   }
 });
+
+test('procedural arms keep assignment width independent of the other branch', () => {
+  const text = `module m(input logic [7:0] a,b,input logic s,output logic [7:0] y);
+    always_comb begin if(s) y=$signed(a)>>b;else y=32'd0;end
+    endmodule`;
+  const graph = project(parse(text));
+  assert.equal(graph.nodes.find((n) => n.op === '>>')!.width, 8);
+  const items = copyComponents(text, graph, [
+    graph.nodes.find((n) => n.assignmentTarget === 'y')!.id,
+  ]);
+  const copied = planTransaction(text, [{ kind: 'paste', items }]).text;
+  for (const s of ['0', '1', 'x']) {
+    const result = simulate(copied, 'm', { a: '128', b: '9', s });
+    assert.equal(result.signals.y.value, '0x00');
+    assert.equal(result.signals.y_copy1.value, result.signals.y.value);
+  }
+});

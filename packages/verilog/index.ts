@@ -893,7 +893,7 @@ export function project(
       return node;
     }
     if (e.kind === 'mux') {
-      const w = Math.max(context, widthOf(e));
+      const w = e.procedural && context ? context : Math.max(context, widthOf(e));
       const c = visit(e.condition, `${key}/C`),
         t = visit(e.truthy, `${key}/T`, w, e.procedural ? undefined : signed),
         f = visit(e.falsy, `${key}/F`, w, e.procedural ? undefined : signed);
