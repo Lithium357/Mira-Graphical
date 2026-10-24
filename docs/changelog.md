@@ -2,9 +2,9 @@
 
 ## 0.9.1
 
-- Detects an existing per-user Windows installation and shows its installed version and location before replacement. Declining cancels before app files change; the same version offers reinstallation.
+- Detects existing per-user or all-users Windows installations and shows its installed version and location before replacement. Declining cancels before app files change; the same version offers reinstallation.
 - Blocks replacing a newer version with an older installer, including silent setup. Keeps the existing application identity and normal upgrade/uninstaller path.
-- Adds disposable Windows CI checks using the published, checksum-pinned 0.9.0 installer: replacement confirmation/cancellation, upgrade in a custom directory, obsolete-file removal, single app registration, settings/project/recovery preservation, same-version repair and downgrade refusal.
+- Adds disposable Windows CI checks using the published, checksum-pinned 0.9.0 installer: replacement confirmation/cancellation, upgrade in a custom directory, obsolete-file removal, single app registration, settings/project/recovery preservation, same-version repair, preserved all-users scope and downgrade refusal in both registry scopes.
 
 ## 0.9.0
 

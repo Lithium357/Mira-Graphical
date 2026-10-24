@@ -2,7 +2,7 @@
 
 ## 0.9.1 installer upgrades
 
-The Windows installer CI job installs the published 0.9.0 setup after checking its pinned SHA-256. It checks the real replacement prompt for both versions and the existing location, declines it and verifies the original app bytes remain unchanged. A silent upgrade then retains a custom location, removes obsolete app files, leaves one app registration, installs the exact new app bundle and verifies the EXE version. Project, recovery and settings sentinels survive upgrade and same-version repair. A simulated newer registry version exercises the compiled downgrade refusal and verifies unchanged app bytes. The test restores the registry version and uninstalls from the disposable runner. Personal installs are untouched by local smoke runs.
+The Windows installer CI job installs the published 0.9.0 setup after checking its pinned SHA-256. It checks the real replacement prompt for both versions and the existing location, declines it and verifies the original app bytes remain unchanged. A silent upgrade then retains a custom location, removes obsolete app files, leaves one app registration, installs the exact new app bundle and verifies the EXE version. Project, recovery and settings sentinels survive upgrade and same-version repair. A simulated newer registry version exercises the compiled downgrade refusal and verifies unchanged app bytes. The test restores the registry version and uninstalls from the disposable runner. It also installs the baseline for all users on the disposable administrator runner, verifies machine-scope downgrade refusal and upgrade without creating a second per-user copy, then uninstalls it. Personal installs are untouched by local smoke runs.
 
 ## 0.9.0 ALU regression
 

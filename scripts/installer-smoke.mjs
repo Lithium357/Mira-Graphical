@@ -67,12 +67,13 @@ function powershell(script) {
     { encoding: 'utf8', windowsHide: true },
   ).trim();
 }
-function installedInfo() {
-  const base = `HKCU:\\Software\\${installerConfig.guid}`;
-  const key = `HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${installerConfig.guid}`;
+function installedInfo(scope = 'HKCU') {
+  assert(['HKCU', 'HKLM'].includes(scope));
+  const base = `${scope}:\\Software\\${installerConfig.guid}`;
+  const key = `${scope}:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${installerConfig.guid}`;
   return JSON.parse(
     powershell(
-      `$a=Get-ItemProperty -LiteralPath ${psQuote(base)} -ErrorAction SilentlyContinue; $u=Get-ItemProperty -LiteralPath ${psQuote(key)} -ErrorAction SilentlyContinue; $entries=@(Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object {$_.DisplayName -like 'Mira Graphical*'}); [pscustomobject]@{version=$u.DisplayVersion;location=$a.InstallLocation;entries=$entries.Count} | ConvertTo-Json -Compress`,
+      `$a=Get-ItemProperty -LiteralPath ${psQuote(base)} -ErrorAction SilentlyContinue; $u=Get-ItemProperty -LiteralPath ${psQuote(key)} -ErrorAction SilentlyContinue; $entries=@(Get-ItemProperty '${scope}:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object {$_.DisplayName -like 'Mira Graphical*'}); [pscustomobject]@{version=$u.DisplayVersion;location=$a.InstallLocation;entries=$entries.Count} | ConvertTo-Json -Compress`,
     ),
   );
 }
@@ -85,6 +86,11 @@ if (process.env.CI) {
     installedInfo().entries,
     0,
     'Upgrade testing requires a clean disposable user profile',
+  );
+  assert.equal(
+    installedInfo('HKLM').entries,
+    0,
+    'Upgrade testing requires no existing machine installation',
   );
   const baseline = installerConfig.upgradeBaseline;
   const baselineFile = join(root, `baseline-${baseline.version}.exe`);
@@ -225,6 +231,50 @@ if (process.env.CI) {
     await new Promise((r) => setTimeout(r, 100));
   assert(!existsSync(join(fresh, 'Mira Graphical.exe')));
   assert.equal(installedInfo().entries, 0);
+  const machine = join(root, 'machine install');
+  assert(!relative(root, machine).startsWith('..'));
+  await launch(baselineFile, ['/S', '/allusers', `/D=${machine}`]);
+  try {
+    assert.deepEqual(installedInfo('HKLM'), {
+      version: baseline.version,
+      location: machine,
+      entries: 1,
+    });
+    const machineExe = join(machine, 'Mira Graphical.exe');
+    const machineKey = `HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${installerConfig.guid}`;
+    const beforeMachine = digest(machineExe);
+    try {
+      powershell(
+        `Set-ItemProperty -LiteralPath ${psQuote(machineKey)} -Name DisplayVersion -Value '99.0.0'`,
+      );
+      await launch(setup, ['/S'], 120000, 1638);
+      assert.equal(digest(machineExe), beforeMachine);
+    } finally {
+      powershell(
+        `Set-ItemProperty -LiteralPath ${psQuote(machineKey)} -Name DisplayVersion -Value ${psQuote(baseline.version)}`,
+      );
+    }
+    await launch(setup, ['/S']);
+    assert.deepEqual(installedInfo('HKLM'), { version, location: machine, entries: 1 });
+    assert.equal(installedInfo().entries, 0);
+    assert.equal(
+      digest(join(machine, 'resources', 'app.asar')),
+      digest(join(unpacked, 'resources', 'app.asar')),
+    );
+    reports.machine = await check(machineExe, 'machine-project');
+    reports.machineScopePreserved = true;
+    reports.machineDowngradeBlocked = true;
+  } finally {
+    await launch(join(machine, 'Uninstall Mira Graphical.exe'), ['/S', '/allusers']);
+  }
+  const machineUninstallStart = Date.now();
+  while (
+    existsSync(join(machine, 'Mira Graphical.exe')) &&
+    Date.now() - machineUninstallStart < 15000
+  )
+    await new Promise((r) => setTimeout(r, 100));
+  assert(!existsSync(join(machine, 'Mira Graphical.exe')));
+  assert.equal(installedInfo('HKLM').entries, 0);
 }
 writeFileSync(join(output, 'installer-smoke.json'), JSON.stringify(reports, null, 2));
 console.log(JSON.stringify(reports));

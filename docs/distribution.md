@@ -6,9 +6,9 @@ This is an unsigned per-user NSIS installer. Windows may show an unknown-publish
 
 ## Replacing an existing version
 
-Setup detects the existing per-user Mira installation by its stable application identity. Interactive setup shows the installed version and location and asks before replacing it; the default answer is **No**. Installing the same version offers reinstallation. A newer installed version blocks an older installer. Setup keeps the existing location by default and uses the previous uninstaller to remove old application files before writing the new build. Project folders and their recovery snapshots outside the application installation folder, along with app settings, are retained. The VS Code companion must still be updated separately through Setup help.
+Setup detects existing Mira installations by the stable application identity and keeps their installation scope. New installations default to the current user. The wizard keeps the checked scope fixed; an all-users upgrade checks both copies if a current-user copy would also be removed. Interactive setup shows the installed version and location and asks before replacing it; the default answer is **No**. Installing the same version offers reinstallation. A newer installed version blocks an older installer. Setup keeps the existing location by default and uses the previous uninstaller to remove old application files before writing the new build. Project folders and their recovery snapshots outside the application installation folder, along with app settings, are retained. The VS Code companion must still be updated separately through Setup help.
 
-Silent setup (`/S`) authorizes an upgrade or same-version reinstall without a prompt; downgrade attempts exit with code **1638**. Declining interactive replacement exits with **1602** and leaves the installed app unchanged. Per-user installations are supported; this does not manage copies manually extracted outside the installer.
+Silent setup (`/S`) authorizes an upgrade or same-version reinstall without a prompt; downgrade attempts exit with code **1638**. Declining interactive replacement exits with **1602** and leaves the installed app unchanged. Existing per-user and administrator-installed all-users copies are checked; this does not manage copies manually extracted outside the installer.
 
 ## Build and verify
 
