@@ -50,7 +50,7 @@ export function loadLayout(path: string): Layout | undefined {
     v.viewport &&
     (!record(v.viewport) ||
       ![v.viewport.x, v.viewport.y, v.viewport.zoom].every(Number.isFinite) ||
-      v.viewport.zoom < 0.25 ||
+      v.viewport.zoom < 0.1 ||
       v.viewport.zoom > 2)
   )
     throw new Error('Invalid stored viewport.');
@@ -58,7 +58,7 @@ export function loadLayout(path: string): Layout | undefined {
     if (!record(v.viewports) || Object.keys(v.viewports).length > 64)
       throw new Error('Invalid module viewports.');
     for (const p of Object.values(v.viewports))
-      if (!record(p) || ![p.x, p.y, p.zoom].every(Number.isFinite) || p.zoom < 0.25 || p.zoom > 2)
+      if (!record(p) || ![p.x, p.y, p.zoom].every(Number.isFinite) || p.zoom < 0.1 || p.zoom > 2)
         throw new Error('Invalid module viewport.');
   }
   return v;

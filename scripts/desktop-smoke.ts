@@ -915,6 +915,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   // Exercise the public command after a manual move, then inspect actual DOM
   // geometry (including measured card height), rather than just layout data.
   service.move(aluURI, not.id, 9000, 9000);
+  win.hide();
   await click('Auto layout');
   await until(() => !service.states.get(aluURI)!.layout.nodes[not.id].manuallyPlaced);
   await sleep(500);
@@ -946,8 +947,16 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   await win.webContents.executeJavaScript(
     `document.querySelector('[aria-label="Fit entire circuit"]').click()`,
   );
-  await sleep(500);
+  await until(() =>
+    win.webContents.executeJavaScript(`(()=>{
+    const area=document.querySelector('.flow-surface').getBoundingClientRect();
+    return Array.from(document.querySelectorAll('.react-flow__node')).every(n=>{
+      const r=n.getBoundingClientRect();return r.left>=area.left+8&&r.right<=area.right-8&&r.top>=area.top+8&&r.bottom<=area.bottom-8;
+    });
+  })()`),
+  );
   writeFileSync(join(output, 'alu-layout.png'), (await win.webContents.capturePage()).toPNG());
+  win.show();
   await click('Readable zoom');
   await sleep(500);
   writeFileSync(

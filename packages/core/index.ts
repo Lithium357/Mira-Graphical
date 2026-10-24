@@ -470,7 +470,7 @@ export class Session {
   viewport(viewport: Viewport) {
     if (
       ![viewport.x, viewport.y, viewport.zoom].every(Number.isFinite) ||
-      viewport.zoom < 0.25 ||
+      viewport.zoom < 0.1 ||
       viewport.zoom > 2
     )
       return;

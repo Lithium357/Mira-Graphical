@@ -154,11 +154,19 @@ const nodeTypes = { circuit: CircuitNode };
 // React Flow queues fits in its store. Stable props must not overwrite a queued
 // overview fit when a layout/status update renders the parent in the same frame.
 const initialFit = { padding: 0.15, minZoom: 0.65, maxZoom: 1 };
-const overviewFit = { padding: 0.15, minZoom: 0.25, maxZoom: 1 };
+const overviewFit = { padding: 0.15, minZoom: 0.1, maxZoom: 1 };
 const afterPaneResize = () =>
-  new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-  );
+  new Promise<void>((resolve) => {
+    // Windows can suspend animation frames in an occluded/minimized window.
+    // A fit request must still finish when another app covers this one.
+    const timer = setTimeout(resolve, 100);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        clearTimeout(timer);
+        resolve();
+      }),
+    );
+  });
 function Diagram({
   state,
   shared,
@@ -673,7 +681,7 @@ function Diagram({
               })
             }
             deleteKeyCode={null}
-            minZoom={0.25}
+            minZoom={0.1}
             maxZoom={2}
             colorMode="dark"
             defaultEdgeOptions={{

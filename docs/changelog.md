@@ -5,6 +5,7 @@
 - Replaced declaration-order columns with deterministic dependency layout: constants stay near consumers, neighbouring layers reduce crossings, and long mux chains fold into rows with each stage's private comparison and operation.
 - Added **View → Auto layout** to rearrange the current module and return to readable zoom. Explicit rearrangement resets dragged positions; ordinary synchronization still preserves them. Source edits, construction drafts and simulation samples are retained.
 - Fixed overview/readable fitting after inspector resizing by measuring the visible canvas directly.
+- Overview can zoom out to 10% for larger circuits. Fit requests also finish in covered/minimized Windows windows, where animation frames may be suspended.
 - Added geometry checks for the reported 57-node INT16 ALU, small circuits and hierarchy, plus Windows UI checks for measured card overlap, manual-position reset and circuit fitting.
 
 ## 0.9.1
