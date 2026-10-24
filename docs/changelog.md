@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0
+
+- Added unsigned Verilog/SystemVerilog shifts (`<<`, `>>`), equality/relational comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`) and bitwise NOT (`~`) across parsing, projection, simulation, construction, wiring and clipboard actions.
+- Fixed the reported INT16 ALU refusing to load at its left-shift operator. The two-module example is retained in `fixtures/alu-int16.v`; select `ALU_INT16` to use it.
+- Preserved Verilog precedence, scalar comparison results, self-determined shift amounts, assignment-context widths and unknown-bit propagation. Unary NOT has one wiring socket; unary/binary replacement is refused.
+- Added independent Icarus comparisons for the ALU, mixed-width expressions and unknown bits, plus real desktop/editor and packaged-runtime checks. VHDL retains its existing typed operator subset.
+- Upgrade both the desktop app and bundled VS Code companion for the expanded parser.
+
 ## 0.8.0
 
 - Added an unsigned per-user Windows x64 NSIS installer with desktop/Start menu shortcuts and uninstallation.

@@ -132,7 +132,11 @@ for (let pass = 0; pass < 2; pass++) {
         languageEdited.add(s.uri);
         service.selectModule(s.uri, 'arithmetic');
         const graph = service.states.get(s.uri)!.graph!;
-        service.graphEdit(s.uri, graph.nodes.find((n) => n.kind === 'op')!.id, '-');
+        service.graphEdit(
+          s.uri,
+          graph.nodes.find((n) => n.kind === 'op')!.id,
+          s.uri.endsWith('.sv') ? '<<' : '-',
+        );
         service.circuitAction(s.uri, {
           kind: 'create',
           component: 'concat',
@@ -140,7 +144,10 @@ for (let pass = 0; pass < 2; pass++) {
           width: 16,
           parts: ['a', 'b'],
         });
-        assert.equal(service.simulate(s.uri, { a: '9', b: '3' }).signals.result.value, '0x06');
+        assert.equal(
+          service.simulate(s.uri, { a: '9', b: '3' }).signals.result.value,
+          s.uri.endsWith('.sv') ? '0x48' : '0x06',
+        );
       }
       if (s.uri.endsWith('adder.v')) {
         writeSmokeState('smoke-state.json', {

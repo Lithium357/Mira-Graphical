@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import { parse, expressions, type Expr, type Module } from './index.js';
+import { parse, expressions, expressionWidth, type Expr, type Module } from './index.js';
+import { isComparison } from '../protocol/index.js';
 import { literalWidth } from './literals.js';
 type Bits = { width: number; value: bigint; known: bigint };
 export type Simulation = {
@@ -129,21 +130,7 @@ export function simulate(
       active.delete(name);
       return result;
     };
-    const width = (e: Expr): number =>
-      e.kind === 'convert'
-        ? (e.resultWidth ?? width(e.value))
-        : (e.nativeWidth ??
-          (e.kind === 'ref'
-            ? ast.nets.find((n) => n.name === e.value)!.width
-            : e.kind === 'slice'
-              ? Math.abs(e.msb - e.lsb) + 1
-              : e.kind === 'literal'
-                ? literalWidth(e.value)
-                : e.kind === 'concat'
-                  ? e.parts.reduce((sum, p) => sum + width(p), 0)
-                  : e.kind === 'mux'
-                    ? Math.max(width(e.truthy), width(e.falsy))
-                    : Math.max(width(e.left), width(e.right))));
+    const width = (e: Expr): number => expressionWidth(e, ast.nets);
     function expression(e: Expr, context = 0): Bits {
       if (ast.language === 'vhdl') context = 0;
       if (e.kind === 'convert') return resize(expression(e.value), width(e));
@@ -176,6 +163,36 @@ export function simulate(
         }
         return { width: w, value, known: k };
       }
+      if (e.kind === 'unary') {
+        const w = Math.max(width(e), context),
+          a = resize(expression(e.value, w), w);
+        return { width: w, value: ~a.value & mask(w), known: a.known };
+      }
+      if (e.kind === 'op' && isComparison(e.op)) {
+        const w = Math.max(width(e.left), width(e.right)),
+          m = mask(w);
+        const a = resize(expression(e.left, w), w),
+          b = resize(expression(e.right, w), w);
+        const mismatch = ((a.value ^ b.value) & a.known & b.known) !== 0n;
+        if (e.op === '==' || e.op === '!=') {
+          if (mismatch) return known(1, BigInt(e.op === '!='));
+          if (a.known !== m || b.known !== m) return unknown(1);
+          return known(1, BigInt(e.op === '=='));
+        }
+        if (a.known !== m || b.known !== m) return unknown(1);
+        return known(
+          1,
+          BigInt(
+            e.op === '<'
+              ? a.value < b.value
+              : e.op === '<='
+                ? a.value <= b.value
+                : e.op === '>'
+                  ? a.value > b.value
+                  : a.value >= b.value,
+          ),
+        );
+      }
       const w = Math.max(width(e), context),
         m = mask(w);
       if (e.kind === 'mux') {
@@ -189,6 +206,20 @@ export function simulate(
           value: truthy.value,
           known: truthy.known & falsy.known & ~(truthy.value ^ falsy.value) & m,
         };
+      }
+      if (e.op === '<<' || e.op === '>>') {
+        const a = resize(expression(e.left, w), w),
+          b = expression(e.right);
+        if (b.known !== mask(b.width)) return unknown(w);
+        if (b.value >= BigInt(w)) return known(w, 0n);
+        const n = b.value;
+        if (e.op === '<<')
+          return {
+            width: w,
+            value: (a.value << n) & m,
+            known: ((a.known << n) | ((1n << n) - 1n)) & m,
+          };
+        return { width: w, value: a.value >> n, known: (a.known >> n) | (m ^ (m >> n)) };
       }
       const a = resize(expression(e.left, w), w),
         b = resize(expression(e.right, w), w);

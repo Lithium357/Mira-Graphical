@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { Lexer, createToken, type IToken } from 'chevrotain';
 import { randomUUID } from 'node:crypto';
-import { operators, type Operator, type Edit, type GraphChange } from '../protocol/index.js';
+import {
+  operators,
+  isComparison,
+  type Operator,
+  type Edit,
+  type GraphChange,
+} from '../protocol/index.js';
 import { literalWidth } from './literals.js';
 import {
   parseVhdl,
@@ -26,7 +32,10 @@ const Identifier = createToken({ name: 'Identifier', pattern: /[a-zA-Z_][a-zA-Z0
 const Fill = createToken({ name: 'Fill', pattern: /'[01]/ });
 const Based = createToken({ name: 'Based', pattern: /[0-9][0-9_]*'[bBoOdDhH][0-9a-fA-FxXzZ_]+/ });
 const Integer = createToken({ name: 'Integer', pattern: /[0-9][0-9_]*/ });
-const Symbol = createToken({ name: 'Symbol', pattern: /[{}()[\]:?;,.=+*\-&|^]/ });
+const Symbol = createToken({
+  name: 'Symbol',
+  pattern: /<<|>>|==|!=|<=|>=|[{}()[\]:?;,.=+*\-&|^~<>]/,
+});
 const lexer = new Lexer([WS, Comment, Identifier, Fill, Based, Integer, Symbol], {
   ensureOptimizations: false,
 });
@@ -53,6 +62,15 @@ export type Expr = (
   | { kind: 'concat'; parts: Expr[]; start: number; end: number }
   | { kind: 'ref'; value: string; start: number; end: number }
   | { kind: 'literal'; value: string; start: number; end: number }
+  | {
+      kind: 'unary';
+      op: '~';
+      value: Expr;
+      start: number;
+      end: number;
+      tokenStart: number;
+      tokenEnd: number;
+    }
   | {
       kind: 'op';
       op: Operator;
@@ -93,6 +111,7 @@ export type Net = {
   declarationEnd?: number;
 };
 export function children(e: Expr): [string, Expr][] {
+  if (e.kind === 'unary') return [['V', e.value]];
   if (e.kind === 'convert') return [['V', e.value]];
   if (e.kind === 'concat') return e.parts.map((p, i) => [`P${i}`, p]);
   return e.kind === 'op'
@@ -155,7 +174,22 @@ export const expressionSpan = (e: Expr) => ({
   start: e.outerStart ?? e.start,
   end: e.outerEnd ?? e.end,
 });
-const precedence: Record<string, number> = { '|': 1, '^': 2, '&': 3, '+': 4, '-': 4, '*': 5 };
+const precedence: Record<string, number> = {
+  '|': 1,
+  '^': 2,
+  '&': 3,
+  '==': 4,
+  '!=': 4,
+  '<': 5,
+  '<=': 5,
+  '>': 5,
+  '>=': 5,
+  '<<': 6,
+  '>>': 6,
+  '+': 7,
+  '-': 7,
+  '*': 8,
+};
 export function parse(source: string, selected?: string): Module {
   if (isVhdl(source)) return parseVhdl(source, selected);
   if (source.length > 1_000_000)
@@ -311,7 +345,19 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   function expr(min = 0): Expr {
     if (++recursion > 128) fail('Expression nesting exceeds 128 levels.');
     let left: Expr;
-    if (peek() === '{') {
+    if (peek() === '~') {
+      const token = take('~');
+      const value = expr(9);
+      left = {
+        kind: 'unary',
+        op: '~',
+        value,
+        start: token.startOffset,
+        end: expressionSpan(value).end,
+        tokenStart: token.startOffset,
+        tokenEnd: token.endOffset! + 1,
+      };
+    } else if (peek() === '{') {
       const open = take('{');
       const parts: Expr[] = [];
       do {
@@ -626,6 +672,7 @@ export type Node = {
   width?: number;
   op?: Operator;
   operands?: string[];
+  operandWidths?: number[];
   operandSignature?: string;
   expressionKey?: string;
   range?: string;
@@ -661,7 +708,31 @@ export const opNames: Record<Operator, string> = {
   '&': 'AND',
   '|': 'OR',
   '^': 'XOR',
+  '<<': 'SHL',
+  '>>': 'SHR',
+  '==': 'EQ',
+  '!=': 'NE',
+  '<': 'LT',
+  '<=': 'LE',
+  '>': 'GT',
+  '>=': 'GE',
+  '~': 'NOT',
 };
+/** Unsigned Verilog self-determined width; VHDL widths come from its typed frontend. */
+export function expressionWidth(e: Expr, nets: Net[]): number {
+  if (e.nativeWidth !== undefined) return e.nativeWidth;
+  const width = (child: Expr) => expressionWidth(child, nets);
+  if (e.kind === 'convert') return e.resultWidth ?? width(e.value);
+  if (e.kind === 'unary') return width(e.value);
+  if (e.kind === 'ref') return nets.find((n) => n.name === e.value)!.width;
+  if (e.kind === 'slice') return Math.abs(e.msb - e.lsb) + 1;
+  if (e.kind === 'literal') return literalWidth(e.value);
+  if (e.kind === 'concat') return e.parts.reduce((sum, p) => sum + width(p), 0);
+  if (e.kind === 'mux') return Math.max(width(e.truthy), width(e.falsy));
+  if (isComparison(e.op)) return 1;
+  if (e.op === '<<' || e.op === '>>') return width(e.left);
+  return Math.max(width(e.left), width(e.right));
+}
 export function project(
   ast: Module,
   previous?: Circuit,
@@ -711,23 +782,25 @@ export function project(
       target: target.id,
       targetHandle: port,
     });
-  const widthOf = (e: Expr): number =>
-    e.kind === 'convert'
-      ? (e.resultWidth ?? widthOf(e.value))
-      : (e.nativeWidth ??
-        (e.kind === 'ref'
-          ? nets.get(e.value)!.width!
-          : e.kind === 'slice'
-            ? Math.abs(e.msb - e.lsb) + 1
-            : e.kind === 'literal'
-              ? literalWidth(e.value)
-              : e.kind === 'concat'
-                ? e.parts.reduce((sum, p) => sum + widthOf(p), 0)
-                : e.kind === 'mux'
-                  ? Math.max(widthOf(e.truthy), widthOf(e.falsy))
-                  : Math.max(widthOf(e.left), widthOf(e.right))));
+  const widthOf = (e: Expr): number => expressionWidth(e, ast.nets);
   function visit(e: Expr, key: string, context = 0): Node {
     if (ast.language === 'vhdl') context = 0;
+    if (e.kind === 'unary') {
+      const w = Math.max(context, widthOf(e));
+      const child = visit(e.value, key + '/V', w);
+      const node = add(key, {
+        kind: 'op',
+        expressionKey: key,
+        label: 'NOT',
+        op: '~',
+        width: w,
+        operands: [child.label],
+        operandWidths: [w],
+        operandSignature: semantic(e.value),
+      });
+      connect(child, node, 'left');
+      return node;
+    }
     if (e.kind === 'convert') {
       const child = visit(e.value, `${key}/V`);
       const node = add(key, {
@@ -792,15 +865,20 @@ export function project(
       connect(f, n, 'right');
       return n;
     }
-    const w = Math.max(context, widthOf(e));
-    const l = visit(e.left, `${key}/L`, w);
-    const r = visit(e.right, `${key}/R`, w);
+    const comparison = isComparison(e.op),
+      shift = e.op === '<<' || e.op === '>>';
+    const w = comparison ? 1 : Math.max(context, widthOf(e));
+    const operandWidth = comparison ? Math.max(widthOf(e.left), widthOf(e.right)) : w;
+    const rightWidth = shift ? widthOf(e.right) : operandWidth;
+    const l = visit(e.left, key + '/L', operandWidth);
+    const r = visit(e.right, key + '/R', rightWidth);
     const n = add(key, {
       kind: 'op',
       expressionKey: key,
       label: opNames[e.op],
       op: e.op,
       operands: [l.label, r.label],
+      operandWidths: [operandWidth, rightWidth],
       operandSignature: JSON.stringify([semantic(e.left), semantic(e.right)]),
       width: w,
     });
@@ -879,7 +957,7 @@ export function project(
           ? 1
           : node.kind === 'instance' || node.kind === 'concat'
             ? node.inputPorts?.find((p) => p.name === edge.targetHandle)?.width
-            : node.width;
+            : (node.operandWidths?.[edge.targetHandle === 'right' ? 1 : 0] ?? node.width);
       const actual =
         from.kind === 'instance'
           ? from.outputPorts?.find((p) => `out:${p.name}` === edge.sourceHandle)?.width
@@ -933,6 +1011,7 @@ export function expressions(ast: Module) {
   return all;
 }
 export function shape(e: Expr): string {
+  if (e.kind === 'unary') return 'unary(' + shape(e.value) + ')';
   if (e.kind === 'convert') return `${e.conversion}:${e.resultWidth ?? ''}(${shape(e.value)})`;
   if (e.kind === 'concat') return `concat(${e.parts.map(shape).join(',')})`;
   return e.kind === 'mux'
@@ -944,6 +1023,7 @@ export function shape(e: Expr): string {
         : `${e.kind}:${e.value}`;
 }
 function semantic(e: Expr): string {
+  if (e.kind === 'unary') return e.op + '(' + semantic(e.value) + ')';
   if (e.kind === 'convert') return `${e.conversion}:${e.resultWidth ?? ''}(${semantic(e.value)})`;
   if (e.kind === 'concat') return `concat(${e.parts.map(semantic).join(',')})`;
   return e.kind === 'mux'
@@ -965,7 +1045,12 @@ export function operatorPatch(
   project(ast);
   const all = expressions(ast);
   const e = all.get(node.key);
-  if (e?.kind !== 'op') throw new Error('Operation no longer exists in the live source.');
+  if (e?.kind !== 'op' && e?.kind !== 'unary')
+    throw new Error('Operation no longer exists in the live source.');
+  if ((e.kind === 'unary') !== (op === '~'))
+    throw new Error(
+      'Unary and binary operations have different input counts. Create a new component instead.',
+    );
   const currentGraph = project(ast);
   const current = currentGraph.nodes.find((n) => n.key === node.key);
   if (current?.operandSignature !== node.operandSignature)
@@ -1043,7 +1128,8 @@ export function validateEditableEdits(source: string, edits: Edit[]): void {
     [];
   for (const scope of Object.values(ast.library))
     for (const e of expressions(scope).values()) {
-      if (e.kind === 'op') allowed.push({ start: e.tokenStart, end: e.tokenEnd, kind: 'operator' });
+      if (e.kind === 'op' || e.kind === 'unary')
+        allowed.push({ start: e.tokenStart, end: e.tokenEnd, kind: 'operator' });
       if (e.kind === 'literal') allowed.push({ start: e.start, end: e.end, kind: 'literal' });
       if (e.kind === 'slice') allowed.push({ start: e.rangeStart, end: e.rangeEnd, kind: 'slice' });
       if (e.kind === 'mux' && e.condition.kind === 'ref')

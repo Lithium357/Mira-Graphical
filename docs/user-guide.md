@@ -1,6 +1,6 @@
 # User guide
 
-Install the [Windows testing build](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.8.0), then follow [setup and verification](distribution.md). For source builds, see [development](development.md).
+Install the [Windows testing build](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.0), then follow [setup and verification](distribution.md). For source builds, see [development](development.md).
 
 ## Adder demo
 

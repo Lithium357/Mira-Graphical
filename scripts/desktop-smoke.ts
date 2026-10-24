@@ -779,18 +779,24 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     );
     await until(() =>
       win.webContents.executeJavaScript(
-        `!!document.querySelector('[aria-label="Replace with SUB"]')`,
+        `!!document.querySelector('[aria-label="Replace with ${doc.ext === 'sv' ? 'SHL' : 'SUB'}"]')`,
       ),
     );
     await win.webContents.executeJavaScript(
-      `document.querySelector('[aria-label="Replace with SUB"]').click()`,
+      `document.querySelector('[aria-label="Replace with ${doc.ext === 'sv' ? 'SHL' : 'SUB'}"]').click()`,
     );
     await until(
       () =>
-        service.states.get(doc.uri)?.previewGraph?.nodes.some((n) => n.op === '-') === true ||
-        service.states.get(doc.uri)?.pendingEdits?.[operation.id]?.value === '-',
+        service.states
+          .get(doc.uri)
+          ?.previewGraph?.nodes.some((n) => n.op === (doc.ext === 'sv' ? '<<' : '-')) === true ||
+        service.states.get(doc.uri)?.pendingEdits?.[operation.id]?.value ===
+          (doc.ext === 'sv' ? '<<' : '-'),
     );
-    assert.equal(service.simulate(doc.uri, { a: '9', b: '3' }).signals.result.value, '0x06');
+    assert.equal(
+      service.simulate(doc.uri, { a: '9', b: '3' }).signals.result.value,
+      doc.ext === 'sv' ? '0x48' : '0x06',
+    );
     await click('Readable zoom');
     await sleep(250);
     const text = await win.webContents.executeJavaScript('document.body.innerText');
@@ -879,5 +885,54 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   );
   assert(service.sessions.has(selectedURI));
   await accessibilitySmoke(win, service, selectedURI, output);
+  const aluURI = pathToFileURL(join(service.workspace, 'alu-int16.v')).href;
+  ws.send(
+    JSON.stringify({
+      type: 'document.open',
+      uri: aluURI,
+      version: 1,
+      text: readFileSync(join(root, 'fixtures/alu-int16.v'), 'utf8'),
+    }),
+  );
+  await until(() => !!service.states.get(aluURI)?.graph);
+  service.selectModule(aluURI, 'ALU_INT16');
+  await win.webContents.executeJavaScript(
+    `(()=>{const s=document.querySelector('[aria-label="Shared module"]');s.value=${JSON.stringify(aluURI)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+  );
+  const aluGraph = service.states.get(aluURI)!.graph!;
+  const not = aluGraph.nodes.find((n) => n.op === '~')!;
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `!!document.querySelector('[data-id="${not.id}"] [data-handleid="left"]')`,
+    ),
+  );
+  assert.equal(
+    await win.webContents.executeJavaScript(
+      `!!document.querySelector('[data-id="${not.id}"] [data-handleid="right"]')`,
+    ),
+    false,
+  );
+  assert.equal(
+    service.simulate(aluURI, { OPc: '15', OPd: '1', opcode: '8' }).signals.result.value,
+    '0x001e',
+  );
+  assert.equal(
+    service.simulate(aluURI, { OPc: '15', OPd: '1', opcode: '12' }).signals.result.value,
+    '0xfff0',
+  );
+  writeFileSync(
+    join(output, 'alu-smoke.json'),
+    JSON.stringify(
+      {
+        passed: true,
+        projection: true,
+        unarySocket: true,
+        shiftSimulation: true,
+        notSimulation: true,
+      },
+      null,
+      2,
+    ),
+  );
   ws.close();
 }

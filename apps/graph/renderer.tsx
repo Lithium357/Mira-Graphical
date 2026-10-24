@@ -24,7 +24,7 @@ import type { Simulation } from '../../packages/verilog/simulation.js';
 import type { ClipboardItem, InputPort } from '../../packages/protocol/index.js';
 import { ConstructionForm, WiringInspector } from './construction-form.js';
 import type { CircuitAction } from '../../packages/protocol/index.js';
-import type { Operator } from '../../packages/protocol/index.js';
+import { operators, vhdlOperators, type Operator } from '../../packages/protocol/index.js';
 type Command = { type: string; [key: string]: unknown };
 declare global {
   interface Window {
@@ -41,6 +41,15 @@ const names: Record<Operator, string> = {
   '&': 'AND',
   '|': 'OR',
   '^': 'XOR',
+  '<<': 'SHL',
+  '>>': 'SHR',
+  '==': 'EQ',
+  '!=': 'NE',
+  '<': 'LT',
+  '<=': 'LE',
+  '>': 'GT',
+  '>=': 'GE',
+  '~': 'NOT',
 };
 type Data = { label: string; kind: string; width?: number; op?: Operator; [key: string]: unknown };
 function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
@@ -71,7 +80,7 @@ function CircuitNode({ data }: NodeProps<FlowNode<Data>>) {
           style={{ top: ['op', 'mux'].includes(data.kind) ? '35%' : '50%' }}
         />
       )}
-      {['op', 'mux'].includes(data.kind) && (
+      {['op', 'mux'].includes(data.kind) && data.op !== '~' && (
         <Handle type="target" position={Position.Left} id="right" style={{ top: '72%' }} />
       )}
       {(data.inputPorts as { name: string; width: number }[] | undefined)?.map((p, i, ports) => (
@@ -889,22 +898,24 @@ function Diagram({
                   <>
                     <h3>Replace operation</h3>
                     <div className="palette">
-                      {(Object.keys(names) as Operator[]).map((op) => (
-                        <button
-                          key={op}
-                          disabled={
-                            state.status === 'Disconnected' ||
-                            state.status === 'Applying' ||
-                            state.status === 'Conflict'
-                          }
-                          className={(pending[node.id]?.value ?? node.op) === op ? 'active' : ''}
-                          onClick={() => void change(op)}
-                          aria-label={`Replace with ${names[op]}`}
-                        >
-                          <b>{op}</b>
-                          <span>{names[op]}</span>
-                        </button>
-                      ))}
+                      {(graph?.language === 'vhdl' ? vhdlOperators : operators)
+                        .filter((op) => (op === '~') === (node.op === '~'))
+                        .map((op) => (
+                          <button
+                            key={op}
+                            disabled={
+                              state.status === 'Disconnected' ||
+                              state.status === 'Applying' ||
+                              state.status === 'Conflict'
+                            }
+                            className={(pending[node.id]?.value ?? node.op) === op ? 'active' : ''}
+                            onClick={() => void change(op)}
+                            aria-label={`Replace with ${names[op]}`}
+                          >
+                            <b>{op}</b>
+                            <span>{names[op]}</span>
+                          </button>
+                        ))}
                     </div>
                     <p className="hint">
                       Updates the selected operator in VS Code after 15 quiet seconds. Comments and

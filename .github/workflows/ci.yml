@@ -40,6 +40,7 @@ jobs:
             dist/packages/SHA256SUMS
             test-results/project-soak.json
             test-results/accessibility-smoke.json
+            test-results/alu-smoke.json
   windows-installer:
     name: Windows installer
     runs-on: windows-latest
@@ -86,8 +87,11 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ghdl iverilog
       - run: pnpm test
       - run: pnpm test:languages
+      - run: pnpm test:alu
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: hdl-reference-results
-          path: test-results/hdl-reference/
+          path: |
+            test-results/hdl-reference/
+            test-results/alu-reference/

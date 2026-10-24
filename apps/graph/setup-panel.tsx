@@ -62,7 +62,7 @@ export function SetupGuide({ workspace }: { workspace: string }) {
           ) : (
             <>
               Install the companion: Extensions → … → Install from VSIX →{' '}
-              <code>mira-graphical-0.8.0.vsix</code> from <code>dist/packages</code>.
+              <code>mira-graphical-0.9.0.vsix</code> from <code>dist/packages</code>.
             </>
           )}
         </li>

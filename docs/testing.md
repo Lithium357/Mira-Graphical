@@ -1,4 +1,12 @@
-# Verification report — 0.8.0
+# Verification report
+
+## 0.9.0 ALU regression
+
+The reported two-module INT16 ALU is retained in `fixtures/alu-int16.v`. The expanded suite has 106 tests (105 pass on Windows, with the symlink privilege case skipped). `pnpm test:alu` compares all 16 opcodes over 2,192 ALU vectors and 137 mixed-width/unknown-bit probe vectors with 14 outputs against Icarus Verilog: **4,110 matching output checks**. The differential test runs in the Ubuntu CI job and retains source, expected values, native logs and its JSON report.
+
+Desktop smoke renders the complete ALU, verifies the single NOT socket and simulates shift/NOT results. SystemVerilog editor passes patch a one-character addition token to a two-character shift token and verify atomic native Undo with unchanged disk source. The actual packaged EXE also exercises shifts, comparison and NOT.
+
+## 0.8.0 baseline
 
 Windows verification with Node 24.19.0, pnpm 11.25.0, Electron 45.0.0 and an isolated official VS Code 1.143.1 runtime. Linux/macOS app releases have not been validated.
 

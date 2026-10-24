@@ -155,11 +155,12 @@ export async function run() {
     await vscode.workspace.applyEdit(prefixEdit);
     const liveSource = native.getText();
     await vscode.commands.executeCommand('mira.open');
+    const expectedOperation = ext === 'sv' ? 'a << b' : 'a - b';
     const nativeStart = Date.now();
-    while (Date.now() - nativeStart < 45000 && !native.getText().includes('a - b'))
+    while (Date.now() - nativeStart < 45000 && !native.getText().includes(expectedOperation))
       await sleep(100);
     assert(native.getText().startsWith(prefix.trimEnd()), `${ext} preserves the unsaved comment`);
-    assert(native.getText().includes('a - b'), `${ext} native operator patch`);
+    assert(native.getText().includes(expectedOperation), `${ext} native operator patch`);
     assert(
       native.getText().includes(ext === 'sv' ? 'assign pair = {a, b};' : 'pair <= a & b;'),
       `${ext} native construction`,

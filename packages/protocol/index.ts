@@ -2,8 +2,21 @@
 export const PROTOCOL_VERSION = 1;
 export const DEBOUNCE_MS = 15_000;
 export const MAX_MESSAGE_BYTES = 2 * 1024 * 1024;
-export const operators = ['+', '-', '*', '&', '|', '^'] as const;
+export const vhdlOperators = ['+', '-', '*', '&', '|', '^'] as const;
+export const operators = [
+  ...vhdlOperators,
+  '<<',
+  '>>',
+  '==',
+  '!=',
+  '<',
+  '<=',
+  '>',
+  '>=',
+  '~',
+] as const;
 export type Operator = (typeof operators)[number];
+export const isComparison = (op: Operator) => ['==', '!=', '<', '<=', '>', '>='].includes(op);
 export type Edit = { start: number; end: number; text: string };
 export type GraphChange = { kind: 'operator' | 'literal' | 'slice' | 'selector'; value: string };
 export type InputPort = 'left' | 'right' | 'select' | `part:${number}` | `port:${string}`;

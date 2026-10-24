@@ -78,6 +78,7 @@ const declaration = (width: number, type: VhdlType, range?: string) =>
 const nativeType = (width: number, preferred?: VhdlType): VhdlType =>
   preferred ?? (width === 1 ? 'std_logic' : 'unsigned');
 export function renderVhdl(e: Expr): string {
+  if (e.kind === 'unary') throw new Error('Unsupported VHDL unary expression.');
   if (e.kind === 'ref') return e.value;
   if (e.kind === 'literal') return nativeLiteral(e.value, e.nativeType ?? 'unsigned');
   if (e.kind === 'slice') return e.value + nativeRange(e.msb, e.lsb, e.bit);

@@ -66,8 +66,15 @@ const opMap: Record<string, Operator> = {
   or: '|',
   xor: '^',
 };
-export const vhdlOperator = (op: Operator): string =>
-  ({ '&': 'and', '|': 'or', '^': 'xor', '+': '+', '-': '-', '*': '*' })[op];
+export const vhdlOperator = (op: Operator): string => {
+  const value = (
+    { '&': 'and', '|': 'or', '^': 'xor', '+': '+', '-': '-', '*': '*' } as Partial<
+      Record<Operator, string>
+    >
+  )[op];
+  if (!value) throw new Error('This operator is not supported in the VHDL subset.');
+  return value;
+};
 export const nativeRange = (msb: number, lsb: number, bit = false) =>
   bit ? `(${msb})` : `(${msb} ${msb >= lsb ? 'downto' : 'to'} ${lsb})`;
 export function nativeLiteral(canonical: string, type: VhdlType = 'unsigned'): string {
@@ -665,6 +672,8 @@ export function inferVhdl(
     if (a.type !== b.type || a.width !== b.width)
       bad('Conditional branches need identical types and widths.');
     result = a;
+  } else if (e.kind === 'unary') {
+    throw new Error('Unary expressions are not supported in the VHDL subset.');
   } else {
     const arithmetic = ['+', '-', '*'].includes(e.op),
       a = inferVhdl(e.left, ast, arithmetic ? 'unsigned' : hint),

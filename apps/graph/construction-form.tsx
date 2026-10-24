@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import React, { useState } from 'react';
 import type { Circuit, Node } from '../../packages/verilog/index.js';
-import type {
-  CircuitAction,
-  CreateComponent,
-  InputPort,
-  Operator,
+import {
+  operators,
+  vhdlOperators,
+  type CircuitAction,
+  type CreateComponent,
+  type InputPort,
+  type Operator,
 } from '../../packages/protocol/index.js';
 export function ConstructionForm({
   graph,
@@ -150,7 +152,7 @@ export function ConstructionForm({
             value={operator}
             onChange={(e) => setOperator(e.target.value as Operator)}
           >
-            {['+', '-', '*', '&', '|', '^'].map((op) => (
+            {(graph.language === 'vhdl' ? vhdlOperators : operators).map((op) => (
               <option key={op}>{op}</option>
             ))}
           </select>
@@ -241,7 +243,9 @@ export function WiringInspector({
   const [source, setSource] = useState('');
   const ports: InputPort[] =
     node.kind === 'op'
-      ? ['left', 'right']
+      ? node.op === '~'
+        ? ['left']
+        : ['left', 'right']
       : node.kind === 'mux'
         ? ['select', 'left', 'right']
         : node.kind === 'instance' || node.kind === 'concat'

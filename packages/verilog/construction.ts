@@ -142,7 +142,10 @@ function create(source: string, ast: Module, action: CreateComponent): Edit[] {
   let expression: string | undefined;
   if (action.component === 'operation') {
     if (!operators.includes(action.operator!)) throw new Error('Choose a supported operation.');
-    expression = `${zero(action.width)} ${action.operator} ${zero(action.width)}`;
+    expression =
+      action.operator === '~'
+        ? `~${zero(action.width)}`
+        : `${zero(action.width)} ${action.operator} ${zero(action.width)}`;
   } else if (action.component === 'mux')
     expression = `1'd0 ? ${zero(action.width)} : ${zero(action.width)}`;
   else if (action.component === 'constant') {
@@ -169,6 +172,7 @@ function create(source: string, ast: Module, action: CreateComponent): Edit[] {
   return [bodyInsertion(source, ast, statements)];
 }
 function operand(e: Expr, port: InputPort): Expr {
+  if (e.kind === 'unary' && port === 'left') return e.value;
   if (e.kind === 'concat' && /^part:[0-9]+$/.test(port)) {
     const part = e.parts[Number(port.slice(5))];
     if (!part) throw new Error('Invalid concatenation socket.');
@@ -182,7 +186,7 @@ function operand(e: Expr, port: InputPort): Expr {
   throw new Error('That component has no matching input socket.');
 }
 function references(e: Expr, name: string): boolean {
-  if (e.kind === 'convert') return references(e.value, name);
+  if (e.kind === 'convert' || e.kind === 'unary') return references(e.value, name);
   if (e.kind === 'ref' || e.kind === 'slice') return e.value === name;
   if (e.kind === 'concat') return e.parts.some((p) => references(p, name));
   if (e.kind === 'op') return references(e.left, name) || references(e.right, name);
@@ -331,7 +335,10 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
     const key =
       action.port === 'select'
         ? 1
-        : (target.inputPorts?.find((p) => p.name === action.port)?.width ?? target.width ?? 1);
+        : (target.inputPorts?.find((p) => p.name === action.port)?.width ??
+          (action.port ? target.operandWidths?.[action.port === 'right' ? 1 : 0] : undefined) ??
+          target.width ??
+          1);
     return checked(source, [
       withoutComments(
         source,
@@ -557,10 +564,12 @@ function copyExpression(source: string, e: Expr): string {
           ? `{${e.parts.map(render).join(', ')}}`
           : e.kind === 'mux'
             ? `(${render(e.condition)} ? ${render(e.truthy)} : ${render(e.falsy)})`
-            : e.kind === 'op'
-              ? `(${render(e.left)} ${e.op} ${render(e.right)})`
-              : (() => {
-                  throw new Error('Unsupported cross-language expression.');
-                })();
+            : e.kind === 'unary'
+              ? `(~${render(e.value)})`
+              : e.kind === 'op'
+                ? `(${render(e.left)} ${e.op} ${render(e.right)})`
+                : (() => {
+                    throw new Error('Unsupported cross-language expression.');
+                  })();
   return render(e);
 }

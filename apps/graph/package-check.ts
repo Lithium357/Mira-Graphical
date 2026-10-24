@@ -30,6 +30,10 @@ export async function checkPackagedApp(
       ext: 'vhd',
       text: 'library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all; entity adder is port(a,b: in unsigned(7 downto 0); y: out unsigned(7 downto 0)); end entity; architecture rtl of adder is begin y <= a + b; end architecture;',
     },
+    {
+      ext: 'alu.v',
+      text: "module adder(input [7:0] a,b,output [7:0] y);assign y=(a==8'd2)?~(a<<b):(a>>b);endmodule",
+    },
   ];
   ws.send(JSON.stringify({ ...config, type: 'hello', editor: 'vscode' }));
   for (const document of documents)
@@ -42,7 +46,9 @@ export async function checkPackagedApp(
       }),
     );
   const start = Date.now();
-  while ([...service.states.values()].filter((s) => s.status === 'Synced').length !== 3) {
+  while (
+    [...service.states.values()].filter((s) => s.status === 'Synced').length !== documents.length
+  ) {
     assert(
       Date.now() - start < 25000,
       JSON.stringify(
@@ -52,12 +58,19 @@ export async function checkPackagedApp(
     await new Promise((r) => setTimeout(r, 100));
   }
   for (const uri of service.states.keys())
-    assert.equal(service.simulate(uri, { a: '2', b: '3' }).signals.y.value, '0x05');
+    assert.equal(
+      service.simulate(uri, { a: '2', b: '3' }).signals.y.value,
+      uri.endsWith('alu.v') ? '0xef' : '0x05',
+    );
   const snapshot = await win.webContents.executeJavaScript(
     `window.mira.command({type:'snapshot'})`,
   );
   assert.equal(snapshot.workspace, workspace);
-  assert.equal(snapshot.states.length, 3);
+  assert.equal(snapshot.states.length, documents.length);
+  const firstURI = pathToFileURL(join(workspace, 'check.v')).href;
+  await win.webContents.executeJavaScript(
+    `(()=>{const s=document.querySelector('[aria-label="Shared module"]');s.value=${JSON.stringify(firstURI)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+  );
   const deadline = Date.now() + 5000;
   while (
     !(await win.webContents.executeJavaScript(
