@@ -62,7 +62,7 @@ Generics, packages/custom types, records, arrays beyond the supported vectors, s
 
 A document is limited to 1 million UTF-16 units, 32768 tokens and 64 modules; each module has at most 4096 tokens and expressions have at most 128 recursive levels. Expanded hierarchy is limited to 256 instances and 32 levels. Instance cycle checks conservatively treat each output as dependent on all inputs, so independent-port feedback patterns can be refused. One unsupported definition prevents a complete projection; the last valid graph remains visible.
 
-The graph uses Verilog assignment context for arithmetic/mux result widths. Diagnostics do not rewrite widths. Constants exceeding their explicit width are refused. Simulator values are limited to 4096 bits and the expanded circuit to 512 signals; undriven nets are represented as unknown rather than distinguishing `z`. Input vectors may contain unknown binary bits. This is not a full four-state, timed HDL simulator. The waveform UI retains 64 sampled vectors and at most 16 watched signals; newly added traces have no historical sample until the next evaluation.
+The graph uses Verilog assignment context for arithmetic/mux result widths. Diagnostics do not rewrite widths. Constants exceeding their explicit width are refused. Simulator values are limited to 4096 bits and the expanded circuit to 4096 signals; undriven nets are represented as unknown rather than distinguishing `z`. Input vectors may contain unknown binary bits. This is not a full four-state, timed HDL simulator. The waveform UI retains 64 sampled vectors and at most 16 watched signals; newly added traces have no historical sample until the next evaluation.
 
 ### Explicit signed expressions (0.9.3)
 

@@ -10,7 +10,7 @@ const dir = join('test-results', 'projects-reference');
 mkdirSync(dir, { recursive: true });
 const hierarchy = readFileSync('fixtures/clocked-hierarchy.sv', 'utf8');
 const ordered = `module ordered(input [7:0] a,b,input [1:0] op,output reg [7:0] y);reg signed [3:0] temp;
-always @* begin temp=a+b;y=8'd0;case(op) 0: y=temp+8'd1;1,2:y=a^b;default:y=b;endcase end endmodule`;
+always @* begin temp=a+b;y=8'd0;case(op+2'd1) 2'd0: y=temp+8'd1;1,2:y=a^b;default:y=b;endcase end endmodule`;
 const graph = project(parse(ordered));
 const copied = planTransaction(ordered, [
   {

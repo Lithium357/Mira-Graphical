@@ -19,6 +19,8 @@ import {
   type Node,
   children,
   expressionSigned,
+  expressionWidth,
+  type Net,
 } from './index.js';
 import { literalWidth } from './literals.js';
 import { PatchDraft } from './patches.js';
@@ -527,7 +529,7 @@ export function copyComponents(
       ...(net.direction === 'wire' || !ports.has(name) ? {} : { direction: net.direction }),
       ...(driver
         ? {
-            expression: copyExpression(source, driver.expr, net.width),
+            expression: copyExpression(source, driver.expr, net.width, ast.nets),
           }
         : {}),
     };
@@ -626,7 +628,7 @@ function paste(source: string, ast: Module, items: ClipboardItem[]): Edit[] {
   return draft.edits();
 }
 
-function copyExpression(source: string, e: Expr, contextWidth: number): string {
+function copyExpression(source: string, e: Expr, contextWidth: number, nets: Net[]): string {
   const text = source
     .slice(expressionSpan(e).start, expressionSpan(e).end)
     .replace(/\/\/[^\r\n]*|\/\*[\s\S]*?\*\//g, ' ');
@@ -669,6 +671,18 @@ function copyExpression(source: string, e: Expr, contextWidth: number): string {
       );
     if (e.kind === 'convert' && ['signed', 'unsigned'].includes(e.conversion))
       return '$' + e.conversion + '(' + render(e.value) + ')';
+    if (e.kind === 'op' && e.caseLabels) {
+      // Every case arm shares the widest selector/label context, including
+      // arithmetic inside the selector. Preserve that context when copying.
+      const width = Math.max(
+        expressionWidth(e.left, nets),
+        ...e.caseLabels.map((label) => expressionWidth(label, nets)),
+      );
+      const signed = expressionSigned(e.left) && e.caseLabels.every(expressionSigned);
+      const cast = (value: Expr) =>
+        '$' + (signed ? 'signed' : 'unsigned') + '(' + width + "'(" + render(value) + '))';
+      return '(' + cast(e.left) + ' === ' + cast(e.right) + ')';
+    }
     if (e.kind === 'op') return '(' + render(e.left) + ' ' + e.op + ' ' + render(e.right) + ')';
     throw new Error('Unsupported cross-language expression.');
   };
