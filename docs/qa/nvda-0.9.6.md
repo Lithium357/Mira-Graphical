@@ -16,6 +16,12 @@ NVDA's installer matched its publisher SHA-256 and had a valid NV Access signatu
 | Recovery                 | Keyboard-selected the adder checkpoint. Tab reached and read the complete recovered source, Compare in VS Code and Open recovered copy. Activating Open recovered copy produced a separate Untitled-1 editor containing the original source; the original adder tab remained open.                                                                                                                               |
 | Clock/reset              | Shared the copied `clocked-hierarchy.sv` as `pipeline.sv` and used its `register_stage` definition. Sampling reset high cleared `q` to `0x00`. With reset low, enable high and `d=4`, Step clk produced `q=0x05`. NVDA announced labelled reset/enable/data edits, Step clk and the updated clocked sample count. These stimuli used indexed accessibility controls, rather than a fully keyboard-only sequence. |
 
+### Wiring and diagnostic follow-up
+
+In ADD's inspector, Tab reached Close inspector, Copy, Duplicate and Source signal. Down selected `a`; Tab reached Connect left and then Connect right. NVDA announced those controls. Enter on Connect right changed the real unsaved editor buffer from `a + b` to `a + a` after debounce. One native VS Code Ctrl+Z restored `a + b`. The disk file's SHA-256 still matched the original fixture. Mouse input was used to enter the navigator and switch between app/editor windows; the inspector wiring sequence used the keyboard.
+
+Appending a temporary unsaved `@` after the module made NVDA announce Invalid source and the alert `adder: Expected a module definition. (9:1; UTF-16 offset 156)`. Native Undo removed the probe. The last valid graph remained visible while editing was disabled during the error.
+
 Selected speech excerpts, restricted to synthetic QA content:
 
 ```text
@@ -32,7 +38,16 @@ Open recovered copy, button
 Recovered copy requested in VS Code.
 Step clk, button
 2 samples · clocked
+Source signal, combo box, Choose a signal, collapsed
+Connect left, button
+Connect right, button
+Invalid source
+alert, adder: Expected a module definition. (9:1; UTF-16 offset 156)
 ```
+
+## Automated release checks
+
+All four jobs in [CI run 40230735217](https://github.com/Lithium357/Mira-Graphical/actions/runs/40230735217) passed for `68693af`: Windows workbench/VS Code, Windows installer, HDL compiler references and real-time release acceptance. The Windows job includes the new minimized-window reopening regression, full desktop/keyboard checks and source/installed-companion editing with native Undo. The real-time report recorded 2,043 samples, nine edits across three languages, unchanged source and successful recovery after restart over 120 seconds. The final follow-up changes only these validation documents; their formatting was checked separately.
 
 ## Limits and follow-up
 
@@ -40,4 +55,6 @@ The earlier minimized-window automation obstacle was overcome by refreshing the 
 
 The Windows helper sometimes returned stale accessibility text immediately after an action. A screenshot confirmed the recovered copy before the text tree caught up. After NVDA table chords, its log also briefly recorded Ctrl/Alt on subsequent keys; sending the standalone modifier keys cleared this. These observations limit claims about a completely uninterrupted keyboard journey.
 
-No graph edit was committed during this NVDA session: the attempted operation-replacement control was outside the visible inspector area. Wiring transactions, graph edits, native Undo, diagnostic locations and register construction retain separate automated coverage, but need their own speech-assisted acceptance. Diagnostics, every sample-table row, trace export, installation through speech, JAWS and a fully keyboard-only end-to-end session remain to be tried by an experienced screen-reader user. An unfamiliar person's onboarding trial also remains separate from this agent-assisted fresh-profile review.
+The initial operation-replacement attempt was outside the visible inspector area. The follow-up instead completed a real wiring transaction, native Undo and an announced diagnostic through the actual companion. Register construction, every sample-table row, trace export, installation through speech, JAWS and a fully keyboard-only end-to-end session remain to be tried by an experienced screen-reader user. An unfamiliar person's onboarding trial also remains separate from this agent-assisted fresh-profile review.
+
+WSL2 Ubuntu was inspected as an optional Linux test environment. WSLg exposed display `:0` and Wayland, but Orca was absent. No Linux screen-reader or desktop compatibility result is claimed, and no packages or system settings were changed for that inspection. Windows remains the verified application platform.
