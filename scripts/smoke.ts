@@ -194,10 +194,13 @@ for (let pass = 0; pass < 2; pass++) {
         );
       }
       if (s.uri.endsWith('adder.v')) {
+        if (s.status === 'Invalid source' || s.status === 'Unsupported construct')
+          console.error('Editor smoke service diagnostic:', JSON.stringify(s.diagnostics));
         writeSmokeState('smoke-state.json', {
           version: s.version,
           status: s.status,
           op: s.graph?.nodes.find((n) => n.kind === 'op')?.op,
+          diagnostics: s.diagnostics,
         });
         if (!edited && s.status === 'Synced' && s.graph) {
           edited = true;
