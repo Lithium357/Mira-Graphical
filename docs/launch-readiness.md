@@ -13,12 +13,17 @@ Completed release foundations:
 - Native keyboard and accessibility-tree checks for setup, component navigation, wiring, palette and simulation, plus modal Escape/focus restoration.
 - First-run workspace/connection guidance and actionable companion connection errors.
 - Pinned external-project refusal review, 0.8.0 release notes and unsigned artifact/checksum instructions.
+- Owner acceptance of everyday usability and extended real-project use, reported on 2026-10-25 after multiple hours and many tweaks across preview usage.
+
+## Recorded owner acceptance
+
+On 2026-10-25, the owner reported that usability is good and the application works well after multiple hours of use and many tweaks. This satisfies the owner usability and extended-use checks. Exact preview versions and individual workflows were not recorded, so this feedback does not certify every supported language or feature. The owner has not evaluated screen-reader behavior.
 
 Remaining work before declaring 1.0:
 
 - Run additional independently authored in-scope projects and user trials. The first [external review](compatibility.md) refused all 15 samples; preprocessing and positional/primitive instances remain outside the bounded scope; the Yosys counter now reaches the non-ANSI port limitation.
 - Complete human screen-reader acceptance. Native keyboard events and the exposed accessibility tree are automated evidence; they do not certify NVDA/JAWS spoken behavior or usability.
-- Conduct multi-hour/day desktop-rendering stress and user editing sessions. The two-minute real-time acceptance session now covers actual debounce, simulation, unsaved edits, memory and recovery restart. The repeatable service soak accelerates 15-second debounce intervals; it does not measure days of operation, power-loss durability or large-canvas frame rates.
+- Broaden measured stress coverage beyond the accepted owner session. A ten-minute local real-time service session passed 10,028 simulation samples and 45 unsaved edits, with about 111 MiB peak memory, unchanged disk source and successful recovery after restart. The repeatable service soak accelerates debounce intervals; neither test measures days of operation, power-loss durability or large-canvas frame rates.
 - Validate the first-run wording with a person using a fresh profile. Isolated-profile installation and automated setup checks pass, but a human usability trial is distinct.
 - Select the final green-commit artifact and attach the release notes, manifests and checksums according to [distribution instructions](distribution.md). Signing remains deferred.
 
@@ -30,6 +35,6 @@ Before 1.0, record tester, app/companion versions, date, result and any issue fo
 
 - Fresh Windows user: install/upgrade, match companion version, share a real project, identify an error line, construct/wire a register, reset/step and export a trace without developer help.
 - NVDA/JAWS user: navigate setup and modal dialogs, choose a component, read widths/errors, wire a connection, operate clock/reset and inspect a waveform using keyboard and speech. Verify focus return and absence of keyboard traps.
-- Owner project session: run the actual ALU/multiplier, hierarchy and any VHDL designs for several hours; record unsupported syntax and whether a refusal preserves current source/drafts.
+- Owner project session: accepted by the owner on 2026-10-25 for usability and multiple hours of real use. Additional language/workflow-specific trials can extend that evidence.
 
 These checks require people; automated accessibility-tree and compiler checks do not substitute for them.
