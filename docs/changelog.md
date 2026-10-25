@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.7 — Public beta
+
+- Published the current Windows workbench as a public beta with matching desktop and companion versions, an unsigned installer, corresponding source and SHA-256 checksums.
+- Added a native minimize/reopen regression to the standard desktop test run and retained its report in CI artifacts.
+- Recorded real NVDA speech-output checks for setup, sharing, component inspection, simulation/table navigation, recovery, clock/reset controls, keyboard wiring, native Undo and source-error announcements. Human screen-reader acceptance remains separate.
+- Preserved strict native editor acknowledgments while hardening Windows test coordination with immutable state snapshots. This beta adds validation and distribution updates; HDL feature scope remains the documented bounded three-language subset.
+
 ## 0.9.6
 
 - Updated first-run guidance with a connection-dependent next step, command-palette shortcuts, companion reload instructions, current clocked support and automatic reconnect behavior.
