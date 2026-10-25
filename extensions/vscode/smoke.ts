@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import * as vscode from 'vscode';
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
+import { readSmokeState } from '../../scripts/smoke-state.js';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function run() {
   const folder = vscode.workspace.workspaceFolders![0];
+  const smokeState = (channel: string) =>
+    readSmokeState(join(folder.uri.fsPath, '.hdlgraph'), channel);
   const undo = async (document: vscode.TextDocument) => {
     const started = Date.now();
     let acknowledged = false;
+    let observed: unknown;
     while (Date.now() - started < 10000) {
       try {
-        const states = JSON.parse(
-          Buffer.from(
-            await vscode.workspace.fs.readFile(
-              vscode.Uri.joinPath(folder.uri, '.hdlgraph', 'smoke-states.json'),
-            ),
-          ).toString('utf8'),
-        );
+        const states = smokeState('smoke-states.json');
+        observed = states.find((s: { uri: string }) => s.uri === document.uri.toString());
         if (
           states.some(
             (s: { uri: string; version: number; status: string }) =>
@@ -32,7 +32,10 @@ export async function run() {
       }
       await sleep(50);
     }
-    assert(acknowledged, `Patch acknowledgment before Undo: ${document.uri.path}`);
+    assert(
+      acknowledged,
+      `Patch acknowledgment before Undo: ${document.uri.path}: ${JSON.stringify(observed)}`,
+    );
     await vscode.window.showTextDocument(document, { preview: false, preserveFocus: false });
     await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
     const before = document.version;
@@ -73,13 +76,7 @@ export async function run() {
   let lastUndoState: unknown;
   // A real 15-second debounce also needs room for editor events and loaded Windows runners.
   while (Date.now() - afterUndo < 45_000) {
-    const s = JSON.parse(
-      Buffer.from(
-        await vscode.workspace.fs.readFile(
-          vscode.Uri.joinPath(folder.uri, '.hdlgraph', 'smoke-state.json'),
-        ),
-      ).toString(),
-    );
+    const s = smokeState('smoke-state.json');
     lastUndoState = s;
     if (s.status === 'Synced' && s.version === doc.version && s.op === '-') {
       reflected = true;
@@ -104,17 +101,7 @@ export async function run() {
   const reconnectStart = Date.now();
   while (Date.now() - reconnectStart < 30000) {
     try {
-      const result = JSON.parse(
-        Buffer.from(
-          await vscode.workspace.fs.readFile(
-            vscode.Uri.joinPath(
-              folder.uri,
-              '.hdlgraph',
-              'reconnect-result-' + process.env.MIRA_SMOKE_PASS + '.json',
-            ),
-          ),
-        ).toString(),
-      );
+      const result = smokeState('reconnect-result-' + process.env.MIRA_SMOKE_PASS + '.json');
       if (result.passed) {
         reconnected = true;
         break;

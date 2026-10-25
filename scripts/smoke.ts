@@ -7,7 +7,6 @@ import {
   createWriteStream,
   readdirSync,
   existsSync,
-  renameSync,
 } from 'node:fs';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -15,17 +14,16 @@ import { runTests, runVSCodeCommand } from '@vscode/test-electron';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { SyncService } from '../packages/core/service.js';
+import { SmokeStateWriter } from './smoke-state.js';
 const root = process.cwd();
 const output = join(root, 'test-results');
 mkdirSync(output, { recursive: true });
 const stamp = Date.now();
 const workspace = join(output, `smoke-workspace-${stamp}`);
 mkdirSync(workspace);
+const smokeStates = new SmokeStateWriter(join(workspace, '.hdlgraph'));
 function writeSmokeState(name: string, value: unknown) {
-  const path = join(workspace, '.hdlgraph', name),
-    temporary = path + '.tmp';
-  writeFileSync(temporary, JSON.stringify(value));
-  renameSync(temporary, path);
+  smokeStates.write(name, value);
 }
 for (const name of ['adder', 'combinational', 'hierarchy'])
   writeFileSync(join(workspace, `${name}.v`), readFileSync(`fixtures/${name}.v`));
@@ -132,9 +130,26 @@ for (let pass = 0; pass < 2; pass++) {
   const unsubscribe = service.subscribe((states) => {
     writeSmokeState(
       'smoke-states.json',
-      states.map((s) => ({ uri: s.uri, version: s.version, status: s.status })),
+      states.map((s) => ({
+        uri: s.uri,
+        version: s.version,
+        status: s.status,
+        diagnostics: s.diagnostics,
+        detail: s.detail,
+      })),
     );
     for (const s of states) {
+      if (['Invalid source', 'Unsupported construct', 'Conflict'].includes(s.status))
+        console.error(
+          'Editor smoke state:',
+          JSON.stringify({
+            uri: s.uri,
+            version: s.version,
+            status: s.status,
+            diagnostics: s.diagnostics,
+            detail: s.detail,
+          }),
+        );
       if (reconnectRequest && s.uri === reconnectRequest.uri) {
         if (s.status === 'Pending') reconnectPending = true;
         if (reconnectPending && s.status === 'Synced') {

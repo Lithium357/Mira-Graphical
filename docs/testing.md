@@ -98,3 +98,5 @@ The desktop suite steps hierarchical and VHDL clocks and creates a register thro
 ## Onboarding and accessibility review (0.9.6)
 
 The desktop suite checks fresh-workspace instructions before connection and the next-step prompt after connection but before sharing. During a real synchronization countdown, it verifies that the visible timer changes without mutating the live status text. `onboarding-smoke.json` records this evidence. Native keyboard/AX checks additionally cover readable graph names, scoped sample-table headers, and skipping the canvas to the inspector with focus return. See the [screen-reader validation record and test journey](accessibility.md) for the partial NVDA trial and remaining human acceptance.
+
+The editor test coordinator publishes immutable state snapshots instead of replacing files while Windows readers may hold them. Readers select the latest complete snapshot; an incomplete publication leaves the previous snapshot readable. This changes only test coordination. Exact version/status acknowledgments, buffer contents, native Undo and unchanged-disk assertions remain required. Failures include the observed service state and diagnostics.
