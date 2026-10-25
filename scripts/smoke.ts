@@ -78,8 +78,14 @@ for (const line of readFileSync('dist/packages/SHA256SUMS', 'utf8').trim().split
     expected,
   );
 }
-if (!process.argv.includes('--editor-only'))
+if (!process.argv.includes('--editor-only')) {
+  await launch(
+    electron,
+    ['.', '--smoke', '--window-activation-only', `--workspace=${workspace}`],
+    env,
+  );
   await launch(electron, ['.', '--smoke', `--workspace=${workspace}`], env);
+}
 const installed = join(output, `vsix-installed-${stamp}`),
   profile = join(output, `vsix-profile-${stamp}`);
 const version = JSON.parse(readFileSync('package.json', 'utf8')).version;

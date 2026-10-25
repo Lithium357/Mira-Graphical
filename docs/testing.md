@@ -77,7 +77,7 @@ The initial disconnected workspace asserts visible setup/VSIX guidance before sh
 
 Combinational simulation and bounded clocked Verilog/SystemVerilog/VHDL hierarchy are covered, including signed nets/casts. `pnpm test:clocked` compares 17,570 outputs against Icarus across 1,255 samples of the reported ALU/multiplier and a falling-edge register probe. Native desktop checks exercise clock stepping, asynchronous reset and restart; packaged-runtime checks retain register state through IPC. Sequential timing/delays, source x/z literals, parameters and syntax outside the documented subset remain unsupported. Undriven signals use x, without a separate z state. Instance feedthrough dependencies are validated after elaboration. See [exact syntax and limits](supported-syntax.md).
 
-Monitor geometry/restoration has automated coverage; the app is a separate movable Windows window. Screen-reader behavior, touch/pen interaction, other operating systems, live cross-file elaboration and automatic recovery restore remain unverified or outside this version. Signing is deliberately deferred; Windows now has an unsigned installer.
+Monitor geometry/restoration has automated coverage; the app is a separate movable Windows window. Full human screen-reader acceptance, touch/pen interaction, other operating systems, live cross-file elaboration and automatic recovery restore remain unverified or outside this version. Signing is deliberately deferred; Windows now has an unsigned installer.
 
 ## Packaged Windows application
 
@@ -97,6 +97,8 @@ The desktop suite steps hierarchical and VHDL clocks and creates a register thro
 
 ## Onboarding and accessibility review (0.9.6)
 
-The desktop suite checks fresh-workspace instructions before connection and the next-step prompt after connection but before sharing. During a real synchronization countdown, it verifies that the visible timer changes without mutating the live status text. `onboarding-smoke.json` records this evidence. Native keyboard/AX checks additionally cover readable graph names, scoped sample-table headers, and skipping the canvas to the inspector with focus return. See the [screen-reader validation record and test journey](accessibility.md) for the partial NVDA trial and remaining human acceptance.
+The desktop suite checks fresh-workspace instructions before connection and the next-step prompt after connection but before sharing. During a real synchronization countdown, it verifies that the visible timer changes without mutating the live status text. `onboarding-smoke.json` records this evidence. Native keyboard/AX checks additionally cover readable graph names, scoped sample-table headers, and skipping the canvas to the inspector with focus return. See the [interactive NVDA review](qa/nvda-0.9.6.md) for real companion sharing, simulation/table speech output, recovery and clock/reset observations, with remaining human acceptance clearly identified.
+
+Before the desktop journey, `pnpm smoke` also minimizes its isolated native window and dispatches Electron's second-instance event. `window-activation-smoke.json` records whether reopening restored a visible, non-minimized window. This tests the existing reopen handler, not a second operating-system process or foreground-focus policy. `--editor-only` skips both desktop checks.
 
 The editor test coordinator publishes immutable state snapshots instead of replacing files while Windows readers may hold them. Readers select the latest complete snapshot; an incomplete publication leaves the previous snapshot readable. This changes only test coordination. Exact version/status acknowledgments, buffer contents, native Undo and unchanged-disk assertions remain required. Failures include the observed service state and diagnostics.

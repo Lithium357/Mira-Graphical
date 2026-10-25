@@ -234,7 +234,11 @@ else {
       if (process.env.MIRA_SMOKE_BUILD !== 'false' && process.argv.includes('--smoke')) {
         const { desktopSmoke } = await import('../../scripts/desktop-smoke.js');
         try {
-          if (process.argv.includes('--accessibility-only')) {
+          if (process.argv.includes('--window-activation-only')) {
+            const { windowActivationSmoke } =
+              await import('../../scripts/window-activation-smoke.js');
+            await windowActivationSmoke(win, root);
+          } else if (process.argv.includes('--accessibility-only')) {
             const { accessibilityFixtureSmoke } =
               await import('../../scripts/accessibility-smoke.js');
             await accessibilityFixtureSmoke(service, win, root);
