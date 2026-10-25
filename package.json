@@ -1,6 +1,6 @@
 {
   "name": "mira-graphical",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "private": true,
   "type": "module",
   "license": "GPL-3.0-only",
@@ -23,7 +23,9 @@
     "test:soak": "tsx scripts/project-soak.ts",
     "test:external": "tsx scripts/external-projects.ts",
     "test:alu": "tsx scripts/reference-alu.ts",
-    "test:clocked": "tsx scripts/reference-clocked.ts"
+    "test:clocked": "tsx scripts/reference-clocked.ts",
+    "test:projects": "tsx scripts/reference-projects.ts",
+    "test:acceptance": "tsx scripts/release-acceptance.ts"
   },
   "dependencies": {
     "@xyflow/react": "12.12.0",

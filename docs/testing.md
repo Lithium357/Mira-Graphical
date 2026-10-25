@@ -75,7 +75,7 @@ The initial disconnected workspace asserts visible setup/VSIX guidance before sh
 
 ## Remaining validation
 
-Combinational simulation and bounded standalone clocked Verilog/SystemVerilog are covered, including signed nets/casts. `pnpm test:clocked` compares 17,570 outputs against Icarus across 1,255 samples of the reported ALU/multiplier and a falling-edge register probe. Native desktop checks exercise clock stepping, asynchronous reset and restart; packaged-runtime checks retain register state through IPC. Sequential timing/delays, sequential hierarchy, source x/z literals, parameters and syntax outside the documented subset remain unsupported. Undriven signals use x, without a separate z state. Instance dependency checks are conservative. See [exact syntax and limits](supported-syntax.md).
+Combinational simulation and bounded clocked Verilog/SystemVerilog/VHDL hierarchy are covered, including signed nets/casts. `pnpm test:clocked` compares 17,570 outputs against Icarus across 1,255 samples of the reported ALU/multiplier and a falling-edge register probe. Native desktop checks exercise clock stepping, asynchronous reset and restart; packaged-runtime checks retain register state through IPC. Sequential timing/delays, source x/z literals, parameters and syntax outside the documented subset remain unsupported. Undriven signals use x, without a separate z state. Instance feedthrough dependencies are validated after elaboration. See [exact syntax and limits](supported-syntax.md).
 
 Monitor geometry/restoration has automated coverage; the app is a separate movable Windows window. Screen-reader behavior, touch/pen interaction, other operating systems, live cross-file elaboration and automatic recovery restore remain unverified or outside this version. Signing is deliberately deferred; Windows now has an unsigned installer.
 
@@ -85,6 +85,12 @@ Monitor geometry/restoration has automated coverage; the app is a separate movab
 
 ## Running again
 
-Run `pnpm install`, `pnpm run licenses`, `pnpm build`, `pnpm test`, then `pnpm smoke`. Allow roughly ten to twelve minutes for real debounce intervals, isolated VSIX installation and two editor passes, plus first-run downloads. A graphical desktop and loopback sockets are required. Workspaces/profiles/logs remain under ignored `test-results/`; the isolated editor runtime is in `.vscode-test/`.
+Run `pnpm install`, `pnpm run licenses`, `pnpm build`, `pnpm test`, then `pnpm smoke`. Allow roughly twelve to fifteen minutes for real debounce intervals, isolated VSIX installation and two editor passes, plus first-run downloads. A graphical desktop and loopback sockets are required. Workspaces/profiles/logs remain under ignored `test-results/`; the isolated editor runtime is in `.vscode-test/`.
 
 The bundler reports React Flow's `use client` directive as informational in this entirely client-rendered app. The official VS Code test CLI can report Node's shell-spawn deprecation warning; all arguments are fixed test flags or internally generated workspace/package paths. The checks verify native installation and editing regardless of those warnings.
+
+## 0.9.5 project and release acceptance
+
+`pnpm test:projects` adds 3,476 Icarus/GHDL comparisons for clocked hierarchy, case dispatch, ordered temporary widths, copied expressions, native edge functions and resets. `pnpm test:acceptance --seconds=120` uses real sockets and 15-second timers across all three languages, simulates while editing unsaved buffers, checks disk source integrity, bounds memory, and verifies recovery after service restart. This is a two-minute backend acceptance session, not a multi-day rendering or human usability certification.
+
+The desktop suite steps hierarchical and VHDL clocks and creates a register through the palette. Source and installed VSIX passes test one native Undo for register construction/wiring and automatic reconnect/resharing of an unsaved buffer. Retry-generation, cancellation, source-location and version-consistency tests run in the ordinary unit suite.

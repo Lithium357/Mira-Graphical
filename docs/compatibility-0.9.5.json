@@ -1,0 +1,155 @@
+{
+  "scope": "Unmodified individual source files, no upstream scripts or synthesized netlists; refusal is not compatibility",
+  "results": [
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/ALU.v",
+      "file": "hack-ALU.v",
+      "sha256": "2c570f88545ce88d336c1979688c8abc9e33b65467f184c015d5094beff32586",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/ALU.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/Add16.v",
+      "file": "hack-Add16.v",
+      "sha256": "18d339f1625d377e2913ff938c12a8dbf91289aaa155f5cc5be91366c6aff4f1",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/Add16.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/And.v",
+      "file": "hack-And.v",
+      "sha256": "b478c8db48fc3c73f3ec71ad17d817c8b3dfd53b3b737ab94436d2438dc3bfa0",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/And.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/And16.v",
+      "file": "hack-And16.v",
+      "sha256": "13b1071ccf6efbeb5c0b30e0c41519ab7b14de7f23ec1af29697300b16e802ca",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/And16.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/FullAdder.v",
+      "file": "hack-FullAdder.v",
+      "sha256": "6fd1fd7add68755fd45fa449ac434b5f4acaaffd296dea81416635639a1bb02f",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/FullAdder.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/HalfAdder.v",
+      "file": "hack-HalfAdder.v",
+      "sha256": "d6093dc68efd36f562a8f75cb032bd58fba52977ff75bef884488452f313db70",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/HalfAdder.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/Mux.v",
+      "file": "hack-Mux.v",
+      "sha256": "4c7a4e4dc4a013bd093bfcdfd82573bb70d65f5302eea3e426112ff953f9d3e3",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/Mux.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/Mux16.v",
+      "file": "hack-Mux16.v",
+      "sha256": "a40590bf3da0a32437d611f8d2493772bc2e12c393f80e4c93954a8984fe602b",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/Mux16.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/Nand.v",
+      "file": "hack-Nand.v",
+      "sha256": "05ea0f12ea3645b07f9bd9b6204a5087aae6602a8e35ee834dbfc6eabeb627bd",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/Nand.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/Not.v",
+      "file": "hack-Not.v",
+      "sha256": "8aba3b46f002f97d59b8d4625e02317d7f6bd34b884fbd21bd243edba94f4c45",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/Not.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/Not16.v",
+      "file": "hack-Not16.v",
+      "sha256": "c65b50cdcacaa1bdbab41db4b8b045b2b38e1b187b75b25c2422aaa03c9bbfe2",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/Not16.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/Or.v",
+      "file": "hack-Or.v",
+      "sha256": "18200ef9cfb3f799c1a1a832f721a373aeb83eb6512d89b4478bd4de0b37f1f6",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/Or.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/Or8Way.v",
+      "file": "hack-Or8Way.v",
+      "sha256": "1e1738fa80fff59bc1c1ca756f3d06e45ca49df94d6aedd228f3979d34e670c1",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/Or8Way.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "wuhanstudio/nand2tetris-iverilog",
+      "revision": "06a924223f4fb37194ddb0c644432fc6ca16ea72",
+      "path": "1-ALU/Xor.v",
+      "file": "hack-Xor.v",
+      "sha256": "db8fa6fc16e088b9db1560f1be22981dcc12dbe979f528f996a0e047af6b761c",
+      "url": "https://github.com/wuhanstudio/nand2tetris-iverilog/blob/06a924223f4fb37194ddb0c644432fc6ca16ea72/1-ALU/Xor.v",
+      "outcome": "refused",
+      "diagnostic": "Unsupported preprocessor directive `default_nettype. Share self-contained modules without directives or macro expansion."
+    },
+    {
+      "repository": "YosysHQ/yosys",
+      "revision": "5053d0e266d9e5f895211e39e6ee3a94cbba408a",
+      "path": "docs/source/code_examples/intro/counter.v",
+      "file": "yosys-counter.v",
+      "sha256": "f2c836c3d885ca82170fc93afca0cb75a326a6f4552d5b7f14018273ed0afa74",
+      "url": "https://github.com/YosysHQ/yosys/blob/5053d0e266d9e5f895211e39e6ee3a94cbba408a/docs/source/code_examples/intro/counter.v",
+      "outcome": "refused",
+      "diagnostic": "Only ANSI input/output ports are supported."
+    }
+  ]
+}

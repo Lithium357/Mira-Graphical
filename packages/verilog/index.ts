@@ -9,6 +9,8 @@ import {
   type GraphChange,
 } from '../protocol/index.js';
 import { literalWidth } from './literals.js';
+import { elaborate, hasRegisters, clocksFor } from './elaboration.js';
+import { lowerStatements, registerInputs, type Statement } from './procedural.js';
 import {
   parseVhdl,
   isVhdl,
@@ -32,15 +34,26 @@ const Identifier = createToken({ name: 'Identifier', pattern: /[a-zA-Z_][a-zA-Z0
 const SystemCast = createToken({ name: 'SystemCast', pattern: /\$(?:signed|unsigned)\b/ });
 const Fill = createToken({ name: 'Fill', pattern: /'[01]/ });
 const Based = createToken({ name: 'Based', pattern: /[0-9][0-9_]*'[bBoOdDhH][0-9a-fA-FxXzZ_]+/ });
+const SizedCast = createToken({ name: 'SizedCast', pattern: /[0-9][0-9_]*'(?=\()/ });
 const Integer = createToken({ name: 'Integer', pattern: /[0-9][0-9_]*/ });
 const Symbol = createToken({
   name: 'Symbol',
   pattern: />>>|===|!==|&&|\|\||<<|>>|==|!=|<=|>=|[{}()[\]:?;,.=+*\-&|^~<>!@]/,
 });
-const lexer = new Lexer([WS, Comment, SystemCast, Identifier, Fill, Based, Integer, Symbol], {
-  ensureOptimizations: false,
-});
-export type Diagnostic = { message: string; start: number; end: number };
+const lexer = new Lexer(
+  [WS, Comment, SystemCast, Identifier, Fill, Based, SizedCast, Integer, Symbol],
+  {
+    ensureOptimizations: false,
+  },
+);
+export type Diagnostic = {
+  message: string;
+  start: number;
+  end: number;
+  line?: number;
+  column?: number;
+  module?: string;
+};
 class ParseError extends Error implements Diagnostic {
   constructor(
     message: string,
@@ -104,6 +117,8 @@ export type Expr = (
     }
 ) & {
   signed?: boolean;
+  synthetic?: boolean;
+  caseLabels?: Expr[];
   outerStart?: number;
   outerEnd?: number;
   nativeType?: 'std_logic' | 'std_logic_vector' | 'unsigned';
@@ -166,7 +181,23 @@ export type Module = {
     expr: Expr;
     start: number;
     end: number;
-    events?: { signal: string; edge: 'posedge' | 'negedge' }[];
+    structured?: boolean;
+    registerInputs?: {
+      clockSensitivity?: { start: number; end: number };
+      data: { start: number; end: number };
+      clock: { start: number; end: number };
+      reset?: { start: number; end: number };
+    };
+    events?: {
+      signal: string;
+      edge: 'posedge' | 'negedge';
+      strict?: boolean;
+      level?: '0' | '1';
+      start?: number;
+      end?: number;
+      sensitivityStart?: number;
+      sensitivityEnd?: number;
+    }[];
   }[];
   portClose: number;
   lastPortEnd: number;
@@ -277,12 +308,6 @@ export function validateLibrary(
           inst.start,
           inst.end,
         );
-      if (child.assigns.some((a) => a.events))
-        throw new ParseError(
-          'Clocked modules currently support standalone simulation. Select/share the clocked module without instantiating it in another module.',
-          inst.start,
-          inst.end,
-        );
       const ports = child.nets.filter((n) => n.direction !== 'wire');
       if (
         inst.ports.length !== ports.length ||
@@ -319,6 +344,7 @@ export function validateLibrary(
       for (const inst of m.instances) walk(library[inst.module], [...path, m.name]);
     };
     walk(ast, []);
+    if (ast.instances.length) project(elaborate(ast));
     project(ast);
   }
   const ast = selected ? library[selected] : Object.values(library)[0];
@@ -373,7 +399,22 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   function expr(min = -1): Expr {
     if (++recursion > 128) fail('Expression nesting exceeds 128 levels.');
     let left: Expr;
-    if (tokens[i]?.tokenType === SystemCast) {
+    if (tokens[i]?.tokenType === SizedCast) {
+      const t = take(),
+        resultWidth = Number(t.image.slice(0, -1).replaceAll('_', ''));
+      if (resultWidth < 1 || resultWidth > 4096) fail('Size casts must be 1–4096 bits.');
+      take('(');
+      const value = expr();
+      const end = take(')').endOffset! + 1;
+      left = {
+        kind: 'convert',
+        conversion: 'resize',
+        value,
+        resultWidth,
+        start: t.startOffset,
+        end,
+      };
+    } else if (tokens[i]?.tokenType === SystemCast) {
       const token = take();
       take('(');
       const value = expr();
@@ -540,64 +581,127 @@ function parseSingle(source: string, tokens: IToken[]): Module {
         net.declarationStart = start;
         net.declarationEnd = end;
       }
-    } else if (peek() === 'always' || peek() === 'always_ff') {
-      const start = take().startOffset;
-      take('@');
-      take('(');
-      const events: NonNullable<Module['assigns'][number]['events']> = [];
-      do {
-        if (!['posedge', 'negedge'].includes(peek()))
-          fail(
-            'Unsupported event control: use posedge/negedge clock and optional asynchronous reset.',
-          );
-        const edge = take().image as 'posedge' | 'negedge';
-        const signal = name();
-        if (!nets.some((n) => n.name === signal && n.direction === 'input' && n.width === 1))
-          fail('Clock/reset event controls must be scalar input ports.');
-        if (events.some((e) => e.signal === signal)) fail('Duplicate event signal.');
-        events.push({ signal, edge });
-        if (peek() !== 'or' && peek() !== ',') break;
-        take();
-      } while (events.length < 2);
-      take(')');
-      let nesting = 0;
-      const hold = (target: string): Expr => ({ kind: 'ref', value: target, start, end: start });
-      const statement = (values: Map<string, Expr>): void => {
-        if (++nesting > 128) fail('Clocked statement nesting exceeds 128 levels.');
-        if (peek() === 'begin') {
+    } else if (['always', 'always_ff', 'always_comb'].includes(peek())) {
+      const processToken = take(),
+        start = processToken.startOffset;
+      let events: Module['assigns'][number]['events'];
+      if (processToken.image !== 'always_comb') {
+        take('@');
+        const wrapped = peek() === '(';
+        if (wrapped) take();
+        if (peek() === '*') {
+          if (processToken.image === 'always_ff') fail('always_ff needs an edge control.');
           take();
-          while (peek() !== 'end') statement(values);
+        } else {
+          events = [];
+          do {
+            if (!['posedge', 'negedge'].includes(peek()))
+              fail('Unsupported event control: use @* or scalar posedge/negedge inputs.');
+            const edge = take().image as 'posedge' | 'negedge',
+              signalToken = tokens[i],
+              signal = name();
+            if (!nets.some((n) => n.name === signal && n.direction === 'input' && n.width === 1))
+              fail('Clock/reset controls must be scalar inputs.');
+            if (events.some((e) => e.signal === signal)) fail('Duplicate event control.');
+            events.push({
+              signal,
+              edge,
+              start: signalToken.startOffset,
+              end: signalToken.endOffset! + 1,
+            });
+            if (peek() !== 'or' && peek() !== ',') break;
+            take();
+          } while (events.length < 2);
+        }
+        if (wrapped) take(')');
+      }
+      let nesting = 0;
+      const empty = (): Statement => ({ kind: 'block', items: [] });
+      const statement = (): Statement => {
+        if (++nesting > 128) fail('Procedural statement nesting exceeds 128.');
+        const statementStart = tokens[i]?.startOffset ?? source.length;
+        let result: Statement;
+        if (peek() === ';') {
+          take();
+          result = empty();
+        } else if (peek() === 'begin') {
+          take();
+          const items: Statement[] = [];
+          while (peek() !== 'end') items.push(statement());
           take('end');
+          result = { kind: 'block', items };
         } else if (peek() === 'if') {
           take();
           take('(');
           const condition = expr();
           take(')');
-          const truthy = new Map(values),
-            falsy = new Map(values);
-          statement(truthy);
+          const yes = statement();
+          let no = empty();
           if (peek() === 'else') {
             take();
-            statement(falsy);
+            no = statement();
           }
-          for (const target of new Set([...truthy.keys(), ...falsy.keys()])) {
-            const t = truthy.get(target) ?? hold(target),
-              f = falsy.get(target) ?? hold(target);
-            values.set(
-              target,
-              t === f
-                ? t
-                : {
-                    kind: 'mux',
-                    procedural: true,
-                    condition,
-                    truthy: t,
-                    falsy: f,
-                    start: condition.start,
-                    end: tokens[i - 1].endOffset! + 1,
-                  },
-            );
+          result = { kind: 'if', condition, yes, no };
+        } else if (peek() === 'case') {
+          take();
+          take('(');
+          const selector = expr();
+          take(')');
+          const labels: Expr[] = [];
+          const arms: { condition: Expr; body: Statement }[] = [];
+          let fallback = empty(),
+            defaultSeen = false;
+          while (peek() !== 'endcase') {
+            if (peek() === 'default') {
+              if (defaultSeen) fail('Duplicate case default.');
+              defaultSeen = true;
+              take();
+              if (peek() === ':') take();
+              fallback = statement();
+              continue;
+            }
+            let condition: Expr | undefined;
+            do {
+              const label = expr();
+              labels.push(label);
+              if (label.kind !== 'literal') fail('Case labels must be literal constants.');
+              const equal: Expr = {
+                kind: 'op',
+                op: '===',
+                left: selector,
+                right: label,
+                caseLabels: labels,
+                start: selector.start,
+                end: label.end,
+                tokenStart: selector.start,
+                tokenEnd: selector.start,
+                synthetic: true,
+              };
+              condition = condition
+                ? {
+                    kind: 'op',
+                    op: '||',
+                    left: condition,
+                    right: equal,
+                    start: selector.start,
+                    end: label.end,
+                    tokenStart: selector.start,
+                    tokenEnd: selector.start,
+                    synthetic: true,
+                  }
+                : equal;
+              if (peek() !== ',') break;
+              take();
+            } while (true);
+            take(':');
+            arms.push({ condition: condition!, body: statement() });
+            if (arms.length > 128) fail('Case exceeds 128 arms.');
           }
+          take('endcase');
+          result = arms.reduceRight<Statement>(
+            (no, arm) => ({ kind: 'if', condition: arm.condition, yes: arm.body, no }),
+            fallback,
+          );
         } else {
           const target = name();
           if (
@@ -608,85 +712,37 @@ function parseSingle(source: string, tokens: IToken[]): Module {
                 ['reg', 'logic'].includes(n.netType ?? ''),
             )
           )
-            fail('Clocked targets must be declared reg or logic.');
-          if (peek() !== '<=')
-            fail('Clocked blocks support nonblocking (<=) assignments to whole registers.');
-          take('<=');
-          values.set(target, expr());
+            fail('Procedural targets must be declared reg or logic.');
+          take(events ? '<=' : '=');
+          const value = expr();
           take(';');
+          result = { kind: 'assign', target, value };
         }
         nesting--;
+        return { ...result, start: statementStart, end: tokens[i - 1].endOffset! + 1 };
       };
-      const values = new Map<string, Expr>();
-      statement(values);
-      const end = tokens[i - 1].endOffset! + 1;
-      for (const [target, value] of values)
-        assigns.push({ target, expr: value, start, end, events });
-    } else if (peek() === 'always_comb') {
-      take();
-      const block = peek() === 'begin';
-      if (block) take();
-      const process: Module['assigns'] = [];
-      const assignment = () => {
-        const start = tokens[i]?.startOffset ?? source.length,
-          target = name();
-        take('=');
-        const value = expr(),
-          end = take(';').endOffset! + 1;
-        return { target, expr: value, start, end };
-      };
-      do {
-        if (block && peek() === 'end') break;
-        if (peek() === 'if') {
-          const start = take().startOffset;
-          take('(');
-          const condition = expr();
-          take(')');
-          const branch = () => {
-            const wrapped = peek() === 'begin';
-            if (wrapped) take();
-            const a = assignment();
-            if (wrapped) take('end');
-            return a;
-          };
-          const truthy = branch();
-          take('else');
-          const falsy = branch();
-          if (truthy.target !== falsy.target)
-            fail('Combinational branches must drive the same output on both paths.');
-          const end = tokens[i - 1].endOffset! + 1;
-          process.push({
-            target: truthy.target,
-            expr: {
-              kind: 'mux',
-              procedural: true,
-              condition,
-              truthy: truthy.expr,
-              falsy: falsy.expr,
-              start: condition.start,
-              end,
-            },
-            start,
-            end,
-          });
-        } else process.push(assignment());
-        if (!block) break;
-      } while (peek() !== 'end');
-      if (block) take('end');
-      const targets = new Set(process.map((a) => a.target));
-      for (const a of process) {
-        if (!nets.some((n) => n.name === a.target && ['logic', 'reg'].includes(n.netType ?? '')))
-          fail('always_comb targets must be declared logic or reg.');
-        const check = (e: Expr): void => {
-          if ((e.kind === 'ref' || e.kind === 'slice') && targets.has(e.value))
-            fail(
-              'Reads of signals written by the same always_comb block are unsupported; use independent assignments or continuous wiring.',
-            );
-          for (const [, child] of children(e)) check(child);
-        };
-        check(a.expr);
+      const body = statement(),
+        end = tokens[i - 1].endOffset! + 1;
+      const values = lowerStatements(body, nets, !!events, start, end);
+      const top = body.kind === 'block' ? body.items : [body];
+      for (const [target, value] of values) {
+        const owner =
+          top.length === 1 ? top[0] : top.find((s) => s.kind === 'assign' && s.target === target);
+        const structured =
+          !owner ||
+          (values.size > 1 && owner.kind !== 'assign') ||
+          (owner.kind === 'if' && !/^if\b/.test(source.slice(owner.start ?? start))) ||
+          (top.length > 1 && owner.kind !== 'assign');
+        assigns.push({
+          target,
+          expr: value,
+          start: events ? start : (owner?.start ?? start),
+          end: events ? end : (owner?.end ?? end),
+          events,
+          structured,
+          registerInputs: events && values.size === 1 ? registerInputs(body, events) : undefined,
+        });
       }
-      assigns.push(...process);
     } else if (peek() === 'assign') {
       const start = take().startOffset;
       const target = name();
@@ -759,6 +815,23 @@ function parseSingle(source: string, tokens: IToken[]): Module {
       if ((e.kind === 'ref' || e.kind === 'slice') && !declared.has(e.value))
         throw new ParseError(`Undeclared identifier ${e.value}.`, e.start, e.end);
       if (e.kind === 'ref') e.signed = declared.get(e.value)?.signed;
+      const signedSource = (node: Expr): boolean =>
+        (node.kind === 'ref' && !!node.signed) ||
+        (node.kind === 'convert' && node.conversion === 'signed') ||
+        children(node).some(([, c]) => signedSource(c));
+      if (
+        e.kind === 'op' &&
+        e.caseLabels &&
+        signedSource(e.left) &&
+        e.caseLabels.some((l) => !expressionSigned(l))
+      )
+        throw new ParseError(
+          'Mixed signed case selectors and unsigned choices are unsupported; use a declared unsigned selector wire.',
+          e.left.start,
+          e.left.end,
+        );
+      if (e.kind === 'convert' && e.conversion === 'resize' && !e.synthetic)
+        e.signed = expressionSigned(e.value);
       if (e.kind === 'concat' && expressionWidth(e, nets) > 4096)
         throw new ParseError('Concatenation/replication exceeds 4096 bits.', e.start, e.end);
       if (e.kind === 'concat') {
@@ -828,6 +901,9 @@ export type Node = {
     | 'register'
     | 'convert';
   register?: boolean;
+  sequentialInstance?: boolean;
+  editable?: boolean;
+  editableRegister?: boolean;
   width?: number;
   op?: Operator;
   operands?: string[];
@@ -904,7 +980,8 @@ export function expressionWidth(e: Expr, nets: Net[]): number {
 export function expressionSigned(e: Expr): boolean {
   if (e.nativeType) return false;
   if (e.kind === 'ref') return e.signed ?? false;
-  if (e.kind === 'convert') return e.conversion === 'signed';
+  if (e.kind === 'convert')
+    return e.conversion === 'signed' || (e.conversion === 'resize' && !!e.signed);
   if (e.kind === 'literal') return /^[0-9][0-9_]*$/.test(e.value);
   if (e.kind === 'unary') return e.op !== '!' && expressionSigned(e.value);
   if (e.kind === 'mux')
@@ -980,6 +1057,7 @@ export function project(
         kind: 'op',
         expressionKey: key,
         label: opNames[e.op],
+        editable: !e.synthetic,
         op: e.op,
         signed,
         width: w,
@@ -991,7 +1069,11 @@ export function project(
       return node;
     }
     if (e.kind === 'convert') {
-      const child = visit(e.value, `${key}/V`);
+      const child = visit(
+        e.value,
+        `${key}/V`,
+        ast.language !== 'vhdl' && e.conversion === 'resize' ? e.resultWidth : undefined,
+      );
       const node = add(key, {
         kind: 'convert',
         label: e.conversion.toUpperCase(),
@@ -1060,10 +1142,14 @@ export function project(
     const comparison = isComparison(e.op),
       shift = e.op === '<<' || e.op === '>>' || e.op === '>>>';
     const w = comparison || logical ? 1 : Math.max(context, widthOf(e));
-    const operandWidth = comparison ? Math.max(widthOf(e.left), widthOf(e.right)) : w;
+    const operandWidth = comparison
+      ? Math.max(widthOf(e.left), widthOf(e.right), ...(e.caseLabels ?? []).map(widthOf))
+      : w;
     const rightWidth = shift || logical ? widthOf(e.right) : operandWidth;
     const operandSigned = comparison
-      ? expressionSigned(e.left) && expressionSigned(e.right)
+      ? expressionSigned(e.left) &&
+        expressionSigned(e.right) &&
+        (e.caseLabels ?? []).every(expressionSigned)
       : signed;
     const l = visit(
       e.left,
@@ -1080,6 +1166,7 @@ export function project(
     const n = add(key, {
       kind: 'op',
       expressionKey: key,
+      editable: !e.synthetic,
       label: opNames[e.op],
       op: e.op,
       signed: comparison ? operandSigned : signed,
@@ -1100,6 +1187,7 @@ export function project(
       kind: 'instance',
       label: inst.name,
       childModule: inst.module,
+      sequentialInstance: hasRegisters(child),
       inputPorts: inputs.map((p) => ({ name: `port:${p.name}`, width: p.width })),
       outputPorts: outputs.map((p) => ({
         name: p.name,
@@ -1131,17 +1219,21 @@ export function project(
       const reg = add(`${ast.name}/register/${a.target}`, {
         kind: 'register',
         register: true,
+        sourceNet: a.target,
+        assignmentTarget: a.target,
+        editableRegister: !!a.registerInputs,
         label: a.target,
         eventControl: a.events.map((e) => `${e.edge} ${e.signal}`).join(' / '),
         width: nets.get(a.target)!.width,
         inputPorts: [
           { name: 'port:D', width: nets.get(a.target)!.width! },
-          ...a.events.map((e) => ({ name: `port:${e.signal}`, width: 1 })),
+          ...a.events.map((e, i) => ({ name: i === 0 ? 'port:clock' : 'port:reset', width: 1 })),
         ],
         outputPorts: [{ name: 'Q', width: nets.get(a.target)!.width!, signal: a.target }],
       });
       connect(root, reg, 'port:D');
-      for (const e of a.events) connect(nets.get(e.signal)!, reg, `port:${e.signal}`);
+      for (const [i, e] of a.events.entries())
+        connect(nets.get(e.signal)!, reg, i === 0 ? 'port:clock' : 'port:reset');
       connect(reg, nets.get(a.target)!, 'left');
       edges.at(-1)!.sourceHandle = 'out:Q';
     } else connect(root, nets.get(a.target)!, 'left');
@@ -1149,14 +1241,25 @@ export function project(
   const incoming = new Map(
     nodes.map((n) => [
       n.id,
-      n.register ? [] : edges.filter((e) => e.target === n.id).map((e) => e.source),
+      n.register || n.sequentialInstance
+        ? []
+        : edges.filter((e) => e.target === n.id).map((e) => e.source),
     ]),
   );
   const depths = new Map<string, number>();
   const active = new Set<string>();
   function depth(id: string): number {
     if (depths.has(id)) return depths.get(id)!;
-    if (active.has(id)) throw new ParseError('Combinational cycles are unsupported.', 0, 0);
+    if (active.has(id))
+      throw new ParseError(
+        'Combinational cycles are unsupported (' +
+          ast.name +
+          ': ' +
+          nodes.find((n) => n.id === id)?.label +
+          ').',
+        ast.start,
+        ast.start + 1,
+      );
     active.add(id);
     const d = Math.max(0, ...incoming.get(id)!.map((s) => depth(s) + 1));
     active.delete(id);
@@ -1217,12 +1320,8 @@ export function project(
     }
   }
   return {
-    sequential: ast.assigns.some((a) => !!a.events),
-    clocks: [
-      ...new Map(
-        ast.assigns.filter((a) => a.events).map((a) => [a.events![0].signal, a.events![0]]),
-      ).values(),
-    ],
+    sequential: hasRegisters(ast),
+    clocks: clocksFor(ast),
     language: ast.language,
     module: ast.name,
     nodes,
@@ -1280,13 +1379,12 @@ export function operatorPatch(
   const node = graph?.nodes.find((n) => n.id === id && n.kind === 'op');
   if (!node) throw new Error('Select an editable operation.');
   const ast = parse(source, graph?.module);
-  if (ast.assigns.some((a) => a.events))
-    throw new Error(
-      'Edit clocked modules in the HDL editor; graph editing currently supports combinational modules.',
-    );
+
   project(ast);
   const all = expressions(ast);
   const e = all.get(node.key);
+  if (e?.synthetic)
+    throw new Error('Generated control logic is edited through its source statement.');
   if (e?.kind !== 'op' && e?.kind !== 'unary')
     throw new Error('Operation no longer exists in the live source.');
   if ((e.kind === 'unary') !== (op === '~' || op === '!'))
@@ -1333,10 +1431,7 @@ export function graphPatch(
   if (!node?.expressionKey)
     throw new Error('Select an editable literal, slice or simple mux selector.');
   const ast = parse(source, graph?.module);
-  if (ast.assigns.some((a) => a.events))
-    throw new Error(
-      'Edit clocked modules in the HDL editor; graph editing currently supports combinational modules.',
-    );
+
   const current = project(ast).nodes.find((n) => n.key === node.key);
   const e = expressions(ast).get(node.expressionKey);
   if (ast.language === 'vhdl') return vhdlTokenEdit(source, ast, node, e, change, current);
@@ -1372,9 +1467,9 @@ export function validateEditableEdits(source: string, edits: Edit[]): void {
   if (ast.language === 'vhdl') return validateVhdlEdits(source, edits);
   const allowed: { start: number; end: number; kind: GraphChange['kind']; scalars?: string[] }[] =
     [];
-  for (const scope of Object.values(ast.library).filter((m) => !m.assigns.some((a) => a.events)))
+  for (const scope of Object.values(ast.library))
     for (const e of expressions(scope).values()) {
-      if (e.kind === 'op' || e.kind === 'unary')
+      if (!e.synthetic && (e.kind === 'op' || e.kind === 'unary'))
         allowed.push({ start: e.tokenStart, end: e.tokenEnd, kind: 'operator' });
       if (e.kind === 'literal') allowed.push({ start: e.start, end: e.end, kind: 'literal' });
       if (e.kind === 'slice') allowed.push({ start: e.rangeStart, end: e.rangeEnd, kind: 'slice' });

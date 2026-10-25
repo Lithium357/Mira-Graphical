@@ -193,8 +193,8 @@ test('SystemVerilog rejects latches, malformed clocked blocks, multiple drivers 
   for (const body of [
     'always_ff result = a;',
     'always_comb if (a) result = b;',
-    'always_comb begin result = a; result = b; end',
-    'always_comb begin temp = a; result = temp; end',
+    'always_comb result = a; always_comb result = b;',
+    'always_comb begin result = temp; temp = a; end',
   ]) {
     assert.throws(() =>
       parse(`module m(input logic a,b, output logic result); logic temp; ${body} endmodule`),

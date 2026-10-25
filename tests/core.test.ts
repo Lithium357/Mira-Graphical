@@ -112,7 +112,7 @@ test('clocked session state persists between samples and resets after source cha
   s.userText(2, text);
   time.tick(15000);
   assert.equal(s.state.status, 'Synced');
-  assert.equal(s.state.canConstruct, false);
+  assert.equal(s.state.canConstruct, true);
   assert.equal(s.simulate({ clk: '0', reset: '1' }).signals.q.value, '0x00');
   s.simulate({ clk: '0', reset: '0' });
   assert.equal(s.simulate({ clk: '1', reset: '0' }).signals.q.value, '0x01');

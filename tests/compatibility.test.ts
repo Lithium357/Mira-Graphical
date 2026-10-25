@@ -16,7 +16,7 @@ test('unsupported preprocessing and event controls provide actionable diagnostic
     );
   }
   assert.throws(
-    () => parse('module clocked(input clk, output reg q); always @(*) q = 1; endmodule'),
+    () => parse('module clocked(input clk, output reg q); always @(clk) q = 1; endmodule'),
     /Unsupported event control/,
   );
   assert.doesNotThrow(() =>

@@ -82,7 +82,9 @@ function layers(boxes: Box[], links: Link[]): Map<string, Point> {
 export function autoLayout(graph: Circuit): Record<string, Point> {
   // Q is a dependency boundary. Keep feedback wires visible, but do not use
   // register D/clock inputs as same-cycle layout dependencies.
-  const registers = new Set(graph.nodes.filter((n) => n.register).map((n) => n.id));
+  const registers = new Set(
+    graph.nodes.filter((n) => n.register || n.sequentialInstance).map((n) => n.id),
+  );
   graph = { ...graph, edges: graph.edges.filter((e) => !registers.has(e.target)) };
   const nodes = [...graph.nodes].sort((a, b) => a.key.localeCompare(b.key));
   const byId = new Map(nodes.map((n) => [n.id, n]));

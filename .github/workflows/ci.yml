@@ -45,6 +45,7 @@ jobs:
             test-results/signed-alu.png
             test-results/clocked-multiplier.png
             test-results/clocked-smoke.json
+            test-results/launch-features-smoke.json
   windows-installer:
     name: Windows installer
     runs-on: windows-latest
@@ -93,6 +94,7 @@ jobs:
       - run: pnpm test:languages
       - run: pnpm test:alu
       - run: pnpm test:clocked
+      - run: pnpm test:projects
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -101,3 +103,23 @@ jobs:
             test-results/hdl-reference/
             test-results/alu-reference/
             test-results/clocked-reference/
+            test-results/projects-reference/
+  acceptance:
+    name: Real-time release acceptance
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:acceptance --seconds=120
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-acceptance
+          path: test-results/release-acceptance.json

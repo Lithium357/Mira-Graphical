@@ -12,6 +12,7 @@ import {
 import { exportVhdlModule } from '../vhdl/index.js';
 import { simulate, type SimulationState } from '../verilog/simulation.js';
 import { PatchDraft } from '../verilog/patches.js';
+import { locateDiagnostic } from './diagnostics.js';
 import { autoLayout } from './auto-layout.js';
 import {
   sourceActionEdits,
@@ -159,7 +160,6 @@ export class Session {
     this.state.redoCount = this.draft?.redo.length ?? 0;
     this.state.canConstruct =
       !!this.state.graph &&
-      !this.state.graph.sequential &&
       this.connected &&
       !this.pendingText &&
       !this.inFlight &&
@@ -582,7 +582,9 @@ export class Session {
       this.state.status = /unsupported/i.test(d.message)
         ? 'Unsupported construct'
         : 'Invalid source';
-      this.state.diagnostics = [{ message: d.message, start: d.start ?? 0, end: d.end ?? 0 }];
+      this.state.diagnostics = [
+        locateDiagnostic(this.text, { message: d.message, start: d.start ?? 0, end: d.end ?? 0 }),
+      ];
     }
     this.emit();
   }

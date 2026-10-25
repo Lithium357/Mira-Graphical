@@ -3,30 +3,30 @@
 Build, wire and explore HDL circuits in a Windows desktop workspace, with live source synchronization to VS Code.
 
 [![CI](https://github.com/Lithium357/Mira-Graphical/actions/workflows/ci.yml/badge.svg)](https://github.com/Lithium357/Mira-Graphical/actions/workflows/ci.yml)
-[![Version: 0.9.4 preview](https://img.shields.io/badge/version-0.9.4_preview-42d6bc)](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.4)
+[![Version: 0.9.5 preview](https://img.shields.io/badge/version-0.9.5_preview-42d6bc)](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.5)
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE)
 
-**[Download for Windows x64](https://github.com/Lithium357/Mira-Graphical/releases/download/v0.9.4/Mira-Graphical-Setup-0.9.4-x64.exe)** · [Release notes and checksums](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.4) · [User guide](docs/user-guide.md)
+**[Download for Windows x64](https://github.com/Lithium357/Mira-Graphical/releases/download/v0.9.5/Mira-Graphical-Setup-0.9.5-x64.exe)** · [Release notes and checksums](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.5) · [User guide](docs/user-guide.md)
 
 ![Mira workbench showing named module wiring, bus widths, a mux and a docked simulation panel](docs/images/workbench.png)
 
 ## Start testing
 
-1. Run **Mira-Graphical-Setup-0.9.4-x64.exe** and launch **Mira Graphical**.
+1. Run **Mira-Graphical-Setup-0.9.5-x64.exe** and launch **Mira Graphical**.
 2. Choose your HDL project folder. Open **Setup help → Show VS Code extension…** to locate the bundled companion.
 3. In VS Code, run **Extensions: Install from VSIX…**, select that companion, and open the same project folder.
 4. Open a `.v`, `.sv`, `.vhd` or `.vhdl` file and run **RTL Graph: Open Current Module**. The circuit appears after **15 seconds of inactivity**.
 
-The app includes its runtime; Node, pnpm and a terminal are unnecessary for installation. **0.9.4 is an unsigned testing preview**. Windows may show an unknown-publisher/SmartScreen prompt. See [installation and checksum verification](docs/distribution.md).
+The app includes its runtime; Node, pnpm and a terminal are unnecessary for installation. **0.9.5 is an unsigned testing preview**. Windows may show an unknown-publisher/SmartScreen prompt. See [installation and checksum verification](docs/distribution.md).
 
 ## What you can do
 
 - Construct and wire arithmetic, bitwise operations, muxes, constants, ports, buses and reusable modules.
 - Edit supported Verilog, SystemVerilog and VHDL through the graph or live VS Code buffer. Source patches preserve surrounding text and support native editor Undo.
-- Inspect named signals and widths, sample inputs, step supported Verilog/SystemVerilog clocks and view local waveforms.
+- Inspect named signals and widths, sample inputs, step supported HDL clocks and view local waveforms.
 - Resize or collapse the inspector and simulation dock, navigate with the keyboard, and recover unsaved source or graph drafts as reviewable copies.
 
-**Current scope:** bounded combinational construction plus standalone Verilog/SystemVerilog register circuits using edge-triggered nonblocking assignments, within the [supported syntax](docs/supported-syntax.md). Clocked modules support viewing and simulation; edit their structure in HDL. Full HDL standards, timed simulation, sequential hierarchy, synthesis and testbenches remain outside this version. Unsupported source produces a diagnostic; the last valid graph stays visible. Review [real-project compatibility](docs/compatibility.md) before trying a larger design.
+**Current scope:** bounded Verilog/SystemVerilog/VHDL circuits, including clocked hierarchy, register construction/wiring, sampled simulation, and live editor synchronization within the [supported syntax](docs/supported-syntax.md). Full HDL standards, timed testbenches, synthesis and implicit cross-file elaboration remain outside this version. Unsupported source preserves the last valid graph. Review [real-project compatibility](docs/compatibility.md) before trying larger designs.
 
 ## Documentation
 

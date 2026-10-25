@@ -9,6 +9,7 @@ import {
 } from './index.js';
 import { isComparison } from '../protocol/index.js';
 import { literalWidth } from './literals.js';
+import { elaborate } from './elaboration.js';
 type Bits = { width: number; value: bigint; known: bigint };
 export type Simulation = {
   signals: Record<string, { width: number; value: string }>;
@@ -87,7 +88,7 @@ export function simulate(
   inputs: Record<string, string>,
   previous?: SimulationState,
 ): Simulation {
-  const root = parse(source, selected);
+  const root = elaborate(parse(source, selected));
   if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs))
     throw new Error('Invalid input vector.');
   const inputNames = root.nets.filter((n) => n.direction === 'input').map((n) => n.name);
@@ -98,8 +99,10 @@ export function simulate(
   let signalCount = 0;
   let registers = previous?.registers ?? Object.create(null);
   let advancing = true;
-  const next: Record<string, string> = Object.assign(Object.create(null), registers);
-  const events: Record<string, string> = Object.create(null);
+  let next: Record<string, string> = Object.assign(Object.create(null), registers);
+  let events: Record<string, string> = Object.create(null);
+  let priorEvents = previous?.events ?? Object.create(null);
+  let triggeredAny = false;
   const truth = (bits: Bits) =>
     bits.value & bits.known ? 1 : bits.known === mask(bits.width) ? 0 : -1;
   function evaluate(ast: Module, bindings: Record<string, Bits>, path: string): Map<string, Bits> {
@@ -166,6 +169,10 @@ export function simulate(
     function evaluateExpression(e: Expr, context = 0, signedContext?: boolean): Bits {
       if (ast.language === 'vhdl') context = 0;
       const signed = signedContext ?? expressionSigned(e);
+      if (e.kind === 'convert' && e.conversion === 'resize' && ast.language !== 'vhdl') {
+        const fixed = resize(expression(e.value, e.resultWidth), e.resultWidth!);
+        return resize(fixed, Math.max(context, e.resultWidth!), signed);
+      }
       if (e.kind === 'convert')
         return ast.language === 'vhdl'
           ? resize(expression(e.value), width(e))
@@ -230,9 +237,12 @@ export function simulate(
         return resize(t === -1 ? unknown(1) : known(1, BigInt(t)), Math.max(context, 1));
       }
       if (e.kind === 'op' && isComparison(e.op)) {
-        const w = Math.max(width(e.left), width(e.right)),
+        const w = Math.max(width(e.left), width(e.right), ...(e.caseLabels ?? []).map(width)),
           m = mask(w);
-        const operandSigned = expressionSigned(e.left) && expressionSigned(e.right);
+        const operandSigned =
+          expressionSigned(e.left) &&
+          expressionSigned(e.right) &&
+          (e.caseLabels ?? []).every(expressionSigned);
         const a = resize(expression(e.left, w, operandSigned), w, operandSigned),
           b = resize(expression(e.right, w, operandSigned), w, operandSigned);
         const mismatch = ((a.value ^ b.value) & a.known & b.known) !== 0n;
@@ -314,7 +324,8 @@ export function simulate(
       );
     }
     for (const declaration of ast.nets) {
-      if (++signalCount > 512) throw new Error('Simulation supports at most 512 expanded signals.');
+      if (++signalCount > 4096)
+        throw new Error('Simulation supports at most 4096 expanded signals.');
       const result = net(declaration.name);
       signals[path + declaration.name] = { width: result.width, value: format(result) };
       if (!path) nodes[`${ast.name}/net/${declaration.name}`] = format(result);
@@ -327,14 +338,19 @@ export function simulate(
         for (const event of driver.events!) {
           const key = path + event.signal;
           const now = format(net(event.signal)),
-            before =
-              previous?.events && Object.hasOwn(previous.events, key) ? previous.events[key] : 'x';
+            before = Object.hasOwn(priorEvents, key) ? priorEvents[key] : 'x';
           events[key] = now;
-          triggered ||=
-            event.edge === 'posedge'
-              ? (before === '0' && now !== '0') || (before !== '1' && now === '1')
-              : (before === '1' && now !== '1') || (before !== '0' && now === '0');
+          triggered ||= event.level
+            ? before !== now && now === event.level
+            : event.strict
+              ? event.edge === 'posedge'
+                ? before === '0' && now === '1'
+                : before === '1' && now === '0'
+              : event.edge === 'posedge'
+                ? (before === '0' && now !== '0') || (before !== '1' && now === '1')
+                : (before === '1' && now !== '1') || (before !== '0' && now === '0');
         }
+        if (triggered) triggeredAny = true;
         if (triggered)
           next[path + driver.target] = format(
             resize(
@@ -372,13 +388,19 @@ export function simulate(
       Object.hasOwn(inputs, declaration.name) ? inputs[declaration.name] : '0',
       declaration.width,
     );
-  evaluate(root, bindings, '');
-  if (root.assigns.some((a) => a.events)) {
-    registers = next;
-    advancing = false;
-    signalCount = 0;
+  if (!root.assigns.some((a) => a.events)) {
     evaluate(root, bindings, '');
-    return { signals, nodes, state: { registers: next, events } };
+    return { signals, nodes };
   }
-  return { signals, nodes };
+  for (let delta = 0; delta < 64; delta++) {
+    triggeredAny = false;
+    signalCount = 0;
+    next = Object.assign(Object.create(null), registers);
+    events = Object.create(null);
+    evaluate(root, bindings, '');
+    if (!triggeredAny) return { signals, nodes, state: { registers, events } };
+    registers = next;
+    priorEvents = events;
+  }
+  throw new Error('Clock/reset network did not settle within 64 delta cycles.');
 }

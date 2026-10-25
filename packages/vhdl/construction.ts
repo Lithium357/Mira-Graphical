@@ -17,6 +17,7 @@ import {
   type Module,
   type Net,
 } from '../verilog/index.js';
+import { registerEdits, requireIndependentDriver } from '../verilog/register-edit.js';
 import { PatchDraft } from '../verilog/patches.js';
 import {
   assertVhdlName,
@@ -109,6 +110,66 @@ function create(source: string, ast: Module, action: CreateComponent, type?: Vhd
     const line = `${name} : ${action.component === 'input' ? 'in' : 'out'} ${dtype}`;
     if (ast.portClose < 0) return [insert(source, ast.vhdl!.entityEndStart, [`port (${line});`])];
     return [{ start: ast.lastPortEnd, end: ast.lastPortEnd, text: '; ' + line }];
+  }
+  if (action.component === 'register') {
+    const control = (name: string | undefined) => {
+      const n = ast.nets.find(
+        (n) =>
+          n.name === name?.toLowerCase() && n.direction === 'input' && n.nativeType === 'std_logic',
+      );
+      if (!n) throw new Error('Choose std_logic input ports for clock/reset.');
+      return n.name;
+    };
+    const clock = control(action.clock),
+      reset = action.reset ? control(action.reset) : undefined;
+    if (action.edge !== undefined && !['posedge', 'negedge'].includes(action.edge))
+      throw new Error('Invalid clock edge.');
+    if (action.resetActive !== undefined && !['0', '1'].includes(action.resetActive))
+      throw new Error('Invalid reset polarity.');
+    if (clock === reset) throw new Error('Clock and reset must be distinct.');
+    const src = action.source
+      ? ast.nets.find((n) => n.name === action.source!.toLowerCase())
+      : undefined;
+    if (action.source && !src) throw new Error('Choose a data signal.');
+    const data = src ? reference(src, { type: t, width: action.width }) : zero(action.width, t),
+      edge = action.edge === 'negedge' ? 'falling_edge' : 'rising_edge';
+    const process = reset
+      ? 'process(' +
+        clock +
+        ',' +
+        reset +
+        ') begin if ' +
+        reset +
+        " = '" +
+        (action.resetActive ?? '1') +
+        "' then " +
+        name +
+        ' <= ' +
+        zero(action.width, t) +
+        '; elsif ' +
+        edge +
+        '(' +
+        clock +
+        ') then ' +
+        name +
+        ' <= ' +
+        data +
+        '; end if; end process;'
+      : 'process(' +
+        clock +
+        ') begin if ' +
+        edge +
+        '(' +
+        clock +
+        ') then ' +
+        name +
+        ' <= ' +
+        data +
+        '; end if; end process;';
+    return [
+      declarations(source, ast, ['signal ' + name + ' : ' + dtype + ';']),
+      body(source, ast, [process]),
+    ];
   }
   if (action.component === 'instance') {
     const child = ast.library[action.moduleName?.toLowerCase() ?? ''];
@@ -291,6 +352,17 @@ export function vhdlActionEdits(source: string, action: SourceAction): Edit[] {
     const from = graph.nodes.find((n) => n.key === action.source),
       net = ast.nets.find((n) => n.name === from?.sourceNet);
     if (!net) throw new Error('Connect from a named signal or component result.');
+    if (target.kind === 'register' || driver?.events) {
+      const dest = ast.nets.find((n) => n.name === (driver?.target ?? target.label))!;
+      const text =
+        action.port === 'port:D' || action.port === 'left'
+          ? reference(net, { type: dest.nativeType!, width: dest.width })
+          : net.name;
+      return checked(
+        source,
+        registerEdits(ast, dest.name, action.port, text).map((e) => safe(source, e)),
+      );
+    }
     if (target.kind === 'instance') {
       const inst = ast.instances.find((i) => i.name === target.label)!,
         port = inst.ports.find((p) => `port:${p.name}` === action.port),
@@ -347,6 +419,15 @@ export function vhdlActionEdits(source: string, action: SourceAction): Edit[] {
     ]);
   }
   if (action.kind === 'zero') {
+    if (target.kind === 'register' || driver?.events) {
+      if (action.port !== 'port:D' && action.port !== 'left')
+        throw new Error('Only register data can be tied to zero.');
+      const dest = ast.nets.find((n) => n.name === (driver?.target ?? target.label))!;
+      return checked(
+        source,
+        registerEdits(ast, dest.name, 'port:D', zero(dest.width, dest.nativeType!)),
+      );
+    }
     if (target.kind === 'instance') {
       const inst = ast.instances.find((i) => i.name === target.label)!,
         port = inst.ports.find((p) => `port:${p.name}` === action.port),
@@ -378,10 +459,12 @@ export function vhdlActionEdits(source: string, action: SourceAction): Edit[] {
     ]);
   }
   if (action.kind === 'disconnect') {
+    if (driver) requireIndependentDriver(ast, driver);
     if (!driver) throw new Error('This component has no named driver.');
     return checked(source, [safe(source, { start: driver.start, end: driver.end, text: '' })]);
   }
   if (action.kind === 'remove') {
+    if (driver) requireIndependentDriver(ast, driver);
     if (target.kind === 'instance') {
       const inst = ast.instances.find((i) => i.name === target.label)!;
       return checked(source, [safe(source, { start: inst.start, end: inst.end, text: '' })]);
@@ -443,6 +526,10 @@ export function copyVhdl(
   const result: ClipboardItem[] = [...signals].map((name) => {
     const n = ast.nets.find((n) => n.name === name)!,
       a = ast.assigns.find((a) => a.target === name);
+    if (a?.events)
+      throw new Error(
+        'Copy the clocked entity instance or create another register to preserve control.',
+      );
     return {
       name,
       width: n.width,

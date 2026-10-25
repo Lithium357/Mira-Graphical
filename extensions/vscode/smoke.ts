@@ -91,6 +91,43 @@ export async function run() {
     reflected,
     `Undo must propagate back to the graph after inactivity: ${JSON.stringify({ expectedVersion: doc.version, observed: lastUndoState })}`,
   );
+  const reconnectFile = vscode.Uri.joinPath(
+    folder.uri,
+    '.hdlgraph',
+    'reconnect-request-' + process.env.MIRA_SMOKE_PASS + '.json',
+  );
+  await vscode.workspace.fs.writeFile(
+    reconnectFile,
+    Buffer.from(JSON.stringify({ uri: uri.toString(), version: doc.version, text: doc.getText() })),
+  );
+  let reconnected = false;
+  const reconnectStart = Date.now();
+  while (Date.now() - reconnectStart < 30000) {
+    try {
+      const result = JSON.parse(
+        Buffer.from(
+          await vscode.workspace.fs.readFile(
+            vscode.Uri.joinPath(
+              folder.uri,
+              '.hdlgraph',
+              'reconnect-result-' + process.env.MIRA_SMOKE_PASS + '.json',
+            ),
+          ),
+        ).toString(),
+      );
+      if (result.passed) {
+        reconnected = true;
+        break;
+      }
+    } catch {}
+    await sleep(100);
+  }
+  assert(
+    reconnected,
+    'Companion must reconnect and reshare the current unsaved buffer automatically',
+  );
+  assert.equal(doc.getText(), unsaved);
+  assert.equal(Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8'), original);
   const comboURI = vscode.Uri.joinPath(folder.uri, 'combinational.v');
   const combo = await vscode.workspace.openTextDocument(comboURI);
   const comboOriginal = combo.getText();
@@ -181,6 +218,30 @@ export async function run() {
     await undo(native);
     assert.equal(native.getText(), liveSource, `${ext} entire batch uses one native undo`);
   }
+  const registerURI = vscode.Uri.joinPath(folder.uri, 'register.sv'),
+    registerDoc = await vscode.workspace.openTextDocument(registerURI),
+    registerOriginal = registerDoc.getText();
+  await vscode.window.showTextDocument(registerDoc);
+  const registerEdit = new vscode.WorkspaceEdit();
+  registerEdit.insert(registerURI, new vscode.Position(0, 0), '// unsaved register test\n');
+  await vscode.workspace.applyEdit(registerEdit);
+  const registerLive = registerDoc.getText();
+  await vscode.commands.executeCommand('mira.open');
+  const registerStart = Date.now();
+  while (Date.now() - registerStart < 45000 && !registerDoc.getText().includes('assign y = q;'))
+    await sleep(100);
+  assert(registerDoc.getText().includes('always @('));
+  assert(registerDoc.getText().includes('assign y = q;'));
+  assert.equal(
+    Buffer.from(await vscode.workspace.fs.readFile(registerURI)).toString('utf8'),
+    registerOriginal,
+  );
+  await undo(registerDoc);
+  assert.equal(
+    registerDoc.getText(),
+    registerLive,
+    'Register construction and wiring must undo as one native edit',
+  );
   const recoveryUri = vscode.Uri.joinPath(folder.uri, 'hierarchy.vhdl');
   const recoveryCurrent = await vscode.workspace.openTextDocument(recoveryUri);
   const recoveryOriginal = recoveryCurrent.getText();
@@ -259,6 +320,8 @@ export async function run() {
           hierarchyBusesDuplicate: true,
           nativeLanguages: ['systemverilog', 'vhd', 'vhdl'],
           signedCasts: true,
+          registerConstruction: true,
+          automaticReconnect: true,
           recoveryReviewCopy: true,
           realDebounceMs: 15000,
         },

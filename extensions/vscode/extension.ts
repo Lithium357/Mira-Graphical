@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import type { EditorMessage, ServiceMessage } from '../../packages/protocol/index.js';
+import { RetryLoop } from './retry.js';
+import { APP_VERSION } from '../../packages/protocol/version.js';
 import { applyLivePatch } from './patch.js';
 let socket: WebSocket | undefined;
 const shared = new Set<string>();
@@ -12,21 +14,47 @@ const applying = new Map<string, { expected: string; observed: boolean }>();
 let status: vscode.StatusBarItem;
 let log: vscode.OutputChannel;
 let connectedWorkspace: string | undefined;
+let reconnectFolder: vscode.WorkspaceFolder | undefined;
+let transportGeneration = 0;
+let remember: (uris: string[]) => void = () => {};
+const retries = new RetryLoop(
+  async () => {
+    if (!reconnectFolder) return;
+    await connect(reconnectFolder, true);
+  },
+  (e) => log?.appendLine('Reconnect: ' + String(e)),
+);
+
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 function send(m: EditorMessage) {
   if (socket?.readyState !== WebSocket.OPEN)
     throw new Error('Disconnected. Start the graph desktop app, then connect again.');
   socket.send(JSON.stringify(m));
 }
-function disconnect() {
+function disconnect(clear = true) {
+  transportGeneration++;
+  retries.stop();
+  reconnectFolder = undefined;
   socket?.close();
   socket = undefined;
-  shared.clear();
+  if (clear) {
+    shared.clear();
+    remember([]);
+  }
+  applying.clear();
   connectedWorkspace = undefined;
   if (status) status.text = '$(debug-disconnect) RTL Graph: Disconnected';
 }
-async function connect(folder: vscode.WorkspaceFolder) {
-  disconnect();
+async function connect(folder: vscode.WorkspaceFolder, retry = false) {
+  if (!retry) {
+    disconnect();
+    reconnectFolder = folder;
+    retries.enable();
+  } else {
+    socket?.close();
+    socket = undefined;
+  }
+  const generation = ++transportGeneration;
   let config: { protocolVersion: number; port: number; token: string; workspace: string };
   const normalize = (s: string) =>
     process.platform === 'win32' ? resolve(s).toLowerCase() : resolve(s);
@@ -47,10 +75,16 @@ async function connect(folder: vscode.WorkspaceFolder) {
     )
       throw new Error('Invalid descriptor');
   } catch {
+    retries.retry();
     throw new Error(
       `Start Mira Graphical for workspace "${folder.uri.fsPath}" before connecting. Select this folder with Choose project folder in Mira's Setup help, then run RTL Graph: Open Current Module again. The local connection descriptor is missing or invalid.`,
     );
   }
+  if (
+    generation !== transportGeneration ||
+    reconnectFolder?.uri.toString() !== folder.uri.toString()
+  )
+    throw new Error('Connection superseded.');
   const ws = new WebSocket(`ws://127.0.0.1:${config.port}`, {
     maxPayload: 2 * 1024 * 1024,
     perMessageDeflate: false,
@@ -76,13 +110,33 @@ async function connect(folder: vscode.WorkspaceFolder) {
     ws.on('message', (b) => {
       const msg = JSON.parse(b.toString()) as ServiceMessage;
       if (msg.type === 'hello.ok') {
+        if (socket !== ws || generation !== transportGeneration) return;
+        retries.connected();
+        if (msg.desktopVersion && msg.desktopVersion !== APP_VERSION)
+          log.appendLine(
+            'Version mismatch: desktop ' +
+              msg.desktopVersion +
+              '; companion ' +
+              APP_VERSION +
+              '. Update the companion.',
+          );
+        for (const uri of [...shared]) {
+          const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri);
+          if (
+            doc &&
+            vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.toString() === folder.uri.toString()
+          )
+            send({ type: 'document.open', uri, version: doc.version, text: doc.getText() });
+          else shared.delete(uri);
+        }
+        remember([...shared]);
         clearTimeout(timer);
         connectedWorkspace = folder.uri.toString();
         status.text = '$(circuit-board) RTL Graph: Connected';
         ok();
       } else if (msg.type === 'error') {
         log.appendLine(msg.error);
-        void vscode.window.showWarningMessage(msg.error);
+        if (!retry) void vscode.window.showWarningMessage(msg.error);
       } else if (msg.type === 'status') {
         status.text = `$(circuit-board) RTL Graph: ${msg.status}`;
         status.tooltip = msg.detail ?? msg.uri;
@@ -106,16 +160,18 @@ async function connect(folder: vscode.WorkspaceFolder) {
           workspace: config.workspace,
           editor: 'vscode',
           capabilities: ['recovery-review'],
+          version: APP_VERSION,
         }),
       ),
     );
     ws.on('close', () => {
       clearTimeout(timer);
       if (socket === ws) {
-        shared.clear();
+        applying.clear();
         connectedWorkspace = undefined;
         socket = undefined;
-        status.text = '$(debug-disconnect) RTL Graph: Disconnected';
+        status.text = '$(sync~spin) RTL Graph: Reconnecting';
+        retries.retry();
       }
       fail(new Error('Local service disconnected. Reconnect and reopen the current module.'));
     });
@@ -199,12 +255,34 @@ export function activate(context: vscode.ExtensionContext) {
   status.command = 'mira.status';
   status.text = '$(debug-disconnect) RTL Graph: Disconnected';
   status.show();
+  remember = (uris) => {
+    void context.workspaceState.update('mira.shared', uris.slice(0, 64));
+  };
+  const restored = new Set(
+    context.workspaceState
+      .get<string[]>('mira.shared', [])
+      .filter((u) => typeof u === 'string')
+      .slice(0, 64),
+  );
+  const resume = (doc: vscode.TextDocument) => {
+    if (!vscode.workspace.isTrusted || !restored.has(doc.uri.toString())) return;
+    const folder = vscode.workspace.getWorkspaceFolder(doc.uri);
+    if (!folder) return;
+    shared.add(doc.uri.toString());
+    if (!reconnectFolder) {
+      reconnectFolder = folder;
+      retries.enable();
+      retries.retry();
+    }
+  };
+  for (const doc of vscode.workspace.textDocuments) resume(doc);
   const safely = (f: () => Promise<unknown>) => () =>
     f().catch((e) => vscode.window.showErrorMessage(`RTL Graph: ${String(e)}`));
   context.subscriptions.push(
     status,
     log,
-    { dispose: disconnect },
+    { dispose: () => disconnect(false) },
+    vscode.workspace.onDidOpenTextDocument(resume),
     vscode.commands.registerCommand(
       'mira.open',
       safely(async () => {
@@ -217,6 +295,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (socket?.readyState !== WebSocket.OPEN || connectedWorkspace !== folder.uri.toString())
           await connect(folder);
         shared.add(doc.uri.toString());
+        remember([...shared]);
         send({
           type: 'document.open',
           uri: doc.uri.toString(),
@@ -228,7 +307,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       'mira.connect',
       safely(async () => {
-        if (socket) {
+        if (socket || reconnectFolder) {
           disconnect();
           return;
         }
@@ -265,11 +344,14 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     vscode.workspace.onDidCloseTextDocument((doc) => {
       const uri = doc.uri.toString();
-      if (shared.delete(uri) && socket?.readyState === WebSocket.OPEN)
-        send({ type: 'document.close', uri });
+      restored.delete(uri);
+      if (shared.delete(uri)) {
+        remember([...shared]);
+        if (socket?.readyState === WebSocket.OPEN) send({ type: 'document.close', uri });
+      }
     }),
   );
 }
 export function deactivate() {
-  disconnect();
+  disconnect(false);
 }

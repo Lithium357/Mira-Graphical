@@ -29,6 +29,11 @@ export function ConstructionForm({
   const [value, setValue] = useState("8'h00");
   const nets = graph.nodes.filter((n) => ['input', 'output', 'wire'].includes(n.kind));
   const [source, setSource] = useState(nets[0]?.label ?? '');
+  const scalarInputs = nets.filter((n) => n.kind === 'input' && n.width === 1);
+  const [clock, setClock] = useState(scalarInputs[0]?.label ?? '');
+  const [reset, setReset] = useState('');
+  const [edge, setEdge] = useState<'posedge' | 'negedge'>('posedge');
+  const [resetActive, setResetActive] = useState<'0' | '1'>('1');
   const [range, setRange] = useState('[0]');
   const [parts, setParts] = useState(
     nets
@@ -41,6 +46,7 @@ export function ConstructionForm({
   );
   const [search, setSearch] = useState('');
   const types = [
+    'register',
     'operation',
     'mux',
     'constant',
@@ -71,6 +77,10 @@ export function ConstructionForm({
             range,
             parts: parts.split(',').map((p) => p.trim()),
             moduleName,
+            clock,
+            reset,
+            edge,
+            resetActive,
           });
       }}
     >
@@ -158,13 +168,50 @@ export function ConstructionForm({
           </select>
         </>
       )}
+      {component === 'register' && (
+        <>
+          <label htmlFor="register-clock">Clock input</label>
+          <select id="register-clock" value={clock} onChange={(e) => setClock(e.target.value)}>
+            {scalarInputs.map((n) => (
+              <option key={n.id}>{n.label}</option>
+            ))}
+          </select>
+          <label htmlFor="register-edge">Clock edge</label>
+          <select
+            id="register-edge"
+            value={edge}
+            onChange={(e) => setEdge(e.target.value as 'posedge' | 'negedge')}
+          >
+            <option value="posedge">Rising</option>
+            <option value="negedge">Falling</option>
+          </select>
+          <label htmlFor="register-reset">Reset input</label>
+          <select id="register-reset" value={reset} onChange={(e) => setReset(e.target.value)}>
+            <option value="">None</option>
+            {scalarInputs
+              .filter((n) => n.label !== clock)
+              .map((n) => (
+                <option key={n.id}>{n.label}</option>
+              ))}
+          </select>
+          <label htmlFor="register-reset-active">Reset active level</label>
+          <select
+            id="register-reset-active"
+            value={resetActive}
+            onChange={(e) => setResetActive(e.target.value as '0' | '1')}
+          >
+            <option value="1">High</option>
+            <option value="0">Low</option>
+          </select>
+        </>
+      )}
       {component === 'constant' && (
         <>
           <label htmlFor="new-value">Constant value</label>
           <input id="new-value" value={value} onChange={(e) => setValue(e.target.value)} required />
         </>
       )}
-      {(component === 'slice' || component === 'split') && (
+      {(component === 'slice' || component === 'split' || component === 'register') && (
         <>
           <label htmlFor="new-source">Source signal</label>
           <select id="new-source" value={source} onChange={(e) => setSource(e.target.value)}>
@@ -248,7 +295,7 @@ export function WiringInspector({
         : ['left', 'right']
       : node.kind === 'mux'
         ? ['select', 'left', 'right']
-        : node.kind === 'instance' || node.kind === 'concat'
+        : node.kind === 'instance' || node.kind === 'register' || node.kind === 'concat'
           ? (node.inputPorts?.map((p) => p.name as InputPort) ?? [])
           : ['wire', 'output', 'slice', 'convert'].includes(node.kind)
             ? ['left']

@@ -31,6 +31,7 @@ export type CreateComponent = {
   signed?: boolean;
   kind: 'create';
   component:
+    | 'register'
     | 'operation'
     | 'mux'
     | 'constant'
@@ -49,6 +50,10 @@ export type CreateComponent = {
   range?: string;
   parts?: string[];
   moduleName?: string;
+  clock?: string;
+  reset?: string;
+  edge?: 'posedge' | 'negedge';
+  resetActive?: '0' | '1';
   netRange?: string;
 };
 /** UI actions address node IDs; transaction proofs use structural source keys instead. */
@@ -80,6 +85,7 @@ export type EditorMessage =
       protocolVersion: 1;
       token: string;
       editor: 'vscode';
+      version?: string;
       workspace: string;
       capabilities?: string[];
     }
@@ -104,7 +110,7 @@ export type EditorMessage =
     };
 export type ServiceMessage =
   | { type: 'recovery.open'; uri: string; text: string; compare: boolean; title: string }
-  | { type: 'hello.ok'; protocolVersion: 1 }
+  | { type: 'hello.ok'; protocolVersion: 1; desktopVersion?: string }
   | {
       type: 'document.applyPatch';
       uri: string;
@@ -125,6 +131,8 @@ export function validateMessage(v: unknown): v is EditorMessage {
   if (!record(v) || typeof v.type !== 'string') return false;
   if (v.type === 'hello')
     return (
+      (v.version === undefined ||
+        (typeof v.version === 'string' && /^[0-9A-Za-z.+-]{1,64}$/.test(v.version))) &&
       v.protocolVersion === 1 &&
       v.editor === 'vscode' &&
       typeof v.token === 'string' &&

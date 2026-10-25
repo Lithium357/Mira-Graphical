@@ -38,14 +38,18 @@ writeFileSync(
   join(workspace, 'hierarchy.signed.v'),
   readFileSync('fixtures/hierarchy.v', 'utf8').replace('a + b', '$signed(a) >>> b'),
 );
+writeFileSync(
+  join(workspace, 'register.sv'),
+  'module register_workbench(input clk,reset,input [7:0] d,output [7:0] y);endmodule',
+);
 const electron = createRequire(import.meta.url)('electron') as string;
 async function launch(exe: string, args: string[], env = process.env) {
   return await new Promise<void>((ok, fail) => {
     const child = spawn(exe, args, { cwd: root, env, stdio: 'inherit', windowsHide: true });
     const timer = setTimeout(() => {
       child.kill();
-      fail(new Error('Smoke process exceeded 300 seconds'));
-    }, 300000);
+      fail(new Error('Smoke process exceeded 360 seconds'));
+    }, 360000);
     child.on('error', (e) => {
       clearTimeout(timer);
       fail(e);
@@ -76,7 +80,8 @@ for (const line of readFileSync('dist/packages/SHA256SUMS', 'utf8').trim().split
     expected,
   );
 }
-await launch(electron, ['.', '--smoke', `--workspace=${workspace}`], env);
+if (!process.argv.includes('--editor-only'))
+  await launch(electron, ['.', '--smoke', `--workspace=${workspace}`], env);
 const installed = join(output, `vsix-installed-${stamp}`),
   profile = join(output, `vsix-profile-${stamp}`);
 const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
@@ -118,6 +123,9 @@ for (let pass = 0; pass < 2; pass++) {
   const service = new SyncService(workspace);
   await service.ready();
   const languageEdited = new Set<string>();
+  let registerEdited = false;
+  let reconnectRequest: { uri: string; version: number; text: string } | undefined;
+  let reconnectPending = false;
   let edited = false,
     comboEdited = false,
     hierarchyEdited = false;
@@ -127,6 +135,38 @@ for (let pass = 0; pass < 2; pass++) {
       states.map((s) => ({ uri: s.uri, version: s.version, status: s.status })),
     );
     for (const s of states) {
+      if (reconnectRequest && s.uri === reconnectRequest.uri) {
+        if (s.status === 'Pending') reconnectPending = true;
+        if (reconnectPending && s.status === 'Synced') {
+          assert.equal(service.sessions.get(s.uri)!.text, reconnectRequest.text);
+          assert.equal(s.version, reconnectRequest.version);
+          writeSmokeState('reconnect-result-' + pass + '.json', { passed: true });
+          reconnectRequest = undefined;
+        }
+      }
+      if (s.uri.endsWith('register.sv') && !registerEdited && s.status === 'Synced' && s.graph) {
+        registerEdited = true;
+        const q = service.circuitAction(s.uri, {
+          kind: 'create',
+          component: 'register',
+          name: 'q',
+          width: 8,
+          clock: 'clk',
+          reset: 'reset',
+          source: 'd',
+        }).selectedId!;
+        service.circuitAction(s.uri, {
+          kind: 'connect',
+          source: q,
+          target: s.graph.nodes.find((n) => n.label === 'y')!.id,
+          port: 'left',
+        });
+        service.simulate(s.uri, { clk: '0', reset: '1', d: '7' });
+        assert.equal(
+          service.simulate(s.uri, { clk: '1', reset: '0', d: '7' }).signals.y.value,
+          '0x07',
+        );
+      }
       if (
         /hierarchy\.(sv|vhd|vhdl|signed\.v)$/.test(s.uri) &&
         !languageEdited.has(s.uri) &&
@@ -249,10 +289,17 @@ for (let pass = 0; pass < 2; pass++) {
     );
     const log = createWriteStream(join(output, `vscode-smoke-${pass}.log`));
     const recoveryRequest = join(workspace, '.hdlgraph', `recovery-request-${pass}.json`);
+    let handledReconnect = false;
     let handledRecovery = '',
       recoveryError: unknown;
     const recoveryTimer = setInterval(() => {
       try {
+        const reconnectPath = join(workspace, '.hdlgraph', 'reconnect-request-' + pass + '.json');
+        if (!handledReconnect && existsSync(reconnectPath)) {
+          reconnectRequest = JSON.parse(readFileSync(reconnectPath, 'utf8'));
+          handledReconnect = true;
+          for (const client of service.server.clients) client.close(1012, 'Smoke reconnect');
+        }
         if (!existsSync(recoveryRequest)) return;
         const request = JSON.parse(readFileSync(recoveryRequest, 'utf8'));
         if (request.phase === handledRecovery) return;

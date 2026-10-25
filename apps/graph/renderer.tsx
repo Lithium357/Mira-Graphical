@@ -273,7 +273,7 @@ function Diagram({
           data: {
             ...n,
             label: n.label,
-            readonly: graph.sequential,
+            readonly: n.editable === false,
             connectable: state.canConstruct,
           },
         })) ?? [],
@@ -572,7 +572,7 @@ function Diagram({
                 : 'VERILOG'}{' '}
             <span className="caption-count">
               {graph?.nodes.length ?? 0} nodes · {graph?.edges.length ?? 0} connections
-              {graph?.sequential ? ' · clocked · edit in HDL' : ''}
+              {graph?.sequential ? ' · clocked' : ''}
             </span>
           </div>
           <ReactFlow
@@ -953,7 +953,7 @@ function Diagram({
                     {Math.round(state.layout.nodes[node.id]?.y ?? 0)}
                   </dd>
                 </dl>
-                {node.kind === 'op' && (
+                {node.kind === 'op' && node.editable !== false && (
                   <>
                     <h3>Replace operation</h3>
                     <div className="palette">
@@ -1092,6 +1092,7 @@ function App() {
   const [states, setStates] = useState<State[]>([]);
   const [uri, setUri] = useState('');
   const [workspace, setWorkspace] = useState('');
+  const [appVersion, setAppVersion] = useState('');
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
   const known = useRef(new Set<string>());
@@ -1107,6 +1108,7 @@ function App() {
       .then((s) => {
         setStates(s.states);
         setWorkspace(s.workspace);
+        setAppVersion(s.version);
       })
       .catch((e) => setError(String(e)));
     const timer = setInterval(() => setNow(Date.now()), 500);
@@ -1132,7 +1134,7 @@ function App() {
         <div className="header-right">
           <button onClick={() => setSetupOpen(true)}>Setup help</button>
           <button onClick={() => setRecoveryOpen(true)}>Recovery</button>
-          <span className="version">0.8 · CIRCUIT WORKBENCH</span>
+          <span className="version">{appVersion} · CIRCUIT WORKBENCH</span>
           <span
             className={`status ${(state?.status ?? 'Disconnected').replaceAll(' ', '-')}`}
             role="status"
@@ -1189,7 +1191,12 @@ function App() {
       {error || state?.diagnostics.length || state?.detail ? (
         <div className="notice" role="alert">
           {error ||
-            state?.diagnostics.map((d) => `${d.message} (UTF-16 offset ${d.start})`).join(' ') ||
+            state?.diagnostics
+              .map(
+                (d) =>
+                  `${d.module ? d.module + ': ' : ''}${d.message} (${d.line ?? 1}:${d.column ?? 1}; UTF-16 offset ${d.start})`,
+              )
+              .join(' ') ||
             state?.detail}
           {error && (
             <button onClick={() => setError('')} aria-label="Dismiss notice">

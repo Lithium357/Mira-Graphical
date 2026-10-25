@@ -153,6 +153,8 @@ else {
             workspace,
             states: [...service!.states.values()],
             editorConnected: service!.editorConnected,
+            version: app.getVersion(),
+            companionVersion: service!.editorVersion,
             packaged: app.isPackaged,
           };
         if (c.type === 'recoveryList') return service!.recovery.list();
@@ -236,6 +238,10 @@ else {
             const { accessibilityFixtureSmoke } =
               await import('../../scripts/accessibility-smoke.js');
             await accessibilityFixtureSmoke(service, win, root);
+          } else if (process.argv.includes('--launch-features-only')) {
+            const { launchFeaturesStandalone } =
+              await import('../../scripts/launch-features-smoke.js');
+            await launchFeaturesStandalone(service, win, root);
           } else await desktopSmoke(service, win, root);
           console.log('DESKTOP SMOKE PASSED');
           app.quit();

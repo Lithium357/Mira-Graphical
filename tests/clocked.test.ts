@@ -147,17 +147,19 @@ test('unsupported clock forms and unsafe graph edits are refused without alterin
   ])
     assert.throws(() => parse(`module m(input clk,output reg q);${statement}endmodule`));
   const graph = project(parse(counter));
-  assert.throws(
-    () => sourceActionEdits(counter, { kind: 'create', component: 'wire', name: 'w', width: 1 }),
-    /HDL editor/,
+  assert.doesNotThrow(() =>
+    sourceActionEdits(counter, { kind: 'create', component: 'wire', name: 'w', width: 1 }),
   );
   assert.throws(
     () => copyComponents(counter, graph, [graph.nodes.find((n) => n.label === 'q')!.id]),
-    /Clocked registers/,
+    /clocked module instance/,
   );
   assert.throws(
-    () => operatorPatch(counter, graph, graph.nodes.find((n) => n.op === '+')!.id, '-'),
-    /HDL editor/,
+    () => sourceActionEdits(counter, { kind: 'disconnect', target: 'counter/register/q' }),
+    /shares a procedural block/,
+  );
+  assert.doesNotThrow(() =>
+    operatorPatch(counter, graph, graph.nodes.find((n) => n.op === '+')!.id, '-'),
   );
 });
 

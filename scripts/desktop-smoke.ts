@@ -484,11 +484,12 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
   win.webContents.focus();
   win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Shift' });
   await sleep(100);
-  win.webContents.sendInputEvent({ type: 'mouseMove', x: box.x, y: box.y });
+  win.webContents.sendInputEvent({ type: 'mouseMove', x: box.x, y: box.y, modifiers: ['shift'] });
   win.webContents.sendInputEvent({
     type: 'mouseDown',
     x: box.x,
     y: box.y,
+    modifiers: ['shift'],
     button: 'left',
     clickCount: 1,
   });
@@ -497,7 +498,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
       type: 'mouseMove',
       x: Math.round(box.x + ((box.right - box.x) * i) / 10),
       y: Math.round(box.y + ((box.bottom - box.y) * i) / 10),
-      modifiers: ['leftbuttondown'],
+      modifiers: ['shift', 'leftbuttondown'],
     });
     await sleep(35);
   }
@@ -505,6 +506,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     type: 'mouseUp',
     x: box.right,
     y: box.bottom,
+    modifiers: ['shift'],
     button: 'left',
     clickCount: 1,
   });
@@ -1088,7 +1090,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     ),
   );
   assert.equal(clockedGraph.nodes.filter((n) => n.register).length, 7);
-  assert.equal(service.states.get(clockedURI)!.canConstruct, false);
+  assert.equal(service.states.get(clockedURI)!.canConstruct, true);
   await fill('[aria-label="Simulation input reset"]', '1');
   await click('Sample inputs');
   await sampled(19);
@@ -1156,5 +1158,7 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
       2,
     ),
   );
+  const { launchFeaturesSmoke } = await import('./launch-features-smoke.js');
+  await launchFeaturesSmoke(service, win, root, ws, click, fill);
   ws.close();
 }

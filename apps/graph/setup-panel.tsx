@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 export function SetupGuide({ workspace }: { workspace: string }) {
   const [connected, setConnected] = useState(false);
   const [message, setMessage] = useState('Checking local connection…');
+  const [versions, setVersions] = useState<{ desktop: string; companion?: string }>();
   const [packaged, setPackaged] = useState(false);
   useEffect(() => {
     let active = true;
@@ -12,6 +13,7 @@ export function SetupGuide({ workspace }: { workspace: string }) {
         if (active) {
           setConnected(snapshot.editorConnected === true);
           setPackaged(snapshot.packaged === true);
+          setVersions({ desktop: snapshot.version, companion: snapshot.companionVersion });
           setMessage(snapshot.editorConnected ? 'VS Code connected' : 'Waiting for VS Code');
         }
       } catch {
@@ -28,6 +30,14 @@ export function SetupGuide({ workspace }: { workspace: string }) {
   return (
     <section aria-label="Workspace setup" className="setup-guide">
       <p role="status">{message}</p>
+      {versions && (
+        <p>
+          Desktop {versions.desktop} · Companion {versions.companion ?? 'not reported'}
+          {connected && versions.desktop !== versions.companion
+            ? ' — update the companion to match Mira.'
+            : ''}
+        </p>
+      )}
       <p>
         <strong>Workspace:</strong> <code>{workspace}</code>
       </p>
@@ -62,7 +72,8 @@ export function SetupGuide({ workspace }: { workspace: string }) {
           ) : (
             <>
               Install the companion: Extensions → … → Install from VSIX →{' '}
-              <code>mira-graphical-0.9.3.vsix</code> from <code>dist/packages</code>.
+              <code>mira-graphical-{versions?.desktop ?? 'current'}.vsix</code> from{' '}
+              <code>dist/packages</code>.
             </>
           )}
         </li>

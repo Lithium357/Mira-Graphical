@@ -13,6 +13,7 @@ import {
 import { resolve, relative, isAbsolute, join, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Session, hash, type State, type Layout, type Clock, type Viewport } from './index.js';
+import { APP_VERSION } from '../protocol/version.js';
 import { RecoveryStore, recoveryFingerprint } from './recovery.js';
 import {
   MAX_MESSAGE_BYTES,
@@ -72,6 +73,7 @@ export class SyncService {
   readonly recovery: RecoveryStore;
   readonly server: WebSocketServer;
   private editor?: WebSocket;
+  editorVersion?: string;
   private editorRecovery = false;
   get editorConnected() {
     return this.editor?.readyState === WebSocket.OPEN;
@@ -119,7 +121,12 @@ export class SyncService {
             clearTimeout(timeout);
             this.editor = socket;
             this.editorRecovery = msg.capabilities?.includes('recovery-review') ?? false;
-            this.send(socket, { type: 'hello.ok', protocolVersion: 1 });
+            this.editorVersion = msg.version;
+            this.send(socket, {
+              type: 'hello.ok',
+              protocolVersion: 1,
+              desktopVersion: APP_VERSION,
+            });
             return;
           }
           if (msg.type === 'hello') throw new Error('Already authenticated.');
@@ -190,6 +197,7 @@ export class SyncService {
         clearTimeout(timeout);
         if (this.editor === socket) {
           this.editor = undefined;
+          this.editorVersion = undefined;
           this.editorRecovery = false;
         }
         for (const [uri, owner] of this.owners)

@@ -22,6 +22,7 @@ import {
 } from './index.js';
 import { literalWidth } from './literals.js';
 import { PatchDraft } from './patches.js';
+import { registerEdits, requireIndependentDriver } from './register-edit.js';
 import { isVhdl } from '../vhdl/index.js';
 import { vhdlActionEdits, copyVhdl } from '../vhdl/construction.js';
 const zero = (width: number) => `${width}'d0`;
@@ -102,6 +103,48 @@ function create(source: string, ast: Module, action: CreateComponent): Edit[] {
         text: (ast.portCount ? ', ' : '') + declaration,
       },
     ];
+  }
+  if (action.component === 'register') {
+    const control = (name: string | undefined) => {
+      if (!ast.nets.some((n) => n.name === name && n.direction === 'input' && n.width === 1))
+        throw new Error('Choose scalar input ports for register clock/reset.');
+      return name!;
+    };
+    const clock = control(action.clock),
+      reset = action.reset ? control(action.reset) : undefined;
+    if (action.edge !== undefined && !['posedge', 'negedge'].includes(action.edge))
+      throw new Error('Invalid register clock edge.');
+    if (action.resetActive !== undefined && !['0', '1'].includes(action.resetActive))
+      throw new Error('Invalid reset polarity.');
+    if (reset === clock) throw new Error('Clock and reset must be distinct.');
+    const data = action.source ? ast.nets.find((n) => n.name === action.source) : undefined;
+    if (action.source && !data) throw new Error('Choose a declared data signal.');
+    const value = data?.name ?? zero(action.width),
+      edge = action.edge ?? 'posedge',
+      low = action.resetActive === '0';
+    const process = reset
+      ? 'always @(' +
+        edge +
+        ' ' +
+        clock +
+        ' or ' +
+        (low ? 'negedge' : 'posedge') +
+        ' ' +
+        reset +
+        ') if (' +
+        (low ? '!' : '') +
+        reset +
+        ') ' +
+        action.name +
+        ' <= ' +
+        zero(action.width) +
+        '; else ' +
+        action.name +
+        ' <= ' +
+        value +
+        ';'
+      : 'always @(' + edge + ' ' + clock + ') ' + action.name + ' <= ' + value + ';';
+    return [bodyInsertion(source, ast, ['reg ' + signed + width + action.name + ';', process])];
   }
   if (action.component === 'instance') {
     const child = ast.library[action.moduleName ?? ''];
@@ -203,10 +246,6 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
   if (!action || typeof action !== 'object') throw new Error('Invalid construction action.');
   const ast = parse(source, action.scope),
     graph = project(ast);
-  if (ast.assigns.some((a) => a.events))
-    throw new Error(
-      'Edit clocked modules in the HDL editor; graph construction currently supports combinational modules.',
-    );
   if (action.kind === 'create') return checked(source, create(source, ast, action));
   if (action.kind === 'paste') return paste(source, ast, action.items);
   if (action.kind === 'import') {
@@ -267,6 +306,13 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
     )
       throw new Error('Invalid input socket.');
     const replacement = from.sourceNet;
+    if (target.kind === 'register' || driver?.events)
+      return checked(
+        source,
+        registerEdits(ast, driver?.target ?? target.label, action.port, replacement).map((e) =>
+          withoutComments(source, e),
+        ),
+      );
     if (target.kind === 'instance') {
       const inst = ast.instances.find((n) => n.name === target.label)!,
         port = inst.ports.find((p) => `port:${p.name}` === action.port);
@@ -277,6 +323,7 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
       ]);
     }
     if (netKind(target)) {
+      if (driver?.structured) throw new Error('Rewire this procedural block in the HDL editor.');
       if (target.kind === 'input' || action.port !== 'left')
         throw new Error('Inputs cannot have drivers.');
       if (
@@ -323,12 +370,22 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
     ]);
   }
   if (action.kind === 'disconnect') {
+    if (driver) requireIndependentDriver(ast, driver);
     if (!driver) throw new Error('This component has no named driver to disconnect.');
     return checked(source, [
       withoutComments(source, { start: driver.start, end: driver.end, text: '' }),
     ]);
   }
   if (action.kind === 'zero') {
+    if (target.kind === 'register' || driver?.events) {
+      if (action.port !== 'port:D' && action.port !== 'left')
+        throw new Error('Only register data can be tied to zero.');
+      return checked(
+        source,
+        registerEdits(ast, driver?.target ?? target.label, 'port:D', zero(target.width ?? 1)),
+      );
+    }
+    if (driver?.structured) throw new Error('Edit this procedural block in HDL.');
     if (target.kind === 'instance') {
       const inst = ast.instances.find((i) => i.name === target.label)!,
         port = inst.ports.find((p) => `port:${p.name}` === action.port),
@@ -369,6 +426,7 @@ export function sourceActionEdits(source: string, action: SourceAction): Edit[] 
         'Ports are kept in the module interface. For an inner expression, use Replace with zero.',
       );
     const declaration = ast.nets.find((n) => n.name === name)!;
+    if (driver) requireIndependentDriver(ast, driver);
     if (
       ast.assigns.some((a) => a.target !== name && references(a.expr, name)) ||
       ast.instances.some((i) => i.ports.some((p) => references(p.expr, name)))
@@ -436,10 +494,6 @@ export function copyComponents(
     names = new Set<string>(),
     instances = new Set<string>(),
     ports = new Set<string>();
-  if (ast.assigns.some((a) => a.events))
-    throw new Error(
-      'Clocked registers cannot be copied as combinational components. Edit this module in the HDL editor.',
-    );
   for (const id of ids) {
     const node = graph.nodes.find((n) => n.id === id);
     if (!node) throw new Error('Selection no longer exists.');
@@ -461,6 +515,10 @@ export function copyComponents(
   const items: ClipboardItem[] = [...names].map((name) => {
     const net = ast.nets.find((n) => n.name === name)!,
       driver = ast.assigns.find((a) => a.target === name);
+    if (driver?.events)
+      throw new Error(
+        'Copy a clocked module instance to preserve register control, or create another register.',
+      );
     return {
       name,
       width: net.width,
@@ -581,25 +639,38 @@ function copyExpression(source: string, e: Expr, contextWidth: number): string {
     owner.procedural && (expressionSigned(owner.truthy) || expressionSigned(owner.falsy))
       ? arm(value)
       : render(value);
-  const render = (e: Expr): string =>
-    e.kind === 'ref' || e.kind === 'literal'
-      ? e.value
-      : e.kind === 'slice'
-        ? `${e.value}[${e.bit ? e.msb : `${e.msb}:${e.lsb}`}]`
-        : e.kind === 'concat'
-          ? e.repeat
-            ? `{${e.repeat}{${e.parts.map(render).join(', ')}}}`
-            : `{${e.parts.map(render).join(', ')}}`
-          : e.kind === 'mux'
-            ? `(${e.procedural ? `(((${render(e.condition)}) != 0) === 1'b1)` : render(e.condition)} ? ${branch(e, e.truthy)} : ${branch(e, e.falsy)})`
-            : e.kind === 'unary'
-              ? `(${e.op}${render(e.value)})`
-              : e.kind === 'convert' && ['signed', 'unsigned'].includes(e.conversion)
-                ? `$${e.conversion}(${render(e.value)})`
-                : e.kind === 'op'
-                  ? `(${render(e.left)} ${e.op} ${render(e.right)})`
-                  : (() => {
-                      throw new Error('Unsupported cross-language expression.');
-                    })();
+  const render = (e: Expr): string => {
+    if (e.kind === 'ref' || e.kind === 'literal') return e.value;
+    if (e.kind === 'slice') return e.value + '[' + (e.bit ? e.msb : e.msb + ':' + e.lsb) + ']';
+    if (e.kind === 'concat') {
+      const text = e.parts.map(render).join(', ');
+      return e.repeat ? '{' + e.repeat + '{' + text + '}}' : '{' + text + '}';
+    }
+    if (e.kind === 'mux')
+      return (
+        '(' +
+        (e.procedural ? '(((' + render(e.condition) + ") != 0) === 1'b1)" : render(e.condition)) +
+        ' ? ' +
+        branch(e, e.truthy) +
+        ' : ' +
+        branch(e, e.falsy) +
+        ')'
+      );
+    if (e.kind === 'unary') return '(' + e.op + render(e.value) + ')';
+    if (e.kind === 'convert' && e.conversion === 'resize')
+      return (
+        '$' +
+        (e.signed ? 'signed' : 'unsigned') +
+        '(' +
+        e.resultWidth +
+        "'(" +
+        render(e.value) +
+        '))'
+      );
+    if (e.kind === 'convert' && ['signed', 'unsigned'].includes(e.conversion))
+      return '$' + e.conversion + '(' + render(e.value) + ')';
+    if (e.kind === 'op') return '(' + render(e.left) + ' ' + e.op + ' ' + render(e.right) + ')';
+    throw new Error('Unsupported cross-language expression.');
+  };
   return render(e);
 }

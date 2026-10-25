@@ -42,6 +42,14 @@ export async function checkPackagedApp(
       ext: 'clocked.v',
       text: "module counter(input clk,reset,output reg [7:0] y);always @(posedge clk or posedge reset) if(reset) y<=8'd0;else y<=y+8'd1;endmodule",
     },
+    {
+      ext: 'native-clocked.vhd',
+      text: "library ieee;use ieee.std_logic_1164.all;use ieee.numeric_std.all;entity counter is port(clk,reset:in std_logic;y:out unsigned(7 downto 0));end entity;architecture rtl of counter is begin process(clk,reset) begin if reset='1' then y<=to_unsigned(0,8);elsif rising_edge(clk) then y<=y+to_unsigned(1,8);end if;end process;end architecture;",
+    },
+    {
+      ext: 'hierarchy.sv',
+      text: "module parent(input clk,reset,output [7:0] y);leaf c(.clk(clk),.reset(reset),.y(y));endmodule module leaf(input clk,reset,output reg [7:0] y);always @(posedge clk or posedge reset) if(reset)y<=8'd0;else case(y[1:0]) 2'd0:y<=8'd1;default:y<=y+8'd1;endcase endmodule",
+    },
   ];
   ws.send(JSON.stringify({ ...config, type: 'hello', editor: 'vscode' }));
   for (const document of documents)
@@ -65,18 +73,23 @@ export async function checkPackagedApp(
     );
     await new Promise((r) => setTimeout(r, 100));
   }
-  for (const uri of [...service.states.keys()].filter((uri) => !uri.endsWith('clocked.v')))
+  for (const uri of [...service.states.keys()].filter(
+    (uri) => !service.states.get(uri)?.graph?.sequential,
+  ))
     assert.equal(
       service.simulate(uri, { a: '2', b: '3' }).signals.y.value,
       uri.endsWith('alu.v') ? '0xef' : uri.endsWith('signed.v') ? '0x01' : '0x05',
     );
   const signedURI = pathToFileURL(join(workspace, 'check.signed.v')).href;
   assert.equal(service.simulate(signedURI, { a: '128', b: '1' }).signals.y.value, '0xc0');
-  const clockedURI = pathToFileURL(join(workspace, 'check.clocked.v')).href;
-  assert.equal(service.simulate(clockedURI, { clk: '0', reset: '1' }).signals.y.value, '0x00');
-  service.simulate(clockedURI, { clk: '0', reset: '0' });
-  assert.equal(service.simulate(clockedURI, { clk: '1', reset: '0' }).signals.y.value, '0x01');
-  assert.equal(service.simulate(clockedURI, { clk: '1', reset: '0' }).signals.y.value, '0x01');
+  for (const uri of [...service.states.keys()].filter(
+    (uri) => service.states.get(uri)?.graph?.sequential,
+  )) {
+    assert.equal(service.simulate(uri, { clk: '0', reset: '1' }).signals.y.value, '0x00');
+    service.simulate(uri, { clk: '0', reset: '0' });
+    assert.equal(service.simulate(uri, { clk: '1', reset: '0' }).signals.y.value, '0x01');
+    assert.equal(service.simulate(uri, { clk: '1', reset: '0' }).signals.y.value, '0x01');
+  }
   const snapshot = await win.webContents.executeJavaScript(
     `window.mira.command({type:'snapshot'})`,
   );
@@ -106,6 +119,8 @@ export async function checkPackagedApp(
         preloadIPC: true,
         simulation: true,
         clockedSimulation: true,
+        clockedHierarchy: true,
+        clockedVhdl: true,
       },
       null,
       2,

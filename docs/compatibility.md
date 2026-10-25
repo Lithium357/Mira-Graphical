@@ -18,3 +18,7 @@ pnpm test:external --download
 To retest already downloaded files offline, run `pnpm test:external`. This optional compatibility review requires network only for downloads and is separate from CI's supported-subset assertions. A refusal is reported rather than treated as a passing compatibility test.
 
 The three-language lane-datapath soak is generated project-scale coverage of the supported subset. It does not turn these external-project refusals into successes. Additional independently authored, in-scope projects and user trials remain useful before 1.0; native SystemVerilog/VHDL compiler fixtures are covered separately.
+
+## 0.9.5 recheck
+
+The same 15 unmodified pinned files were rechecked after adding clocks, hierarchy and cases. All remain refused: 14 stop at preprocessing and the Yosys counter now stops at non-ANSI ports. [Current machine-readable results](compatibility-0.9.5.json) preserve source hashes and first diagnostics. Supported fixtures include the user-reported ALU/multiplier plus independently structured pipeline and native clocked-counter examples, with compiler comparisons; this does not establish broad project compatibility.

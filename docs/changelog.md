@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.5
+
+- Added clocked module/entity hierarchy with isolated per-instance registers, simultaneous updates and bounded delta-cycle settling. Flattened dependency validation rejects combinational feedthrough loops while allowing register feedback. Parent waveforms expose hierarchical signal names.
+- Added Verilog/SystemVerilog `case`, comma-separated literal choices, defaults, nested conditionals, `always @*`/`always @(*)`, and ordered blocking assignments with intermediate width/type preservation. Latches and reads before assignment remain errors. Copied ordered expressions retain explicit size casts.
+- Added native VHDL named/unnamed rising/falling-edge processes, enables, synchronous/asynchronous scalar resets, nested scalar conditionals and literal-choice cases. VHDL edge functions require known transitions; native type/width checks remain enforced.
+- Added register creation and D/clock/reset wiring in both HDL families, with independently replayed source transactions. Register control shared by multiple assignments is protected from destructive per-node edits. Generated case predicates are not editable source operators.
+- Added automatic companion reconnect with capped retry, cancellation on manual disconnect, retained explicitly shared URIs and fresh in-memory snapshots. Pending graph patches are never replayed on reconnect. Desktop/companion versions appear in Setup help; diagnostics include module, line and UTF-16 column.
+- Added Icarus/GHDL project comparisons, real desktop and installed-companion register/Undo/reconnect checks, packaged hierarchical/native-clocked checks, and a two-minute real-time three-language acceptance runner with source/recovery/memory checks. Human accessibility/usability acceptance remains open.
+
 ## 0.9.4
 
 - Added bounded standalone Verilog/SystemVerilog clocked modules: `always`/`always_ff` with one or two scalar input edge controls, nonblocking whole-register assignments, nested `begin`/`end` and `if`/`else`, register holds and asynchronous resets. Register values commit together after evaluating old-state right-hand sides.

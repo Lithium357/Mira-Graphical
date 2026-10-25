@@ -14,6 +14,7 @@ import {
   type Node,
 } from '../verilog/index.js';
 import { literalWidth } from '../verilog/literals.js';
+import { lowerStatements, registerInputs, type Statement } from '../verilog/procedural.js';
 
 export type VhdlType = 'std_logic' | 'std_logic_vector' | 'unsigned';
 export type Token = { image: string; start: number; end: number };
@@ -333,9 +334,21 @@ export function parseVhdl(source: string, selected?: string): Module {
   function conditionExpr(): Expr {
     const c = expression(6);
     take('=');
-    take("'1'");
+    const bit = take().image;
+    if (bit !== "'1'" && bit !== "'0'") fail("Use a scalar selector = '1' or '0'.");
     if (!['ref', 'slice', 'literal'].includes(c.kind)) fail("Use a scalar selector = '1'.");
-    return c;
+    return bit === "'1'"
+      ? c
+      : {
+          kind: 'unary',
+          op: '!',
+          value: c,
+          start: c.start,
+          end: tokens[i - 1].end,
+          tokenStart: c.start,
+          tokenEnd: c.start,
+          synthetic: true,
+        };
   }
   const closing = (kind: string, unit: string) => {
     const start = take('end').start;
@@ -462,12 +475,204 @@ export function parseVhdl(source: string, selected?: string): Module {
       const end = take(';').end;
       return { target, expr, start, end };
     };
-    const process = () => {
-      take('process');
+    const process = (label?: string) => {
+      const processStart = take('process').start;
       take('(');
-      take('all');
+      const sensitivity: string[] = [];
+      const sensitivityTokens: Token[] = [];
+      do {
+        const token = take();
+        sensitivity.push(token.image);
+        sensitivityTokens.push(token);
+        if (peek() !== ',') break;
+        take();
+      } while (true);
       take(')');
+      if (peek() === 'is') take();
       take('begin');
+      const finish = () => {
+        take('end');
+        take('process');
+        if (label && peek() !== ';' && name() !== label) fail('Process end label mismatch.');
+        take(';');
+      };
+      if (sensitivity[0] !== 'all') {
+        let level = 0;
+        const empty = (): Statement => ({ kind: 'block', items: [] });
+        const block = (): Statement => {
+          const items: Statement[] = [];
+          while (!['end', 'else', 'elsif', 'when'].includes(peek())) items.push(statement());
+          return { kind: 'block', items };
+        };
+        const conditional = (): Statement => {
+          take();
+          const condition = conditionExpr();
+          take('then');
+          const yes = block();
+          let no = empty();
+          if (peek() === 'elsif') no = conditional();
+          else if (peek() === 'else') {
+            take();
+            no = block();
+          }
+          return { kind: 'if', condition, yes, no };
+        };
+        const statement = (): Statement => {
+          if (++level > 128) fail('VHDL clocked statement nesting exceeds 128.');
+          let result: Statement;
+          if (peek() === 'null') {
+            take();
+            take(';');
+            result = empty();
+          } else if (peek() === 'if') {
+            result = conditional();
+            take('end');
+            take('if');
+            take(';');
+          } else if (peek() === 'case') {
+            take();
+            const selector = expression();
+            take('is');
+            let fallback = empty();
+            let seenDefault = false;
+            const arms: { condition: Expr; body: Statement }[] = [];
+            while (peek() === 'when') {
+              if (seenDefault) fail('others must be the final case alternative.');
+              take();
+              if (peek() === 'others') {
+                if (seenDefault) fail('Duplicate others branch.');
+                seenDefault = true;
+                take();
+                take('=>');
+                fallback = block();
+                continue;
+              }
+              const label = expression();
+              if (label.kind !== 'literal') fail('VHDL case choices must be literal bit strings.');
+              take('=>');
+              arms.push({
+                condition: {
+                  kind: 'op',
+                  op: '===',
+                  left: selector,
+                  right: label,
+                  start: selector.start,
+                  end: label.end,
+                  tokenStart: selector.start,
+                  tokenEnd: selector.start,
+                  synthetic: true,
+                },
+                body: block(),
+              });
+              if (arms.length > 128) fail('VHDL case exceeds 128 arms.');
+            }
+            take('end');
+            take('case');
+            take(';');
+            result = arms.reduceRight<Statement>(
+              (no, a) => ({ kind: 'if', condition: a.condition, yes: a.body, no }),
+              fallback,
+            );
+          } else {
+            const a = assignment();
+            result = { kind: 'assign', target: a.target, value: a.expr };
+          }
+          level--;
+          return result;
+        };
+        const edge = () => {
+          const kind = take();
+          if (!['rising_edge', 'falling_edge'].includes(kind.image))
+            fail('Use rising_edge/falling_edge on a scalar input clock.');
+          take('(');
+          const token = tokens[i],
+            signal = name();
+          take(')');
+          return {
+            signal,
+            start: token.start,
+            end: token.end,
+            edge: kind.image === 'rising_edge' ? ('posedge' as const) : ('negedge' as const),
+            strict: true,
+          };
+        };
+        take('if');
+        let clock: ReturnType<typeof edge>,
+          reset: { signal: string; edge: 'posedge' | 'negedge'; level: '0' | '1' } | undefined,
+          body: Statement;
+        if (['rising_edge', 'falling_edge'].includes(peek())) {
+          clock = edge();
+          take('then');
+          body = block();
+        } else {
+          const condition = conditionExpr();
+          const signal =
+            condition.kind === 'ref'
+              ? condition.value
+              : condition.kind === 'unary' && condition.value.kind === 'ref'
+                ? condition.value.value
+                : fail('Reset must be a scalar input.');
+          reset = {
+            signal,
+            edge: condition.kind === 'unary' ? 'negedge' : 'posedge',
+            level: condition.kind === 'unary' ? '0' : '1',
+          };
+          take('then');
+          const yes = block();
+          take('elsif');
+          clock = edge();
+          take('then');
+          const no = block();
+          body = { kind: 'if', condition, yes, no };
+        }
+        take('end');
+        take('if');
+        take(';');
+        finish();
+        const events: NonNullable<Module['assigns'][number]['events']> = [
+          clock,
+          ...(reset ? [reset] : []),
+        ];
+        for (const e of events) {
+          const token = sensitivityTokens.find((t) => t.image === e.signal);
+          if (token) {
+            if (e === clock) {
+              e.sensitivityStart = token.start;
+              e.sensitivityEnd = token.end;
+            } else {
+              e.start = token.start;
+              e.end = token.end;
+            }
+          }
+        }
+        if (
+          sensitivity.length !== events.length ||
+          new Set(sensitivity).size !== sensitivity.length ||
+          events.some(
+            (e) =>
+              !sensitivity.includes(e.signal) ||
+              !nets.some(
+                (n) =>
+                  n.name === e.signal && n.direction === 'input' && n.nativeType === 'std_logic',
+              ),
+          )
+        )
+          fail(
+            'Clocked process sensitivity must list exactly its scalar input clock and optional asynchronous reset.',
+          );
+        const end = tokens[i - 1].end;
+        for (const [target, value] of lowerStatements(body, nets, true, processStart, end))
+          assigns.push({
+            target,
+            expr: value,
+            start: processStart,
+            end,
+            events,
+            registerInputs: registerInputs(body, events),
+          });
+        return;
+      }
+      if (sensitivity.length !== 1) fail('process(all) cannot contain other sensitivity items.');
       while (peek() !== 'end') {
         if (peek() === 'null') {
           take();
@@ -501,9 +706,7 @@ export function parseVhdl(source: string, selected?: string): Module {
           });
         } else assigns.push(assignment());
       }
-      take('end');
-      take('process');
-      take(';');
+      finish();
     };
     while (peek() !== 'end') {
       if (peek() === 'process') {
@@ -514,8 +717,10 @@ export function parseVhdl(source: string, selected?: string): Module {
         const start = tokens[i].start,
           instance = name();
         take(':');
-        if (peek() === 'process')
-          fail('Named process blocks are not yet supported; use process(all).');
+        if (peek() === 'process') {
+          process(instance);
+          continue;
+        }
         take('entity');
         take('work');
         take('.');
@@ -598,8 +803,8 @@ export function inferVhdl(
   let result: { type: VhdlType; width: number };
   const bad = (message: string): never => error(message, e.start, e.end);
   if (
-    (e.kind !== 'mux' && children(e).some(([, c]) => c.kind === 'mux')) ||
-    (e.kind === 'mux' && (e.outerStart !== undefined || e.truthy.kind === 'mux'))
+    (e.kind !== 'mux' && children(e).some(([, c]) => c.kind === 'mux' && !c.procedural)) ||
+    (e.kind === 'mux' && !e.procedural && (e.outerStart !== undefined || e.truthy.kind === 'mux'))
   )
     bad('Use conditional assignments at the assignment root, not nested conditional expressions.');
   if (e.kind === 'ref' || e.kind === 'slice') {
@@ -675,8 +880,19 @@ export function inferVhdl(
       bad('Conditional branches need identical types and widths.');
     result = a;
   } else if (e.kind === 'unary') {
-    throw new Error('Unary expressions are not supported in the VHDL subset.');
+    const value = inferVhdl(e.value, ast, 'std_logic');
+    if (e.op !== '!' || !e.synthetic || value.type !== 'std_logic')
+      bad('Unsupported VHDL unary expression.');
+    result = { type: 'std_logic', width: 1 };
   } else {
+    if (e.synthetic && e.op === '===') {
+      const a = inferVhdl(e.left, ast, hint),
+        b = inferVhdl(e.right, ast, a.type);
+      if (a.type !== b.type || a.width !== b.width) bad('Case choice type/width mismatch.');
+      e.nativeType = 'std_logic';
+      e.nativeWidth = 1;
+      return { type: 'std_logic', width: 1 };
+    }
     const arithmetic = ['+', '-', '*'].includes(e.op),
       a = inferVhdl(e.left, ast, arithmetic ? 'unsigned' : hint),
       b = inferVhdl(e.right, ast, a.type);
