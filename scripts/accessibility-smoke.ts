@@ -92,6 +92,14 @@ export async function accessibilitySmoke(
   service.discardGraphChanges(uri);
   await key('Escape');
   assert.equal(await js(`document.activeElement?.hasAttribute('data-add-component')`), true);
+  await tabTo(`el?.textContent==='Skip circuit to inspector'`);
+  await key('Enter');
+  assert.equal(
+    await js(`document.activeElement?.getAttribute('aria-label')`),
+    'Component inspector',
+  );
+  await key('Escape');
+  assert.equal(await js(`document.activeElement?.hasAttribute('data-add-component')`), true);
   await key('Enter');
   assert.equal(await js('document.activeElement?.id'), 'palette-search');
   win.webContents.insertText('mux');
@@ -111,6 +119,15 @@ export async function accessibilitySmoke(
   await key('Enter');
   await delay();
   assert(await js(`!!document.querySelector('svg[aria-label="Waveforms, 1 samples"]')`));
+  await tabTo(`el?.tagName==='SUMMARY'&&el.textContent==='Sample values'`);
+  await key('Enter');
+  assert(
+    await js(
+      `!!document.querySelector('table caption')?.textContent.includes('Sampled signal values')`,
+    ),
+  );
+  assert(await js(`Array.from(document.querySelectorAll('tbody th')).every(th=>th.scope==='row')`));
+  assert(await js(`Array.from(document.querySelectorAll('thead th')).every(th=>th.scope==='col')`));
   win.webContents.debugger.attach('1.3');
   let tree;
   try {
@@ -125,6 +142,10 @@ export async function accessibilitySmoke(
   assert(accessible.some((n: any) => n.role === 'region' && n.name === 'Combinational simulation'));
   assert(accessible.some((n: any) => n.name?.startsWith('Simulation input')));
   assert(accessible.some((n: any) => n.name === 'Waveforms, 1 samples'));
+  assert(accessible.some((n: any) => n.role === 'table' && n.name === 'Sampled signal values'));
+  assert(accessible.some((n: any) => n.role === 'columnheader' && n.name === 'Sample 0'));
+  assert(accessible.some((n: any) => /, (input|op|output), \d+ bits/.test(n.name ?? '')));
+  assert(accessible.some((n: any) => / to /.test(n.name ?? '') && n.role === 'group'));
   await tabTo(`el?.getAttribute('aria-label')==='Close simulation'`);
   await key('Enter');
   assert.equal(await js(`document.activeElement?.textContent`), 'Simulation');
@@ -139,6 +160,8 @@ export async function accessibilitySmoke(
           'wiring transaction',
           'palette search and Escape',
           'simulation sample and return',
+          'named components/connections and scoped sample table headers',
+          'skip canvas and return focus',
         ],
         accessible,
         humanScreenReaderAcceptance: 'Still requires a human screen-reader session',
@@ -153,6 +176,8 @@ export async function accessibilityFixtureSmoke(
   win: BrowserWindow,
   root: string,
 ) {
+  win.show();
+  win.focus();
   const config = await service.ready();
   const ws = new WebSocket(`ws://127.0.0.1:${config.port}`);
   await once(ws, 'open');

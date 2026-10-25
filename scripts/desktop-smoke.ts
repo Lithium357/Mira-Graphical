@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { WebSocket } from 'ws';
 import { screen, type BrowserWindow } from 'electron';
 import type { SyncService } from '../packages/core/service.js';
+import { APP_VERSION } from '../packages/protocol/version.js';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function until(f: () => boolean | Promise<boolean>, timeout = 20_000) {
   const start = Date.now();
@@ -24,6 +25,16 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     ),
   );
   assert.equal(service.editorConnected, false, 'Fresh workspace starts disconnected');
+  assert(
+    await win.webContents.executeJavaScript(
+      `document.querySelector('.setup-next-step')?.textContent.includes('Install the companion')`,
+    ),
+  );
+  assert(
+    await win.webContents.executeJavaScript(
+      `document.body.innerText.includes('Ctrl+Shift+P')&&document.body.innerText.includes('Developer: Reload Window')`,
+    ),
+  );
   const click = async (label: string) => {
     await until(() =>
       win.webContents.executeJavaScript(
@@ -95,13 +106,51 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
       type: 'hello',
       ...config,
       editor: 'vscode',
+      version: APP_VERSION,
       capabilities: ['recovery-review'],
     }),
   );
-  await sleep(100);
+  await until(() =>
+    win.webContents.executeJavaScript(
+      `document.querySelector('.setup-next-step')?.textContent.includes('Open an HDL file')`,
+    ),
+  );
   ws.send(JSON.stringify({ type: 'document.open', uri, version, text: live }));
   await sleep(1000);
   assert.equal(service.states.get(uri)?.graph, undefined, 'No early projection');
+  const countdownBefore = await win.webContents.executeJavaScript(
+    `(()=>{window.__statusChanges=0;const live=document.querySelector('.header-right .status [role="status"]');window.__statusObserver=new MutationObserver(()=>window.__statusChanges++);window.__statusObserver.observe(live,{subtree:true,childList:true,characterData:true});return live.parentElement.textContent;})()`,
+  );
+  await sleep(2200);
+  assert.notEqual(
+    await win.webContents.executeJavaScript(
+      `document.querySelector('.header-right .status').textContent`,
+    ),
+    countdownBefore,
+    'Visual countdown advances',
+  );
+  assert.equal(
+    await win.webContents.executeJavaScript(
+      `window.__statusObserver.disconnect();window.__statusChanges`,
+    ),
+    0,
+    'Countdown must not repeatedly announce the synchronization status',
+  );
+  writeFileSync(
+    join(root, 'test-results', 'onboarding-smoke.json'),
+    JSON.stringify(
+      {
+        passed: true,
+        disconnectedGuidance: true,
+        connectedWithoutFileGuidance: true,
+        commandPaletteShortcut: true,
+        companionReloadGuidance: true,
+        quietCountdown: true,
+      },
+      null,
+      2,
+    ),
+  );
   await until(() => !!service.states.get(uri)?.graph);
   await until(() =>
     win.webContents.executeJavaScript(`document.querySelectorAll('.circuit-node').length===4`),

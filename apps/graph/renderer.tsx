@@ -264,6 +264,7 @@ function Diagram({
           ...old.find((o) => o.id === n.id),
           id: n.id,
           type: 'circuit',
+          ariaLabel: `${n.label}, ${n.register ? 'register' : n.kind}, ${n.width ?? '?'} bit${n.width === 1 ? '' : 's'}${n.assignmentTarget ? ', drives ' + n.assignmentTarget : ''}`,
           // Supply initial geometry for newly constructed nodes. A status
           // refresh can arrive before ResizeObserver has measured them.
           initialWidth: 172,
@@ -562,7 +563,15 @@ function Diagram({
           </button>
         </div>
         <div className="flow-surface">
-          {' '}
+          <button
+            className="canvas-skip"
+            onClick={() => {
+              setInspectorOpen(true);
+              requestAnimationFrame(() => inspector.current?.focus());
+            }}
+          >
+            Skip circuit to inspector
+          </button>{' '}
           <div className="canvas-caption">
             <span className="live-dot" />{' '}
             {graph?.language === 'vhdl'
@@ -576,6 +585,12 @@ function Diagram({
             </span>
           </div>
           <ReactFlow
+            ariaLabelConfig={{
+              'node.a11yDescription.default':
+                'Arrow keys move components. For wiring and editing, use View, Component navigator, then Inspect component.',
+              'edge.a11yDescription.default':
+                'Circuit connection. Edit wiring through the component inspector.',
+            }}
             selectionOnDrag
             panOnDrag={[1, 2]}
             multiSelectionKeyCode={['Meta', 'Control']}
@@ -585,6 +600,7 @@ function Diagram({
                 port = source?.outputPorts?.find((p) => `out:${p.name}` === e.sourceHandle);
               return {
                 ...e,
+                ariaLabel: `${source?.label ?? 'Component'} to ${graph?.nodes.find((n) => n.id === e.target)?.label ?? 'component'}${e.targetHandle ? ', ' + e.targetHandle.replace('port:', '') : ''}`,
                 label: wireLabels
                   ? `${port?.signal ?? source?.sourceNet ?? source?.label} · ${port?.width ?? source?.width ?? '?'}b`
                   : undefined,
@@ -1135,12 +1151,12 @@ function App() {
           <button onClick={() => setSetupOpen(true)}>Setup help</button>
           <button onClick={() => setRecoveryOpen(true)}>Recovery</button>
           <span className="version">{appVersion} · CIRCUIT WORKBENCH</span>
-          <span
-            className={`status ${(state?.status ?? 'Disconnected').replaceAll(' ', '-')}`}
-            role="status"
-          >
-            ● {state?.status ?? 'Disconnected'}
-            {seconds ? ` · ${seconds}s` : ''}
+          <span className={`status ${(state?.status ?? 'Disconnected').replaceAll(' ', '-')}`}>
+            <span role="status" aria-atomic="true">
+              <span aria-hidden="true">● </span>
+              {state?.status ?? 'Disconnected'}
+            </span>
+            <span aria-hidden="true">{seconds ? ` · ${seconds}s` : ''}</span>
           </span>
         </div>
       </header>
@@ -1229,7 +1245,7 @@ function App() {
         <span>
           {state
             ? 'Layout saved separately · Semantic updates after 15s'
-            : 'Waiting for VS Code · Use Connect/Disconnect to reconnect'}
+            : 'Waiting for VS Code · Share a file with Open Current Module'}
         </span>
         <span>GPLv3 · Local first</span>
       </footer>

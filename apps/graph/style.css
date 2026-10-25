@@ -1108,6 +1108,16 @@ dl,
 .setup-guide li {
   margin-bottom: 8px;
 }
+.canvas-skip {
+  position: absolute;
+  left: 12px;
+  top: 44px;
+  transform: translateY(-10000px);
+  z-index: 20;
+}
+.canvas-skip:focus {
+  transform: none;
+}
 .welcome {
   overflow: auto;
 }

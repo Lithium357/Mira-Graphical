@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.6
+
+- Updated first-run guidance with a connection-dependent next step, command-palette shortcuts, companion reload instructions, current clocked support and automatic reconnect behavior.
+- Added human-readable accessible names for circuit components and connections, accurate keyboard editing guidance and a keyboard shortcut past the circuit canvas to the inspector.
+- Kept the visual synchronization countdown outside the live announcement region, so each tick does not repeat the status. Added captions and row/column headers to sampled waveform values.
+- Expanded native regression coverage for disconnected/connected onboarding, quiet countdowns, named graph elements, table semantics and skip-canvas focus restoration.
+
 ## 0.9.5
 
 - Added clocked module/entity hierarchy with isolated per-instance registers, simultaneous updates and bounded delta-cycle settling. Flattened dependency validation rejects combinational feedthrough loops while allowing register feedback. Parent waveforms expose hierarchical signal names.

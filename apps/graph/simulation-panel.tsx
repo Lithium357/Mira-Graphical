@@ -311,18 +311,21 @@ export function SimulationPanel({
             <details>
               <summary>Sample values</summary>
               <table>
+                <caption>Sampled signal values</caption>
                 <thead>
                   <tr>
-                    <th>Signal</th>
+                    <th scope="col">Signal</th>
                     {samples.map((_, i) => (
-                      <th key={i}>{i}</th>
+                      <th scope="col" key={i}>
+                        Sample {i}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {watch.map((name) => (
                     <tr key={name}>
-                      <th>{name}</th>
+                      <th scope="row">{name}</th>
                       {samples.map((s, i) => (
                         <td key={i}>{s[name]?.value ?? '—'}</td>
                       ))}

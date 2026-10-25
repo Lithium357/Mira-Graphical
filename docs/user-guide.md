@@ -1,6 +1,6 @@
 # User guide
 
-Install the [Windows testing build](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.5), then follow [setup and verification](distribution.md). For source builds, see [development](development.md).
+Install the [Windows testing build](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.6), then follow [setup and verification](distribution.md). For source builds, see [development](development.md).
 
 ## Adder demo
 
@@ -69,4 +69,6 @@ Try `fixtures/combinational.v`: select `8'h0F` and queue `8'h2A`, select `a[7:0]
 
 Keyboard arrow keys move selected nodes and save their positions. Newly shared modules open automatically in the module picker. Window bounds are saved on close and restored on a connected monitor; unplugged-monitor bounds are clamped back on screen.
 
-Unsupported constructs reject the projection rather than silently disappearing. Layout and graph identities are independent of source formatting and operator spelling. New nodes receive left-to-right dependency placement; a committed removal discards their old position. Renames and structural expression rewrites may create new identities. Recovery opens reviewable copies; merging recovered changes remains manual. Sequential simulation, synthesis, multi-workspace window management and arbitrary Verilog support remain outside this version.
+Unsupported constructs reject the projection rather than silently disappearing. Layout and graph identities are independent of source formatting and operator spelling. New nodes receive left-to-right dependency placement; a committed removal discards their old position. Renames and structural expression rewrites may create new identities. Recovery opens reviewable copies; merging recovered changes remains manual. Timed simulation, synthesis, multi-workspace window management and arbitrary Verilog support remain outside this version.
+
+See [keyboard and screen-reader use](accessibility.md) for canvas navigation, sample tables, first-run steps and the current validation limits.
