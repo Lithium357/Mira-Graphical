@@ -2,6 +2,8 @@
 
 Build, wire and explore HDL circuits in a Windows desktop workspace, with live source synchronization to VS Code.
 
+> **AI-assisted development:** Mira is built with substantial assistance from OpenAI Codex, including code, tests, and documentation. The maintainer directs development and tests the app on real HDL projects. See [testing and limitations](docs/testing.md).
+
 [![CI](https://github.com/Lithium357/Mira-Graphical/actions/workflows/ci.yml/badge.svg)](https://github.com/Lithium357/Mira-Graphical/actions/workflows/ci.yml)
 [![Version: 0.9.7 beta](https://img.shields.io/badge/version-0.9.7_beta-42d6bc)](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.7)
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE)
