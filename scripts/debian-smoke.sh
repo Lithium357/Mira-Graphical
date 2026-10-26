@@ -62,7 +62,8 @@ apt-get purge -y mira-graphical
 test ! -e "$binary"
 test ! -e /usr/share/applications/mira-graphical.desktop
 test -f '/home/mira-test/project with spaces/keep.sv'
-test -f '/home/mira-test/project with spaces/installed/.hdlgraph/connection.json'
+test -d '/home/mira-test/project with spaces/installed/.hdlgraph'
+find '/home/mira-test/project with spaces/installed/.hdlgraph' -name 'checkpoint-*.json' -print -quit | grep -q .
 python3 - "$version" "$output/debian-smoke.json" <<'PY'
 import json,sys
 release=dict(line.strip().split('=',1) for line in open('/etc/os-release') if '=' in line)
