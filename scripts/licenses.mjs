@@ -10,6 +10,8 @@ import {
 import { createHash } from 'node:crypto';
 import { join, relative, dirname, resolve } from 'node:path';
 const seen = new Set();
+const outputDirectory =
+  process.argv.find((a) => a.startsWith('--output-dir='))?.slice(13) ?? 'docs';
 const packages = [];
 function find(name, from) {
   let dir = from;
@@ -88,9 +90,9 @@ const developmentHelper = (p) =>
       '80780388a077c74609a5fc7ee1cc3d382740a5e48d87f7aac5a20cbddef3e91c',
   );
 const unknown = packages.filter((p) => !permitted.has(p.license) && !developmentHelper(p));
-mkdirSync('docs', { recursive: true });
+mkdirSync(outputDirectory, { recursive: true });
 writeFileSync(
-  'docs/third-party-licenses.json',
+  join(outputDirectory, 'third-party-licenses.json'),
   JSON.stringify(
     packages.map((p) => ({
       ...p,
@@ -109,7 +111,7 @@ for (const p of packages) {
       notices += `\n${readFileSync(file, 'utf8').replace(/\r\n?/g, '\n')}\n`;
     } catch {}
 }
-writeFileSync('docs/THIRD_PARTY_NOTICES.txt', notices);
+writeFileSync(join(outputDirectory, 'THIRD_PARTY_NOTICES.txt'), notices);
 console.log(
   `${packages.length} installed package versions audited; ${unknown.length} licenses need review; ${packages.filter(developmentHelper).length} reviewed development-only Microsoft helpers (not distributed).`,
 );

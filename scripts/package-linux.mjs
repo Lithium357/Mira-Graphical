@@ -88,7 +88,8 @@ cpSync('dist/apps/graph/preload.cjs', join(stage, 'dist/apps/graph/preload.cjs')
 cpSync('apps/graph/dist', join(stage, 'apps/graph/dist'), { recursive: true });
 cpSync('LICENSE', join(stage, 'LICENSE'));
 cpSync('build/mira.png', join(stage, 'icon.png'));
-cpSync('docs/THIRD_PARTY_NOTICES.txt', join(stage, 'THIRD_PARTY_NOTICES.txt'));
+const notices = 'dist/linux-licenses/THIRD_PARTY_NOTICES.txt';
+cpSync(notices, join(stage, 'THIRD_PARTY_NOTICES.txt'));
 execFileSync('git', [
   'archive',
   '--format=zip',
@@ -123,7 +124,7 @@ const artifacts = await build({
       },
       { from: join(output, 'Mira-Graphical-Source.zip'), to: 'Mira-Graphical-Source.zip' },
       { from: 'LICENSE', to: 'LICENSE.txt' },
-      { from: 'docs/THIRD_PARTY_NOTICES.txt', to: 'THIRD_PARTY_NOTICES.txt' },
+      { from: notices, to: 'THIRD_PARTY_NOTICES.txt' },
     ],
     linux: {
       target: 'deb',

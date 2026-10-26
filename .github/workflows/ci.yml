@@ -97,7 +97,7 @@ jobs:
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint && pnpm format:check && pnpm test
-      - run: pnpm run licenses && pnpm build
+      - run: node scripts/licenses.mjs --output-dir=dist/linux-licenses && MIRA_NOTICES_FILE=dist/linux-licenses/THIRD_PARTY_NOTICES.txt pnpm build
       - run: dbus-run-session -- xvfb-run -a sh -c 'openbox >/tmp/mira-openbox.log 2>&1 & pnpm smoke'
       - uses: actions/upload-artifact@v4
         if: always()

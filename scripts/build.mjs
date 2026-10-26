@@ -36,5 +36,5 @@ await vite({
   logLevel: 'warn',
 });
 copyFileSync('LICENSE', 'extensions/vscode/LICENSE');
-if (existsSync('docs/THIRD_PARTY_NOTICES.txt'))
-  copyFileSync('docs/THIRD_PARTY_NOTICES.txt', 'extensions/vscode/THIRD_PARTY_NOTICES.txt');
+const notices = process.env.MIRA_NOTICES_FILE ?? 'docs/THIRD_PARTY_NOTICES.txt';
+if (existsSync(notices)) copyFileSync(notices, 'extensions/vscode/THIRD_PARTY_NOTICES.txt');
