@@ -74,6 +74,8 @@ export class SyncService {
   readonly server: WebSocketServer;
   private editor?: WebSocket;
   editorVersion?: string;
+  editorName?: string;
+  private editorReadOnly = false;
   private editorRecovery = false;
   get editorConnected() {
     return this.editor?.readyState === WebSocket.OPEN;
@@ -81,6 +83,7 @@ export class SyncService {
   private owners = new Map<string, WebSocket>();
   private listeners = new Set<(states: State[]) => void>();
   private descriptor?: string;
+  private closing = false;
   constructor(
     workspace: string,
     private clock?: Clock,
@@ -98,6 +101,10 @@ export class SyncService {
       perMessageDeflate: false,
     });
     this.server.on('connection', (socket, req) => {
+      if (this.closing) {
+        socket.terminate();
+        return;
+      }
       if (req.headers.origin) {
         socket.close(1008, 'Browser clients are not allowed');
         return;
@@ -106,6 +113,7 @@ export class SyncService {
       const timeout = setTimeout(() => socket.close(1008, 'Authentication required'), 3000);
       socket.on('error', () => {});
       socket.on('message', (raw) => {
+        if (this.closing) return;
         try {
           const msg: unknown = JSON.parse(raw.toString());
           if (!validateMessage(msg)) throw new Error('Invalid protocol message.');
@@ -122,6 +130,9 @@ export class SyncService {
             this.editor = socket;
             this.editorRecovery = msg.capabilities?.includes('recovery-review') ?? false;
             this.editorVersion = msg.version;
+            this.editorName =
+              msg.displayName ?? (msg.editor === 'vscode' ? 'VS Code' : 'LSP editor');
+            this.editorReadOnly = msg.capabilities?.includes('view-only') ?? false;
             this.send(socket, {
               type: 'hello.ok',
               protocolVersion: 1,
@@ -167,6 +178,7 @@ export class SyncService {
               },
               this.clock,
               layout,
+              this.editorReadOnly,
             );
             this.sessions.set(msg.uri, session);
             return;
@@ -198,11 +210,13 @@ export class SyncService {
         if (this.editor === socket) {
           this.editor = undefined;
           this.editorVersion = undefined;
+          this.editorName = undefined;
+          this.editorReadOnly = false;
           this.editorRecovery = false;
         }
         for (const [uri, owner] of this.owners)
           if (owner === socket) {
-            this.sessions.get(uri)?.disconnect();
+            if (!this.closing) this.sessions.get(uri)?.disconnect();
             this.owners.delete(uri);
           }
       });
@@ -249,10 +263,14 @@ export class SyncService {
   }
   openRecovery(id: string, preview: boolean, compare: boolean, expectedHash?: string) {
     if (!this.editor || this.editor.readyState !== WebSocket.OPEN)
-      throw new Error('Connect VS Code to open a recovered copy. You can also copy the text here.');
+      throw new Error(
+        'Connect an editor to open a recovered copy. You can also copy the text here.',
+      );
     if (!this.editorRecovery)
       throw new Error(
-        'Update the Mira companion extension to 0.6.0 or newer to open recovery. Copy text is still available.',
+        this.editorName === 'VS Code'
+          ? 'Update the Mira companion extension to 0.6.0 or newer to open recovery. Copy text is still available.'
+          : 'This editor connection does not support opening recovery copies. Copy text is still available.',
       );
     const saved = this.recovery.read(id);
     if (expectedHash !== undefined && recoveryFingerprint(saved) !== expectedHash)
@@ -336,6 +354,7 @@ export class SyncService {
     return config;
   }
   async close() {
+    this.closing = true;
     for (const s of this.sessions.values()) s.close();
     for (const socket of this.server.clients) socket.terminate();
     await new Promise<void>((ok) => this.server.close(() => ok()));

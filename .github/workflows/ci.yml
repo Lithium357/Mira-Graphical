@@ -146,6 +146,33 @@ jobs:
             dist/packages/*.vsix
             dist/packages/manifest.json
             test-results/debian-*/
+  editor-companions:
+    name: Vim and Neovim live buffers
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y vim neovim
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Fetch pinned Vim client for integration testing
+        run: |
+          git init test-results/vim-lsp
+          git -C test-results/vim-lsp remote add origin https://github.com/prabirshrestha/vim-lsp.git
+          git -C test-results/vim-lsp fetch --depth=1 origin 977e704cdbbbbc89a54f8f226d3468b0aa0405c9
+          git -C test-results/vim-lsp checkout --detach FETCH_HEAD
+      - run: pnpm test:editors
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: editor-companion-results
+          path: test-results/lsp-editors/
   hdl-reference:
     name: HDL compiler reference checks
     runs-on: ubuntu-latest

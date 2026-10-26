@@ -3,6 +3,14 @@ import { build as bundle } from 'esbuild';
 import { build as vite } from 'vite';
 import { copyFileSync, existsSync } from 'node:fs';
 await bundle({
+  entryPoints: ['packages/lsp/cli.ts'],
+  outfile: 'dist/editors/mira-lsp.cjs',
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'node24',
+});
+await bundle({
   entryPoints: ['extensions/vscode/extension.ts'],
   outfile: 'extensions/vscode/dist/extension.cjs',
   bundle: true,

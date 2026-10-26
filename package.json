@@ -1,6 +1,6 @@
 {
   "name": "mira-graphical",
-  "version": "0.9.8",
+  "version": "0.9.9",
   "private": true,
   "type": "module",
   "license": "GPL-3.0-only",
@@ -27,6 +27,7 @@
     "test:clocked": "tsx scripts/reference-clocked.ts",
     "test:projects": "tsx scripts/reference-projects.ts",
     "test:enums": "tsx scripts/reference-enums.ts",
+    "test:editors": "tsx scripts/lsp-editor-smoke.ts",
     "test:acceptance": "tsx scripts/release-acceptance.ts"
   },
   "dependencies": {

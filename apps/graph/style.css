@@ -1125,3 +1125,9 @@ dl,
   outline: 2px solid #78d8ff;
   outline-offset: 3px;
 }
+:root .source-readonly {
+  margin: 0;
+  padding: 8px 12px;
+  color: #ffce88;
+  background: #33291e;
+}

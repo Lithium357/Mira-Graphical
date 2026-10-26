@@ -274,12 +274,12 @@ function Diagram({
           data: {
             ...n,
             label: n.label,
-            readonly: n.editable === false,
+            readonly: state.readOnly || n.editable === false,
             connectable: state.canConstruct,
           },
         })) ?? [],
     );
-  }, [graph, state.layout, state.status, state.canConstruct, setNodes]);
+  }, [graph, state.layout, state.status, state.canConstruct, state.readOnly, setNodes]);
   const node = graph?.nodes.find((n) => n.id === selected);
   useEffect(() => {
     if (node) lastValidSelection.current = node.id;
@@ -423,6 +423,12 @@ function Diagram({
             !!(e.target as HTMLElement).closest('.react-flow__node');
         }}
       >
+        {state.readOnly && (
+          <p className="source-readonly" role="status">
+            Live viewing only · Edit HDL in your editor. Graph editing requires a client that
+            supports versioned edits.
+          </p>
+        )}
         <div className="construction-toolbar">
           <button
             data-add-component
@@ -785,7 +791,10 @@ function Diagram({
               }}
               graph={graph}
               revision={`${state.version}:${state.pendingSteps}`}
-              disabled={!state.canConstruct && !(graph.sequential && state.status === 'Synced')}
+              disabled={
+                !state.canConstruct &&
+                !((graph.sequential || state.readOnly) && state.status === 'Synced')
+              }
               run={(inputs, reset) =>
                 window.mira.command({
                   type: 'simulate',
@@ -969,7 +978,7 @@ function Diagram({
                     {Math.round(state.layout.nodes[node.id]?.y ?? 0)}
                   </dd>
                 </dl>
-                {node.kind === 'op' && node.editable !== false && (
+                {node.kind === 'op' && node.editable !== false && !state.readOnly && (
                   <>
                     <h3>Replace operation</h3>
                     <div className="palette">
@@ -996,76 +1005,83 @@ function Diagram({
                         ))}
                     </div>
                     <p className="hint">
-                      Updates the selected operator in VS Code after 15 quiet seconds. Comments and
-                      formatting are preserved.
+                      Updates the selected operator in your editor after 15 quiet seconds. Comments
+                      and formatting are preserved.
                     </p>
                   </>
                 )}
-                {((node.kind === 'literal' && node.editable !== false) ||
-                  node.kind === 'slice' ||
-                  (node.kind === 'mux' && node.selector)) && (
-                  <form
-                    className="edit-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void command({
-                        type: 'change',
-                        uri: state.uri,
-                        id: node.id,
-                        kind: node.kind === 'mux' ? 'selector' : node.kind,
-                        value: draft,
-                      });
-                    }}
-                  >
-                    <label htmlFor="component-value">
-                      {node.kind === 'literal'
-                        ? 'Literal value'
-                        : node.kind === 'slice'
-                          ? 'Slice range'
-                          : 'Mux selector'}
-                    </label>
-                    {node.kind === 'mux' ? (
-                      <select
-                        id="component-value"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                      >
-                        {graph?.nodes
-                          .filter(
-                            (n) =>
-                              ['input', 'wire', 'output'].includes(n.kind) &&
-                              n.width === 1 &&
-                              (graph?.language !== 'vhdl' || n.nativeType === 'std_logic'),
-                          )
-                          .map((n) => (
-                            <option key={n.id} value={n.label}>
-                              {n.label}
-                            </option>
-                          ))}
-                      </select>
-                    ) : (
-                      <input
-                        id="component-value"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        maxLength={8192}
-                        placeholder={node.kind === 'literal' ? "8'hFF" : '[7:0]'}
-                      />
-                    )}
-                    <button
-                      disabled={['Disconnected', 'Applying', 'Conflict'].includes(state.status)}
+                {!state.readOnly &&
+                  ((node.kind === 'literal' && node.editable !== false) ||
+                    node.kind === 'slice' ||
+                    (node.kind === 'mux' && node.selector)) && (
+                    <form
+                      className="edit-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void command({
+                          type: 'change',
+                          uri: state.uri,
+                          id: node.id,
+                          kind: node.kind === 'mux' ? 'selector' : node.kind,
+                          value: draft,
+                        });
+                      }}
                     >
-                      Queue change
-                    </button>
-                    <p className="hint">
-                      Only this source token or range changes after 15 quiet seconds.
-                    </p>
-                  </form>
-                )}
+                      <label htmlFor="component-value">
+                        {node.kind === 'literal'
+                          ? 'Literal value'
+                          : node.kind === 'slice'
+                            ? 'Slice range'
+                            : 'Mux selector'}
+                      </label>
+                      {node.kind === 'mux' ? (
+                        <select
+                          id="component-value"
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                        >
+                          {graph?.nodes
+                            .filter(
+                              (n) =>
+                                ['input', 'wire', 'output'].includes(n.kind) &&
+                                n.width === 1 &&
+                                (graph?.language !== 'vhdl' || n.nativeType === 'std_logic'),
+                            )
+                            .map((n) => (
+                              <option key={n.id} value={n.label}>
+                                {n.label}
+                              </option>
+                            ))}
+                        </select>
+                      ) : (
+                        <input
+                          id="component-value"
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          maxLength={8192}
+                          placeholder={node.kind === 'literal' ? "8'hFF" : '[7:0]'}
+                        />
+                      )}
+                      <button
+                        disabled={['Disconnected', 'Applying', 'Conflict'].includes(state.status)}
+                      >
+                        Queue change
+                      </button>
+                      <p className="hint">
+                        Only this source token or range changes after 15 quiet seconds.
+                      </p>
+                    </form>
+                  )}
                 {node.kind === 'mux' && !node.selector && (
                   <p className="hint">
                     This selector is an expression. Edit its supported operations in the graph, or
                     change its structure in VS Code.
+                  </p>
+                )}
+                {state.readOnly && (
+                  <p role="status">
+                    Live viewing only: this editor cannot apply versioned graph edits. Edit the HDL
+                    in your editor; simulation and layout remain available.
                   </p>
                 )}
               </>
@@ -1183,7 +1199,8 @@ function App() {
             aria-label="Module definition"
             value={state.graph.module}
             disabled={
-              (!state.canConstruct && !(state.graph.sequential && state.status === 'Synced')) ||
+              (!state.canConstruct &&
+                !((state.graph.sequential || state.readOnly) && state.status === 'Synced')) ||
               !!state.pendingSteps
             }
             onChange={(e) =>

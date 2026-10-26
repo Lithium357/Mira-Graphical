@@ -63,6 +63,7 @@ export type State = {
   undoCount?: number;
   redoCount?: number;
   canConstruct?: boolean;
+  readOnly?: boolean;
   recoveryWarning?: string;
 };
 export interface Clock {
@@ -117,6 +118,7 @@ export class Session {
     private hooks: Hooks,
     private time: Clock = clock,
     layout?: Layout,
+    private readOnly = false,
   ) {
     this.text = text;
     this.state = {
@@ -124,6 +126,7 @@ export class Session {
       version,
       status: 'Pending',
       diagnostics: [],
+      readOnly,
       layout: layout ?? { schemaVersion: 1, nodes: {}, identities: {} },
     };
     this.pendingText = true;
@@ -160,6 +163,7 @@ export class Session {
     this.state.redoCount = this.draft?.redo.length ?? 0;
     this.state.canConstruct =
       !!this.state.graph &&
+      !this.readOnly &&
       this.connected &&
       !this.pendingText &&
       !this.inFlight &&
@@ -232,6 +236,8 @@ export class Session {
     this.graphChange(id, { kind: 'operator', value: op });
   }
   graphChange(id: string, change: GraphChange) {
+    if (this.readOnly)
+      throw new Error('This editor supports live viewing only; edit the source in your editor.');
     if (!this.connected || this.inFlight || this.conflicted)
       throw new Error(
         'Reconnect / reopen the module after a conflict, or wait for the patch acknowledgment.',
@@ -259,7 +265,9 @@ export class Session {
     this.authority = 'graph';
     this.activity();
   }
-  private editableConstruction() {
+  private editableConstruction(allowReadOnly = false) {
+    if (this.readOnly && !allowReadOnly)
+      throw new Error('This editor supports live viewing only; edit the source in your editor.');
     if (
       !this.connected ||
       this.inFlight ||
@@ -376,7 +384,7 @@ export class Session {
     };
   }
   exportModules(name: string): string[] {
-    this.editableConstruction();
+    this.editableConstruction(true);
     if (this.draft?.table.edits().length)
       throw new Error('Synchronize the source module before importing it.');
     const ast = parse(this.text, name),
@@ -394,7 +402,7 @@ export class Session {
     );
   }
   simulate(inputs: Record<string, string>, reset = false) {
-    this.editableConstruction();
+    this.editableConstruction(true);
     const source = this.draft?.table.text ?? this.text;
     const key = this.state.graph!.module + ':' + hash(source);
     const result = simulate(
@@ -407,7 +415,7 @@ export class Session {
     return result;
   }
   copy(ids: string[]): ClipboardItem[] {
-    this.editableConstruction();
+    this.editableConstruction(true);
     return copyComponents(
       this.draft?.table.text ?? this.text,
       this.draft?.graph ?? this.state.graph!,
@@ -415,7 +423,7 @@ export class Session {
     );
   }
   selectModule(name: string) {
-    this.editableConstruction();
+    this.editableConstruction(true);
     if (this.draft?.table.edits().length || this.edits.size)
       throw new Error('Synchronize or discard pending edits before navigating modules.');
     parse(this.text, name);

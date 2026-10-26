@@ -4,11 +4,11 @@ Mira provides an **amd64 `.deb` package for Debian 12 and 13**, with the same HD
 
 ## Install and connect
 
-Download `Mira-Graphical-0.9.8-amd64.deb` and `SHA256SUMS` from the [0.9.8 beta release](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.8). Check the package hash against the release checksums, then install it from your download directory:
+Download `Mira-Graphical-0.9.9-amd64.deb` and `SHA256SUMS` from the [0.9.9 beta release](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.9). Check the package hash against the release checksums, then install it from your download directory:
 
 ```sh
-sha256sum Mira-Graphical-0.9.8-amd64.deb
-sudo apt install ./Mira-Graphical-0.9.8-amd64.deb
+sha256sum Mira-Graphical-0.9.9-amd64.deb
+sudo apt install ./Mira-Graphical-0.9.9-amd64.deb
 ```
 
 Launch **Mira Graphical** from your desktop's application menu, or run `mira-graphical`. Choose your project folder. In **Setup help → Show VS Code extension…**, locate the bundled companion; install it using VS Code's **Extensions: Install from VSIX…** command. Open the same folder in a local Linux VS Code window and run **RTL Graph: Open Current Module** on your HDL document. The graph updates after 15 seconds of inactivity. After companion upgrades, run **Developer: Reload Window** once.

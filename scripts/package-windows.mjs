@@ -118,6 +118,9 @@ const artifacts = await build({
       'THIRD_PARTY_NOTICES.txt',
     ],
     extraResources: [
+      { from: 'dist/editors/mira-lsp.cjs', to: 'editors/mira-lsp.cjs' },
+      { from: 'build/editors/mira-lsp.cmd', to: 'editors/mira-lsp.cmd' },
+      { from: 'docs/editors.md', to: 'editors/README.md' },
       {
         from: `dist/packages/mira-graphical-${manifest.version}.vsix`,
         to: 'companion/mira-graphical.vsix',

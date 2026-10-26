@@ -147,6 +147,14 @@ else {
           shell.showItemInFolder(source);
           return;
         }
+        if (c.type === 'otherEditors') {
+          const folder = app.isPackaged
+            ? join(process.resourcesPath, 'editors')
+            : join(root, 'docs', 'editors.md');
+          const { shell } = await import('electron');
+          shell.showItemInFolder(folder);
+          return;
+        }
         if (c.type === 'copyText' && typeof c.text === 'string' && c.text.length <= 1_000_000) {
           return clipboard.writeText(c.text);
         }
@@ -155,6 +163,7 @@ else {
             workspace,
             states: [...service!.states.values()],
             editorConnected: service!.editorConnected,
+            editorName: service!.editorName,
             version: app.getVersion(),
             companionVersion: service!.editorVersion,
             packaged: app.isPackaged,

@@ -6,6 +6,7 @@ export function SetupGuide({ workspace }: { workspace: string }) {
   const [versions, setVersions] = useState<{ desktop: string; companion?: string }>();
   const [packaged, setPackaged] = useState(false);
   const [shared, setShared] = useState(0);
+  const [editor, setEditor] = useState('VS Code');
   useEffect(() => {
     let active = true;
     const check = async () => {
@@ -16,7 +17,12 @@ export function SetupGuide({ workspace }: { workspace: string }) {
           setPackaged(snapshot.packaged === true);
           setShared(snapshot.states.length);
           setVersions({ desktop: snapshot.version, companion: snapshot.companionVersion });
-          setMessage(snapshot.editorConnected ? 'VS Code connected' : 'Waiting for VS Code');
+          setEditor(snapshot.editorName ?? 'VS Code');
+          setMessage(
+            snapshot.editorConnected
+              ? `${snapshot.editorName ?? 'VS Code'} connected`
+              : 'Waiting for an editor',
+          );
         }
       } catch {
         if (active) setMessage('Connection status unavailable. Restart Mira for this workspace.');
@@ -40,7 +46,9 @@ export function SetupGuide({ workspace }: { workspace: string }) {
         {connected && versions?.desktop !== versions?.companion
           ? 'Update the companion below, then run Developer: Reload Window in VS Code.'
           : connected && shared === 0
-            ? 'Open an HDL file in VS Code and run RTL Graph: Open Current Module.'
+            ? editor === 'VS Code'
+              ? 'Open an HDL file in VS Code and run RTL Graph: Open Current Module.'
+              : 'Open an HDL file with the Mira LSP companion enabled in this project.'
             : connected
               ? 'Your file is shared. Wait for the synchronization countdown; check any diagnostic shown above.'
               : 'Install the companion below, open this project in VS Code, then share an HDL file.'}
@@ -74,6 +82,25 @@ export function SetupGuide({ workspace }: { workspace: string }) {
           Show VS Code extension…
         </button>
       )}
+      <details>
+        <summary>Vim, Neovim, Notepad++ and other editors</summary>
+        <p>
+          Use the bundled Mira LSP companion with your editor's LSP client. It shares open HDL
+          buffers, including unsaved changes. Clients supporting versioned workspace edits can also
+          apply graph changes with native Undo; other clients use live viewing and simulation.
+        </p>
+        <p>
+          Notepad++ with NppLspClient currently uses live viewing only. Use Folder as Workspace to
+          select the same project as Mira.
+        </p>
+        <button
+          onClick={() =>
+            void window.mira.command({ type: 'otherEditors' }).catch((e) => setMessage(String(e)))
+          }
+        >
+          Show other editor setup…
+        </button>
+      </details>
       <ol>
         <li>
           In VS Code, use File → Open Folder to open the workspace shown above. Trust only projects

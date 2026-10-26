@@ -7,12 +7,14 @@ import { WebSocket } from 'ws';
 import type { BrowserWindow } from 'electron';
 import type { SyncService } from '../../packages/core/service.js';
 import { APP_VERSION } from '../../packages/protocol/version.js';
+import { checkLspBundle } from '../../packages/lsp/check.js';
 export async function checkPackagedApp(
   service: SyncService,
   win: BrowserWindow,
   workspace: string,
 ) {
   const config = await service.ready();
+  await checkLspBundle(process.execPath, process.resourcesPath, workspace);
   const ws = new WebSocket(`ws://127.0.0.1:${config.port}`);
   await new Promise<void>((ok, fail) => {
     ws.once('open', ok);
@@ -138,6 +140,7 @@ export async function checkPackagedApp(
         platform: process.platform,
         version: APP_VERSION,
         nodeIsolation: true,
+        lspCompanion: true,
       },
       null,
       2,

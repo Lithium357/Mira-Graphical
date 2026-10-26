@@ -84,7 +84,8 @@ export type EditorMessage =
       type: 'hello';
       protocolVersion: 1;
       token: string;
-      editor: 'vscode';
+      editor: 'vscode' | 'lsp';
+      displayName?: string;
       version?: string;
       workspace: string;
       capabilities?: string[];
@@ -134,7 +135,9 @@ export function validateMessage(v: unknown): v is EditorMessage {
       (v.version === undefined ||
         (typeof v.version === 'string' && /^[0-9A-Za-z.+-]{1,64}$/.test(v.version))) &&
       v.protocolVersion === 1 &&
-      v.editor === 'vscode' &&
+      ['vscode', 'lsp'].includes(String(v.editor)) &&
+      (v.displayName === undefined ||
+        (typeof v.displayName === 'string' && /^[^\x00-\x1f\x7f]{1,64}$/.test(v.displayName))) &&
       typeof v.token === 'string' &&
       v.token.length <= 256 &&
       typeof v.workspace === 'string' &&

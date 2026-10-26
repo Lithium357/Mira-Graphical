@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.9 — Editor companions beta
+
+- Added a shared LSP companion for live HDL buffers beyond VS Code, bundled with Windows and Debian runtime launchers and editor setup instructions.
+- Added guarded versioned graph edits for capable clients, preserving native editor Undo and requiring both an edit response and the actual changed buffer before acknowledgment.
+- Added explicit live-viewing mode for clients without versioned edit support, including Notepad++'s current NppLspClient. Viewing, layout, module navigation and simulation remain available; graph source writes are disabled in the core and UI.
+- Added UTF-16/CRLF framing tests, real Vim/Neovim integration coverage and installed-package companion launch checks.
+
 ## 0.9.8 — Debian desktop beta and enum FSMs
 
 - Added a native Debian amd64 package with a desktop launcher, PNG icon, bundled companion/source and checksums. Added Debian 12/13 package lifecycle checks and Linux desktop/VS Code integration CI.

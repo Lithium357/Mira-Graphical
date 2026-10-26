@@ -1,5 +1,13 @@
 # Architecture and safety boundaries
 
+## Other editor companions
+
+The stdio LSP companion in `packages/lsp` translates open/change/close notifications into the existing authenticated local editor protocol. It keeps only explicitly opened HDL buffers inside the selected root, negotiates UTF-16 positions, requests full synchronization and also validates incremental ranges. The desktop never scans or saves source files. The launcher uses Electron's bundled Node runtime in packaged distributions; it creates no desktop window.
+
+For clients advertising both `workspace.applyEdit` and versioned `workspaceEdit.documentChanges`, the companion independently replays graph proofs against the cached live revision, sends one versioned text-document edit, then waits for both the successful LSP response and matching changed-buffer notification. A missing or conflicting acknowledgment leaves the existing conflict/recovery path intact. Client buffer revisions are tracked separately from monotonic service revisions, including clients starting at version zero. Reconnection rereads the descriptor and sends current snapshots; pending edits are not replayed.
+
+Clients without those capabilities advertise `view-only` to the desktop. Each session enforces read-only source actions, while simulation, layout and navigation use a separate read permission. The UI identifies the mode and omits token edit controls. The editor display name is bounded protocol data, not an executable command. Notepad++'s current NppLspClient uses this mode; its upstream apply-edit handler is unimplemented. Recovery copy-to-editor remains a VS Code capability; clipboard recovery works for everyone.
+
 ## Native HDL frontends
 
 `packages/verilog` handles the documented Verilog/SystemVerilog subset; `packages/vhdl` tokenizes and parses native VHDL into the shared expression/hierarchy model with explicit native types, widths and conversion nodes. VHDL uses its own arithmetic sizing and source emitter. Common projection, layout, hierarchy, simulation and synchronization operate on that model. Source content selects the frontend, while the adapter accepts `.v`, `.sv`, `.vhd` and `.vhdl` documents.
