@@ -8,7 +8,8 @@ import { SyncService } from '../packages/core/service.js';
 const root = process.cwd(),
   output = resolve('test-results/lsp-editors');
 mkdirSync(output, { recursive: true });
-const disk = 'module editor_test(input [7:0] a,b,output [7:0] y);assign y=a+b;endmodule\n';
+const disk =
+  'module editor_test(input [7:0] a,b,output [7:0] y); /* Unicode 🙂 */ assign y=a+b;endmodule\r\n';
 const selected = process.argv.find((a) => a.startsWith('--editor='))?.slice(9);
 if (selected && !['neovim', 'vim'].includes(selected)) throw new Error('Unknown editor test');
 for (const editor of selected ? [selected] : ['neovim', 'vim']) {

@@ -108,7 +108,7 @@ function! s:Apply(request) abort
       execute (len(lines)+1).',$delete _'
     endif
     let &l:endofline = final_newline
-    let applied = s:Text(doc.buf) ==# text
+    let applied = s:Text(doc.buf) ==# text ? v:true : v:false
     let s:applying = 0
     call s:Snapshot()
   catch
