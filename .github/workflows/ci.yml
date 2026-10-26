@@ -161,12 +161,6 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y vim neovim
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - name: Fetch pinned Vim client for integration testing
-        run: |
-          git init test-results/vim-lsp
-          git -C test-results/vim-lsp remote add origin https://github.com/prabirshrestha/vim-lsp.git
-          git -C test-results/vim-lsp fetch --depth=1 origin 977e704cdbbbbc89a54f8f226d3468b0aa0405c9
-          git -C test-results/vim-lsp checkout --detach FETCH_HEAD
       - run: pnpm test:editors
       - uses: actions/upload-artifact@v4
         if: always()

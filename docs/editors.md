@@ -5,7 +5,7 @@ Mira's **LSP companion** connects open HDL buffers from other editors to the des
 | Editor/client                                            | Mode                                                                                                                                              |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Neovim built-in LSP                                      | Two-way live buffers and versioned graph edits with native Undo                                                                                   |
-| Vim with `prabirshrestha/vim-lsp`                        | Two-way live buffers and versioned graph edits with native Undo                                                                                   |
+| Vim with the bundled Mira companion                      | Two-way live buffers and versioned graph edits with native Undo                                                                                   |
 | Notepad++ with NppLspClient                              | Live buffers, graph viewing, layout and simulation; graph editing disabled                                                                        |
 | Other LSP clients (for example Emacs Eglot, Sublime LSP) | Capability-based: two-way when versioned workspace edits are supported; otherwise live viewing. These clients need their own integration testing. |
 
@@ -42,21 +42,16 @@ On Windows, replace `cmd` with `{ 'cmd.exe', '/d', '/c', 'C:\\path\\to\\Mira Gra
 
 ## Vim
 
-Install [vim-lsp](https://github.com/prabirshrestha/vim-lsp) using your preferred plugin manager, then register Mira in your vimrc. Start Vim in the project folder, or use `:lcd` to select it before connecting:
+Use the bundled `mira.vim` companion. It checks the actual buffer text and change counter before applying a versioned edit; a general LSP plugin is unnecessary. Start Vim in your project folder and add this to your vimrc:
 
 ```vim
-augroup mira_lsp
-  autocmd!
-  autocmd User lsp_setup call lsp#register_server({
-        \ 'name': 'mira-graphical',
-        \ 'cmd': {info -> ['sh', '/opt/Mira Graphical/resources/editors/mira-lsp.sh']},
-        \ 'root_uri': {info -> lsp#utils#path_to_uri(getcwd())},
-        \ 'allowlist': ['verilog', 'systemverilog', 'vhdl'],
-        \ })
-augroup END
+source /opt/Mira\ Graphical/resources/editors/mira.vim
+let g:mira_lsp_command = ['sh', '/opt/Mira Graphical/resources/editors/mira-lsp.sh']
 ```
 
-For Windows, use `['cmd.exe', '/d', '/c', 'C:\path\to\Mira Graphical\resources\editors\mira-lsp.cmd']` for the command list. This requires Vim's job/channel support and the LSP plugin; plain legacy Vim without those features is unsupported.
+For Windows, source `C:/path/to/Mira Graphical/resources/editors/mira.vim` (escape spaces in the `:source` command) and use `['cmd.exe', '/d', '/c', 'C:\path\to\Mira Graphical\resources\editors\mira-lsp.cmd']` for the command list. Then run **`:MiraConnect`** from the project directory, or **`:MiraConnect /absolute/project/path`**. **`:MiraShare`** refreshes the current buffer; **`:MiraDisconnect`** ends the connection. Named HDL buffers update automatically while connected.
+
+This requires Vim 8+ with jobs/channels and UTF-8 encoding. The companion preserves file format and the EOF newline option; a graph edit changing that option is refused so native Undo remains exact. Configure Mira's root in the same filesystem namespace as the companion runtime. The common `vim-lsp` client currently does not advertise/enforce versioned document edits, so using it directly with the generic LSP companion gives live viewing only. Do not override capabilities to bypass that check.
 
 ## Notepad++
 
@@ -81,4 +76,4 @@ Replace the installation path, then use **Start server for current language**. F
 - If no graph appears, check the LSP log and project root. Mira's `.hdlgraph/connection.json` belongs to that project and contains local credentials; do not share or commit it. Files outside the project and non-file/untitled URIs are refused.
 - After a conflict, restart/reopen the LSP connection to negotiate the current buffer. Use Mira's Recovery panel to copy recovered text; opening a recovered copy directly in the editor remains a VS Code companion feature.
 
-The automated editor tests run real Vim/vim-lsp and Neovim processes and check unsaved changes, graph edits, native Undo and unchanged disk contents. Notepad++'s read-only negotiation is covered by protocol tests and its documented client capabilities; that does not claim a human Notepad++ walkthrough.
+The automated editor tests run real Vim/Mira-companion and Neovim processes and check unsaved changes, graph edits, native Undo and unchanged disk contents. Notepad++'s read-only negotiation is covered by protocol tests and its documented client capabilities; that does not claim a human Notepad++ walkthrough.

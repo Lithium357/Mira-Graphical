@@ -9,6 +9,7 @@ import { APP_VERSION } from '../protocol/version.js';
 export async function checkLspBundle(executable: string, resources: string, workspace: string) {
   const file = join(resources, 'editors/mira-lsp.cjs');
   assert(existsSync(file));
+  assert(existsSync(join(resources, 'editors/mira.vim')));
   assert(
     existsSync(
       join(

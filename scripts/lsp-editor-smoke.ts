@@ -75,11 +75,8 @@ vim.cmd('qa!')
     executable = process.env.MIRA_NVIM_EXE ?? 'nvim';
     args = ['--headless', '-u', 'NONE', '-n', '-c', 'luafile ' + script];
   } else {
-    const plugin = resolve('test-results/vim-lsp');
-    assert(
-      existsSync(join(plugin, 'plugin/lsp.vim')),
-      'Fetch the pinned vim-lsp test dependency first',
-    );
+    const plugin = resolve('build/editors/mira.vim');
+    assert(existsSync(plugin));
     const quote = (s: string) => "'" + s.replaceAll('\\', '/').replaceAll("'", "''") + "'";
     script = join(session, 'smoke.vim');
     writeFileSync(
@@ -87,16 +84,13 @@ vim.cmd('qa!')
       `set nocompatible
 set encoding=utf-8
 set noswapfile
-execute 'set runtimepath+=' . fnameescape(${quote(plugin)})
-let g:lsp_log_verbose=1
-let g:lsp_log_file=${quote(join(session, 'vim-lsp.log'))}
-runtime plugin/lsp.vim
-call lsp#register_server({'name':'mira','cmd':{info->${JSON.stringify(cmd)}},'root_uri':{info->${quote(pathToFileURL(workspace).href)}},'allowlist':['verilog','systemverilog']})
+execute 'source ' . fnameescape(${quote(plugin)})
+let g:mira_lsp_command=${JSON.stringify(cmd)}
 execute 'edit ' . fnameescape(${quote(file)})
 call append(0,'// UNSAVED editor marker')
 let &undolevels = &undolevels
 setfiletype systemverilog
-call lsp#enable()
+execute 'MiraConnect ' . ${quote(workspace)}
 function! WaitFor(expression,seconds) abort
  let deadline=reltimefloat(reltime())+a:seconds
  while !eval(a:expression)

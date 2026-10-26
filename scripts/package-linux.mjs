@@ -120,6 +120,7 @@ const artifacts = await build({
     extraResources: [
       { from: 'dist/editors/mira-lsp.cjs', to: 'editors/mira-lsp.cjs' },
       { from: 'build/editors/mira-lsp.sh', to: 'editors/mira-lsp.sh' },
+      { from: 'build/editors/mira.vim', to: 'editors/mira.vim' },
       { from: 'docs/editors.md', to: 'editors/README.md' },
       {
         from: `dist/packages/mira-graphical-${manifest.version}.vsix`,
