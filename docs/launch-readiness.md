@@ -27,7 +27,7 @@ Remaining work before declaring 1.0:
 - Validate first-run wording with an unfamiliar person. The 0.9.6 agent review used disposable profiles and expanded disconnected/connected guidance checks, while isolated-profile installation/editor tests cover the companion. A fresh-person usability trial remains distinct.
 - Select the final green-commit artifact and attach the release notes, manifests and checksums according to [distribution instructions](distribution.md). Signing remains deferred.
 
-Windows is the verified desktop platform. Portable core tests on Linux do not certify the Linux/macOS Electron application. Passing CI provides regression evidence, not full HDL conformance or a declaration that 1.0 is ready to ship.
+Windows and Linux have desktop integration CI; Debian 12/13 amd64 additionally have installed-package lifecycle checks. See [Debian validation scope](linux.md); native Wayland and human Orca acceptance remain separate. macOS is unverified. Passing CI provides regression evidence, not full HDL conformance or a declaration that 1.0 is ready to ship.
 
 ## Human acceptance checklist
 

@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.9.8 — Debian desktop beta and enum FSMs
+
+- Added a native Debian amd64 package with a desktop launcher, PNG icon, bundled companion/source and checksums. Added Debian 12/13 package lifecycle checks and Linux desktop/VS Code integration CI.
 
 - Added module-local SystemVerilog enums, named enum case labels and typed state registers for FSM code. State names remain visible in the circuit; reset and clock stepping use their declared encodings.
 - Added an enum FSM example, guarded graph edits, native desktop coverage and independent Icarus trace comparisons.

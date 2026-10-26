@@ -1,25 +1,25 @@
 # Mira Graphical
 
-Build, wire and explore HDL circuits in a Windows desktop workspace, with live source synchronization to VS Code.
+Build, wire and explore HDL circuits on Windows and Debian Linux, with live source synchronization to VS Code.
 
 > **AI-assisted development:** Mira is built with substantial assistance from OpenAI Codex, including code, tests, and documentation. The maintainer directs development and tests the app on real HDL projects. See [testing and limitations](docs/testing.md).
 
 [![CI](https://github.com/Lithium357/Mira-Graphical/actions/workflows/ci.yml/badge.svg)](https://github.com/Lithium357/Mira-Graphical/actions/workflows/ci.yml)
-[![Version: 0.9.7 beta](https://img.shields.io/badge/version-0.9.7_beta-42d6bc)](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.7)
+[![Version: 0.9.8 beta](https://img.shields.io/badge/version-0.9.8_beta-42d6bc)](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.8)
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE)
 
-**[Download for Windows x64](https://github.com/Lithium357/Mira-Graphical/releases/download/v0.9.7/Mira-Graphical-Setup-0.9.7-x64.exe)** · [Release notes and checksums](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.7) · [User guide](docs/user-guide.md)
+**[Windows x64](https://github.com/Lithium357/Mira-Graphical/releases/download/v0.9.8/Mira-Graphical-Setup-0.9.8-x64.exe)** · **[Debian amd64](https://github.com/Lithium357/Mira-Graphical/releases/download/v0.9.8/Mira-Graphical-0.9.8-amd64.deb)** · [Release notes and checksums](https://github.com/Lithium357/Mira-Graphical/releases/tag/v0.9.8) · [User guide](docs/user-guide.md)
 
 ![Mira workbench showing named module wiring, bus widths, a mux and a docked simulation panel](docs/images/workbench.png)
 
 ## Start testing
 
-1. Run **Mira-Graphical-Setup-0.9.7-x64.exe** and launch **Mira Graphical**.
+1. Install the Windows setup EXE or follow the [Debian installation steps](docs/linux.md), then launch **Mira Graphical**.
 2. Choose your HDL project folder. Open **Setup help → Show VS Code extension…** to locate the bundled companion.
 3. In VS Code, run **Extensions: Install from VSIX…**, select that companion, and open the same project folder.
 4. Open a `.v`, `.sv`, `.vhd` or `.vhdl` file and run **RTL Graph: Open Current Module**. The circuit appears after **15 seconds of inactivity**.
 
-The app includes its runtime; Node, pnpm and a terminal are unnecessary for installation. **0.9.7 is an unsigned public beta**. Windows may show an unknown-publisher/SmartScreen prompt. See [installation and checksum verification](docs/distribution.md).
+The app includes its runtime; Node and pnpm are unnecessary for installation. **0.9.8 is an unsigned public beta**. Windows may show an unknown-publisher/SmartScreen prompt. See [Windows installation and checksum verification](docs/distribution.md) or [Debian setup](docs/linux.md).
 
 ## What you can do
 
@@ -36,6 +36,7 @@ The app includes its runtime; Node, pnpm and a terminal are unnecessary for inst
 | ------------------------------------------------ | ------------------------------------------------------------------------- |
 | Circuit editing, wiring, simulation and recovery | [User guide](docs/user-guide.md)                                          |
 | Installation, bundled companion and checksums    | [Windows distribution](docs/distribution.md)                              |
+| Debian install, upgrade and Linux test scope     | [Debian desktop](docs/linux.md)                                           |
 | Supported language constructs and limits         | [Syntax reference](docs/supported-syntax.md)                              |
 | Build from source and run checks                 | [Development](docs/development.md)                                        |
 | Design and synchronization behavior              | [Architecture](docs/architecture.md)                                      |

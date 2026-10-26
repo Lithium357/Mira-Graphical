@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { WebSocket } from 'ws';
 import type { BrowserWindow } from 'electron';
 import type { SyncService } from '../../packages/core/service.js';
+import { APP_VERSION } from '../../packages/protocol/version.js';
 export async function checkPackagedApp(
   service: SyncService,
   win: BrowserWindow,
@@ -49,6 +50,10 @@ export async function checkPackagedApp(
     {
       ext: 'hierarchy.sv',
       text: "module parent(input clk,reset,output [7:0] y);leaf c(.clk(clk),.reset(reset),.y(y));endmodule module leaf(input clk,reset,output reg [7:0] y);always @(posedge clk or posedge reset) if(reset)y<=8'd0;else case(y[1:0]) 2'd0:y<=8'd1;default:y<=y+8'd1;endcase endmodule",
+    },
+    {
+      ext: 'enum.sv',
+      text: 'module counter(input clk,reset,output wire [7:0] y);typedef enum logic[7:0]{IDLE,RUN} state_t;state_t state;always_ff @(posedge clk or posedge reset)if(reset)state<=IDLE;else case(state)IDLE:state<=RUN;default:state<=RUN;endcase assign y=state;endmodule',
     },
   ];
   ws.send(JSON.stringify({ ...config, type: 'hello', editor: 'vscode' }));
@@ -94,6 +99,14 @@ export async function checkPackagedApp(
     `window.mira.command({type:'snapshot'})`,
   );
   assert.equal(snapshot.workspace, workspace);
+  assert.equal(snapshot.version, APP_VERSION);
+  assert(
+    await win.webContents.executeJavaScript(
+      `typeof process==='undefined' && typeof require==='undefined'`,
+    ),
+    'Packaged renderer must not expose Node globals',
+  );
+  assert(!process.argv.includes('--no-sandbox'));
   assert.equal(snapshot.states.length, documents.length);
   const firstURI = pathToFileURL(join(workspace, 'check.v')).href;
   await win.webContents.executeJavaScript(
@@ -121,6 +134,10 @@ export async function checkPackagedApp(
         clockedSimulation: true,
         clockedHierarchy: true,
         clockedVhdl: true,
+        enumFSM: true,
+        platform: process.platform,
+        version: APP_VERSION,
+        nodeIsolation: true,
       },
       null,
       2,

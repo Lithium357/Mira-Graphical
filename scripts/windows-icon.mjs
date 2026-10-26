@@ -72,3 +72,4 @@ ico.writeUInt32LE(png.length, 14);
 ico.writeUInt32LE(22, 18);
 mkdirSync('build', { recursive: true });
 writeFileSync('build/mira.ico', Buffer.concat([ico, png]));
+writeFileSync('build/mira.png', png);

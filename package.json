@@ -1,6 +1,6 @@
 {
   "name": "mira-graphical",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "private": true,
   "type": "module",
   "license": "GPL-3.0-only",
@@ -17,6 +17,7 @@
     "qa:native": "tsx scripts/qa-session.ts",
     "package:extension": "pnpm build && node scripts/package-extension.mjs",
     "package:windows": "pnpm run licenses && pnpm build && node scripts/package-extension.mjs && node scripts/package-windows.mjs",
+    "package:linux": "pnpm run licenses && pnpm build && node scripts/package-extension.mjs && node scripts/package-linux.mjs",
     "test:installer": "node scripts/installer-smoke.mjs",
     "test:reference": "tsx scripts/reference.ts",
     "test:languages": "tsx scripts/reference-languages.ts",

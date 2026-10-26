@@ -2,7 +2,7 @@
 
 ## Build and run
 
-Requires Node **22.12+**, pnpm **11.25.0**, and VS Code **1.96+**. Windows is the development/test platform; Linux and macOS releases have not been verified. Install requires internet access for packages and Electron; normal editing runs offline.
+Requires Node **22.12+**, pnpm **11.25.0**, and VS Code **1.96+**; release builds use Node 24. Windows and Linux have desktop integration CI; Debian amd64 packaging and its test scope are documented in [Debian desktop](linux.md). macOS releases have not been verified. Install requires internet access for packages and Electron; normal editing runs offline.
 
 ```powershell
 git clone https://github.com/Lithium357/Mira-Graphical.git
@@ -36,6 +36,7 @@ pnpm build      # desktop UI, core and bundled VS Code extension
 pnpm smoke      # desktop + isolated VSIX install + two real editor passes
 pnpm package:extension # build an unsigned installable VSIX
 pnpm package:windows   # build the unsigned Windows installer from a clean commit
+pnpm package:linux     # build Debian amd64 on x64 Linux from a clean commit
 pnpm test:reference # Verilog differential test; requires Icarus Verilog in PATH
 pnpm test:languages # VHDL/SystemVerilog differential test; requires GHDL and Icarus
 pnpm audit      # online dependency vulnerability check

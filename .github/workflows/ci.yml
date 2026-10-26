@@ -79,6 +79,73 @@ jobs:
             dist/windows/manifest.json
             dist/windows/SHA256SUMS
             test-results/installer-smoke.json
+  linux-desktop:
+    name: Linux workbench and VS Code
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y xvfb dbus-x11 openbox libgtk-3-0t64 libnss3 libasound2t64 libgbm1
+      # The ephemeral Ubuntu runner restricts downloaded development binaries.
+      # Allow Chromium's user-namespace sandbox; never pass --no-sandbox to Mira.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint && pnpm format:check && pnpm test
+      - run: pnpm run licenses && pnpm build
+      - run: dbus-run-session -- xvfb-run -a sh -c 'openbox >/tmp/mira-openbox.log 2>&1 & pnpm smoke'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-desktop-results
+          path: |
+            test-results/*smoke*.json
+            test-results/*.png
+            test-results/vscode-smoke-*.log
+  debian-package:
+    name: Debian amd64 package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm package:linux
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Install, upgrade, run and remove on Debian 12 and 13
+        run: |
+          for version in 12 13; do
+            mkdir -p "test-results/debian-$version"
+            docker run --rm --cap-add=SYS_ADMIN --security-opt seccomp=unconfined --shm-size=1g \
+              -e MIRA_DISPOSABLE_DEBIAN_TEST=1 \
+              -v "$PWD/dist/linux:/artifacts:ro" \
+              -v "$PWD/scripts/debian-smoke.sh:/debian-smoke.sh:ro" \
+              -v "$PWD/test-results/debian-$version:/results" \
+              "debian:$version" bash /debian-smoke.sh
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debian-package
+          compression-level: 0
+          path: |
+            dist/linux/*.deb
+            dist/linux/Mira-Graphical-Source.zip
+            dist/linux/manifest.json
+            dist/linux/SHA256SUMS
+            dist/packages/*.vsix
+            dist/packages/manifest.json
+            test-results/debian-*/
   hdl-reference:
     name: HDL compiler reference checks
     runs-on: ubuntu-latest

@@ -7,7 +7,7 @@ body:
     id: version
     attributes:
       label: Mira version and environment
-      placeholder: '0.8.0; Windows 11 x64; VS Code version…'
+      placeholder: '0.9.8; Windows 11 x64 or Debian 13 amd64 (X11/Wayland); VS Code version…'
     validations:
       required: true
   - type: textarea

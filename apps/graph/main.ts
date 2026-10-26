@@ -86,7 +86,9 @@ else {
         show: !packageCheck && !process.argv.includes('--smoke'),
         backgroundColor: '#0b1220',
         title: 'Mira Graphical',
-        icon: app.isPackaged ? join(root, 'icon.ico') : undefined,
+        icon: app.isPackaged
+          ? join(root, process.platform === 'linux' ? 'icon.png' : 'icon.ico')
+          : undefined,
         webPreferences: {
           // Smoke runs keep pane preferences and browser storage out of the user's session.
           partition: process.argv.includes('--smoke') ? 'mira-smoke' : undefined,
