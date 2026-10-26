@@ -76,7 +76,8 @@ function create(source: string, ast: Module, action: CreateComponent): Edit[] {
   assertIdentifier(action.name);
   if (
     ast.nets.some((n) => n.name === action.name) ||
-    ast.instances.some((n) => n.name === action.name)
+    ast.instances.some((n) => n.name === action.name) ||
+    ast.enumNames?.includes(action.name)
   )
     throw new Error('A signal with that name already exists.');
   if (!Number.isSafeInteger(action.width) || action.width < 1 || action.width > 4096)
@@ -558,7 +559,11 @@ export function copyComponents(
 function paste(source: string, ast: Module, items: ClipboardItem[]): Edit[] {
   if (!Array.isArray(items) || !items.length || items.length > 50)
     throw new Error('Paste 1–50 clipboard items.');
-  const occupied = new Set([...ast.nets.map((n) => n.name), ...ast.instances.map((i) => i.name)]),
+  const occupied = new Set([
+      ...ast.nets.map((n) => n.name),
+      ...ast.instances.map((i) => i.name),
+      ...(ast.enumNames ?? []),
+    ]),
     mapping = new Map<string, string>();
   for (const item of items) {
     if (item.language === 'vhdl')
@@ -632,7 +637,9 @@ function copyExpression(source: string, e: Expr, contextWidth: number, nets: Net
   const text = source
     .slice(expressionSpan(e).start, expressionSpan(e).end)
     .replace(/\/\/[^\r\n]*|\/\*[\s\S]*?\*\//g, ' ');
-  if (!text.includes(';')) return text;
+  const namedConstant = (e: Expr): boolean =>
+    !!e.constantName || children(e).some(([, child]) => namedConstant(child));
+  if (!text.includes(';') && !namedConstant(e)) return text;
   // A procedural if assigns each arm independently. Freeze each arm's width
   // and type before expressing it as a ternary; bitwise OR preserves x masks.
   const arm = (e: Expr) =>
@@ -642,7 +649,8 @@ function copyExpression(source: string, e: Expr, contextWidth: number, nets: Net
       ? arm(value)
       : render(value);
   const render = (e: Expr): string => {
-    if (e.kind === 'ref' || e.kind === 'literal') return e.value;
+    if (e.kind === 'ref') return e.value;
+    if (e.kind === 'literal') return e.constantName && e.signed ? `$signed(${e.value})` : e.value;
     if (e.kind === 'slice') return e.value + '[' + (e.bit ? e.msb : e.msb + ':' + e.lsb) + ']';
     if (e.kind === 'concat') {
       const text = e.parts.map(render).join(', ');

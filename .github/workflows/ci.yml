@@ -48,6 +48,7 @@ jobs:
             test-results/clocked-multiplier.png
             test-results/clocked-smoke.json
             test-results/launch-features-smoke.json
+            test-results/enum-fsm.png
   windows-installer:
     name: Windows installer
     runs-on: windows-latest
@@ -97,6 +98,7 @@ jobs:
       - run: pnpm test:alu
       - run: pnpm test:clocked
       - run: pnpm test:projects
+      - run: pnpm test:enums
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -106,6 +108,7 @@ jobs:
             test-results/alu-reference/
             test-results/clocked-reference/
             test-results/projects-reference/
+            test-results/enum-reference/
   acceptance:
     name: Real-time release acceptance
     runs-on: windows-latest

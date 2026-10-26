@@ -1001,7 +1001,7 @@ function Diagram({
                     </p>
                   </>
                 )}
-                {(node.kind === 'literal' ||
+                {((node.kind === 'literal' && node.editable !== false) ||
                   node.kind === 'slice' ||
                   (node.kind === 'mux' && node.selector)) && (
                   <form

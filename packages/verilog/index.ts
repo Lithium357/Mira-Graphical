@@ -116,6 +116,8 @@ export type Expr = (
       procedural?: boolean;
     }
 ) & {
+  constantName?: string;
+  enumType?: string;
   signed?: boolean;
   synthetic?: boolean;
   caseLabels?: Expr[];
@@ -125,6 +127,7 @@ export type Expr = (
   nativeWidth?: number;
 };
 export type Net = {
+  enumType?: string;
   signed?: boolean;
   name: string;
   direction: 'input' | 'output' | 'wire';
@@ -154,6 +157,7 @@ export function children(e: Expr): [string, Expr][] {
       : [];
 }
 export type Module = {
+  enumNames?: string[];
   language?: 'verilog' | 'systemverilog' | 'vhdl';
   vhdl?: {
     entityStart: number;
@@ -354,6 +358,9 @@ export function validateLibrary(
 function parseSingle(source: string, tokens: IToken[]): Module {
   let i = 0;
   let recursion = 0;
+  type EnumBase = { width: number; msb: number; lsb: number; signed: boolean; id: string };
+  const enumTypes = new Map<string, EnumBase>();
+  const enumMembers = new Map<string, { value: string; signed: boolean; enumType: string }>();
   if (tokens.length > 4096)
     throw new ParseError('Module exceeds the MVP limit of 4096 tokens.', 0, source.length);
   const peek = () => tokens[i]?.image;
@@ -474,7 +481,10 @@ function parseSingle(source: string, tokens: IToken[]): Module {
       } else {
         const value = name();
         left = { kind: 'ref', value, start: t.startOffset, end: t.endOffset! + 1 };
+        const member = enumMembers.get(value);
+        if (member) left = { ...left, ...member, kind: 'literal', constantName: value };
         if (peek() === '[') {
+          if (member) fail('Slicing enum constants is unsupported.');
           const rangeStart = take('[').startOffset;
           const msb = integer();
           const bit = peek() !== ':';
@@ -563,8 +573,148 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   take(';');
   const assigns: Module['assigns'] = [];
   const instances: Module['instances'] = [];
+  const freshEnumName = () => {
+    const token = tokens[i],
+      value = name();
+    if (
+      enumTypes.has(value) ||
+      enumMembers.has(value) ||
+      nets.some((n) => n.name === value) ||
+      instances.some((n) => n.name === value)
+    )
+      throw new ParseError(
+        `Duplicate declaration ${value}.`,
+        token.startOffset,
+        token.endOffset! + 1,
+      );
+    return value;
+  };
+  const enumAssignment = (target: string, value: Expr) => {
+    const type = nets.find((n) => n.name === target)?.enumType;
+    if (!type) return;
+    const matches = (e: Expr): boolean =>
+      e.kind === 'mux'
+        ? matches(e.truthy) && matches(e.falsy)
+        : e.kind === 'ref'
+          ? nets.find((n) => n.name === e.value)?.enumType === type
+          : e.kind === 'literal' && e.enumType === type;
+    if (!matches(value))
+      throw new ParseError(
+        `Assign ${target} from a member or variable of the same enum type; enum casts are unsupported.`,
+        value.start,
+        value.end,
+      );
+  };
+  const enumVariables = (base: EnumBase, start: number) => {
+    const first = nets.length;
+    do {
+      const { id, ...range } = base;
+      nets.push({
+        ...range,
+        enumType: id,
+        name: freshEnumName(),
+        direction: 'wire',
+        netType: 'logic',
+      });
+      if (peek() !== ',') break;
+      take(',');
+    } while (true);
+    const end = take(';').endOffset! + 1;
+    for (const net of nets.slice(first)) {
+      net.declarationStart = start;
+      net.declarationEnd = end;
+    }
+  };
+  const enumDeclaration = () => {
+    const start = tokens[i].startOffset;
+    const typedef = peek() === 'typedef';
+    if (typedef) take('typedef');
+    take('enum');
+    let packed = { width: 32, msb: 31, lsb: 0 },
+      signed = true;
+    if (['logic', 'reg', 'int'].includes(peek())) {
+      const base = take().image;
+      signed = base === 'int';
+      if (['signed', 'unsigned'].includes(peek())) signed = take().image === 'signed';
+      if (base === 'int') {
+        if (peek() === '[') fail('Packed dimensions on int enums are unsupported.');
+      } else packed = width();
+    }
+    if (packed.width > 4096) fail('Enum width must be 1–4096 bits.');
+    const id = `enum@${start}`;
+    take('{');
+    let next = 0n;
+    const used = new Set<string>();
+    const memberNames: string[] = [];
+    do {
+      const token = tokens[i],
+        member = freshEnumName();
+      let value = next;
+      if (peek() === '=') {
+        take('=');
+        const negative = peek() === '-';
+        if (negative) take('-');
+        const literal = tokens[i];
+        if (![Integer, Based].includes(literal?.tokenType))
+          fail('Enum encodings require decimal or sized literal constants.');
+        take();
+        try {
+          literalWidth(literal.image);
+        } catch (error) {
+          throw new ParseError(String(error), literal.startOffset, literal.endOffset! + 1);
+        }
+        const parts = literal.image.replaceAll('_', '').split("'");
+        if (negative && parts.length !== 1)
+          fail('Negative enum encodings require decimal integers.');
+        if (parts.length > 1 && Number(parts[0]) !== packed.width)
+          fail('Sized enum encodings must match the enum base width.');
+        value =
+          parts.length === 1
+            ? BigInt(parts[0])
+            : BigInt(
+                ({ b: '0b', o: '0o', h: '0x', d: '' } as Record<string, string>)[
+                  parts[1][0].toLowerCase()
+                ] + parts[1].slice(1),
+              );
+        if (negative) value = -value;
+        // Sized values are bit patterns; interpret their sign in the declared base.
+        if (parts.length > 1 && signed && value >= 1n << BigInt(packed.width - 1))
+          value -= 1n << BigInt(packed.width);
+      }
+      const min = signed ? -(1n << BigInt(packed.width - 1)) : 0n;
+      const max = (1n << BigInt(packed.width - (signed ? 1 : 0))) - 1n;
+      if (value < min || value > max)
+        throw new ParseError(
+          'Enum encoding overflows its base type.',
+          token.startOffset,
+          token.endOffset! + 1,
+        );
+      const bits = BigInt.asUintN(packed.width, value).toString();
+      if (used.has(bits))
+        throw new ParseError('Duplicate enum encoding.', token.startOffset, token.endOffset! + 1);
+      used.add(bits);
+      enumMembers.set(member, { value: `${packed.width}'d${bits}`, signed, enumType: id });
+      memberNames.push(member);
+      if (memberNames.length > 128) fail('Enum exceeds 128 members.');
+      next = value + 1n;
+      if (peek() !== ',') break;
+      take(',');
+    } while (peek() !== '}');
+    take('}');
+    const base: EnumBase = { ...packed, signed, id };
+    if (typedef) {
+      const type = freshEnumName();
+      enumTypes.set(type, base);
+      take(';');
+    } else enumVariables(base, start);
+  };
   while (peek() !== 'endmodule') {
-    if (['wire', 'logic', 'reg'].includes(peek())) {
+    if (peek() === 'typedef' || peek() === 'enum') {
+      enumDeclaration();
+    } else if (enumTypes.has(peek())) {
+      const token = take();
+      enumVariables(enumTypes.get(token.image)!, token.startOffset);
+    } else if (['wire', 'logic', 'reg'].includes(peek())) {
       const start = take().startOffset,
         first = nets.length;
       const netType = tokens[i - 1].image;
@@ -715,6 +865,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
             fail('Procedural targets must be declared reg or logic.');
           take(events ? '<=' : '=');
           const value = expr();
+          enumAssignment(target, value);
           take(';');
           result = { kind: 'assign', target, value };
         }
@@ -748,6 +899,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
       const target = name();
       take('=');
       const expression = expr();
+      enumAssignment(target, expression);
       const end = take(';').endOffset! + 1;
       assigns.push({ target, expr: expression, start, end });
     } else if (tokens[i]?.tokenType === Identifier && !keywords.has(peek())) {
@@ -778,12 +930,16 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   if (i !== tokens.length) fail('Unexpected text after module.');
   if (
     new Set(instances.map((n) => n.name)).size !== instances.length ||
-    instances.some((n) => nets.some((net) => net.name === n.name))
+    instances.some(
+      (n) =>
+        nets.some((net) => net.name === n.name) || enumMembers.has(n.name) || enumTypes.has(n.name),
+    )
   )
     fail('Duplicate instance or signal name.');
   const declared = new Map<string, Net>();
   for (const net of nets) {
-    if (declared.has(net.name)) fail(`Duplicate declaration ${net.name}.`);
+    if (declared.has(net.name) || enumMembers.has(net.name) || enumTypes.has(net.name))
+      fail(`Duplicate declaration ${net.name}.`);
     declared.set(net.name, net);
   }
   const driven = new Set<string>();
@@ -863,6 +1019,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
     check(a.expr);
   }
   return {
+    enumNames: [...enumTypes.keys(), ...enumMembers.keys()],
     language: tokens.some(
       (t) => ['logic', 'always_comb', 'always_ff'].includes(t.image) || t.tokenType === Fill,
     )
@@ -982,7 +1139,7 @@ export function expressionSigned(e: Expr): boolean {
   if (e.kind === 'ref') return e.signed ?? false;
   if (e.kind === 'convert')
     return e.conversion === 'signed' || (e.conversion === 'resize' && !!e.signed);
-  if (e.kind === 'literal') return /^[0-9][0-9_]*$/.test(e.value);
+  if (e.kind === 'literal') return e.signed ?? /^[0-9][0-9_]*$/.test(e.value);
   if (e.kind === 'unary') return e.op !== '!' && expressionSigned(e.value);
   if (e.kind === 'mux')
     return !e.procedural && expressionSigned(e.truthy) && expressionSigned(e.falsy);
@@ -1090,7 +1247,8 @@ export function project(
       return add(`${key}/literal`, {
         kind: 'literal',
         expressionKey: key,
-        label: e.value,
+        label: e.constantName ?? e.value,
+        editable: e.constantName ? false : undefined,
         width: /^'[01]$/.test(e.value) ? Math.max(1, context) : literalWidth(e.value),
       });
     if (e.kind === 'slice') {
@@ -1437,6 +1595,7 @@ export function graphPatch(
   if (ast.language === 'vhdl') return vhdlTokenEdit(source, ast, node, e, change, current);
   let edit: Edit;
   if (change.kind === 'literal' && e?.kind === 'literal' && node.kind === 'literal') {
+    if (e.constantName) throw new Error('Edit named enum encodings in their HDL declaration.');
     if (e.value !== node.label)
       throw new Error('Literal changed in the live buffer. Commit source changes first.');
     literalWidth(change.value);
@@ -1471,7 +1630,8 @@ export function validateEditableEdits(source: string, edits: Edit[]): void {
     for (const e of expressions(scope).values()) {
       if (!e.synthetic && (e.kind === 'op' || e.kind === 'unary'))
         allowed.push({ start: e.tokenStart, end: e.tokenEnd, kind: 'operator' });
-      if (e.kind === 'literal') allowed.push({ start: e.start, end: e.end, kind: 'literal' });
+      if (e.kind === 'literal' && !e.constantName)
+        allowed.push({ start: e.start, end: e.end, kind: 'literal' });
       if (e.kind === 'slice') allowed.push({ start: e.rangeStart, end: e.rangeEnd, kind: 'slice' });
       if (e.kind === 'mux' && e.condition.kind === 'ref')
         allowed.push({

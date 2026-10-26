@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added module-local SystemVerilog enums, named enum case labels and typed state registers for FSM code. State names remain visible in the circuit; reset and clock stepping use their declared encodings.
+- Added an enum FSM example, guarded graph edits, native desktop coverage and independent Icarus trace comparisons.
+
 ## 0.9.7 — Public beta
 
 - Published the current Windows workbench as a public beta with matching desktop and companion versions, an unsigned installer, corresponding source and SHA-256 checksums.

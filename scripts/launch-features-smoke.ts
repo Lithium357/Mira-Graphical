@@ -28,6 +28,7 @@ export async function launchFeaturesSmoke(
   for (const spec of [
     { file: 'clocked-hierarchy.sv', module: 'pipeline', output: 'second', value: '0x50' },
     { file: 'clocked-counter.vhd', module: 'clocked_counter', output: 'q', value: '0x02' },
+    { file: 'enum-fsm.sv', module: 'enum_fsm', output: 'state_code', value: '0x3' },
   ]) {
     const uri = pathToFileURL(join(service.workspace, 'feature-' + spec.file)).href;
     ws.send(
@@ -63,9 +64,15 @@ export async function launchFeaturesSmoke(
     await fill('[aria-label="Simulation input reset"]', '1');
     await sample('Sample inputs', 1);
     await fill('[aria-label="Simulation input reset"]', '0');
-    await fill('[aria-label="Simulation input en"]', '1');
+    await fill(
+      spec.module === 'enum_fsm'
+        ? '[aria-label="Simulation input start"]'
+        : '[aria-label="Simulation input en"]',
+      '1',
+    );
     if (spec.module === 'pipeline') await fill('[aria-label="Simulation input data"]', '4');
     await sample('Step clk', 2);
+    if (spec.module === 'enum_fsm') await fill('[aria-label="Simulation input finish"]', '1');
     await sample('Step clk', 3);
     const result = service.states
       .get(uri)!
@@ -75,6 +82,21 @@ export async function launchFeaturesSmoke(
         `document.querySelector('[data-id="${result.id}"] .node-simulation')?.textContent===${JSON.stringify(spec.value)}`,
       ),
     );
+    if (spec.module === 'enum_fsm') {
+      const state = service.states.get(uri)!;
+      for (const name of ['IDLE', 'RUN', 'DONE']) {
+        assert(state.graph!.nodes.some((n) => n.label === name && n.editable === false));
+      }
+      assert(!state.pendingSteps);
+      await until(() =>
+        win.webContents.executeJavaScript(`document.body.innerText.includes('DONE')`),
+      );
+      await new Promise((r) => setTimeout(r, 500));
+      writeFileSync(
+        join(root, 'test-results', 'enum-fsm.png'),
+        (await win.webContents.capturePage()).toPNG(),
+      );
+    }
     if (spec.module === 'clocked_counter') {
       await click('Add component');
       await until(() => win.webContents.executeJavaScript(`!!document.querySelector('#new-kind')`));
@@ -98,7 +120,13 @@ export async function launchFeaturesSmoke(
   writeFileSync(
     join(root, 'test-results', 'launch-features-smoke.json'),
     JSON.stringify(
-      { passed: true, hierarchicalClockSteps: true, vhdlClockSteps: true, registerPalette: true },
+      {
+        passed: true,
+        hierarchicalClockSteps: true,
+        vhdlClockSteps: true,
+        registerPalette: true,
+        enumFSM: true,
+      },
       null,
       2,
     ),
@@ -110,6 +138,8 @@ export async function launchFeaturesStandalone(
   win: BrowserWindow,
   root: string,
 ) {
+  win.show();
+  win.focus();
   const config = await service.ready(),
     ws = new WebSocket('ws://127.0.0.1:' + config.port);
   await new Promise<void>((ok, fail) => {
