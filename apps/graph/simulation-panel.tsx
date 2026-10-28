@@ -2,7 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Circuit } from '../../packages/verilog/index.js';
 import type { Simulation } from '../../packages/verilog/simulation.js';
+import type { TestVector } from '../../packages/verilog/test-vectors.js';
+import { TestPanel } from './test-panel.js';
 export function SimulationPanel({
+  uri,
   graph,
   minimized,
   onMinimize,
@@ -13,6 +16,7 @@ export function SimulationPanel({
   onValues,
   onError,
 }: {
+  uri: string;
   graph: Circuit;
   minimized: boolean;
   onMinimize: () => void;
@@ -33,11 +37,12 @@ export function SimulationPanel({
   const [watch, setWatch] = useState<string[]>([]);
   const [latest, setLatest] = useState<Simulation>();
   const [busy, setBusy] = useState(false);
+  const [vectors, setVectors] = useState<TestVector[]>([]);
   const generation = useRef(0);
   const fresh = useRef(true);
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
-    panel.current?.querySelector<HTMLInputElement>('input')?.focus();
+    panel.current?.querySelector<HTMLInputElement>('.simulation-inputs input')?.focus();
   }, []);
   const callbacks = useRef({ onValues, onError });
   callbacks.current = { onValues, onError };
@@ -45,6 +50,7 @@ export function SimulationPanel({
     generation.current++;
     fresh.current = true;
     setSamples([]);
+    setVectors([]);
     setLatest(undefined);
     setBusy(false);
     setInputs(Object.fromEntries(ports.map((p) => [p.label, '0'])));
@@ -68,11 +74,18 @@ export function SimulationPanel({
     setBusy(true);
     try {
       let vector = inputs;
+      const recorded: TestVector[] = [];
       if (clock) {
         const inactive = { ...inputs, [clock.signal]: clock.edge === 'posedge' ? '0' : '1' };
         await run(inactive, fresh.current);
         if (revision !== generation.current) return;
         fresh.current = false;
+        recorded.push({
+          inputs: Object.fromEntries(
+            Object.entries(inactive).map(([name, value]) => [name, value.trim()]),
+          ),
+          expect: {},
+        });
         vector = { ...inputs, [clock.signal]: clock.edge === 'posedge' ? '1' : '0' };
         setInputs(vector);
       }
@@ -80,6 +93,22 @@ export function SimulationPanel({
       fresh.current = false;
       if (revision !== generation.current) return;
       setLatest(result);
+      recorded.push({
+        inputs: Object.fromEntries(
+          Object.entries(vector).map(([name, value]) => [name, value.trim()]),
+        ),
+        expect: Object.fromEntries(
+          [
+            ...new Set([
+              ...watch,
+              ...graph.nodes.filter((n) => n.kind === 'output').map((n) => n.label),
+            ]),
+          ]
+            .filter((name) => result.signals[name])
+            .map((name) => [name, result.signals[name].value]),
+        ),
+      });
+      setVectors((old) => [...old, ...recorded].slice(0, 128));
       setSamples((old) =>
         [...old, Object.fromEntries(watch.map((name) => [name, result.signals[name]]))].slice(-64),
       );
@@ -151,6 +180,14 @@ export function SimulationPanel({
         </button>
       </div>
       <div className="simulation-content" hidden={minimized}>
+        <TestPanel
+          uri={uri}
+          module={graph.module}
+          revision={revision}
+          vectors={vectors}
+          disabled={disabled || busy}
+          onError={onError}
+        />
         <div className="simulation-setup">
           <form
             className="simulation-inputs"
@@ -167,6 +204,7 @@ export function SimulationPanel({
                   value={inputs[port.label] ?? '0'}
                   onChange={(e) => setInputs({ ...inputs, [port.label]: e.target.value })}
                   maxLength={8192}
+                  disabled={busy || disabled}
                 />
               </label>
             ))}
@@ -190,6 +228,7 @@ export function SimulationPanel({
                   fresh.current = true;
                   setLatest(undefined);
                   setSamples([]);
+                  setVectors([]);
                   onValues({});
                 }}
               >

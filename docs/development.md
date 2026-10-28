@@ -57,3 +57,7 @@ The smoke runner uses actual 15-second timers, writes to isolated test workspace
 - `docs`: design decisions, syntax, tests, dependency licenses and third-party notices.
 
 Dependency licenses are audited from the actual installed dependency closure. Generated notices retain MIT/BSD/ISC/Apache/MPL terms; dual licenses use their permissive option. The Windows distribution includes Electron and Chromium notices alongside project and dependency licenses. See [license audit notes](licenses.md).
+
+## Workflow checks
+
+`pnpm test` covers saved-test validation/replay, derived state machines, VHDL enums and authenticated live multi-file invalidation. `pnpm test:vhdl-enums` compares 771 samples against GHDL (VHDL-2008). `pnpm smoke` also runs the isolated desktop workflow acceptance and writes `test-results/workflow-features-smoke.json` plus screenshots. See [saved tests](simulation-tests.md) for the regression CLI.

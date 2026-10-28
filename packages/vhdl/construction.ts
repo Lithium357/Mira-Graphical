@@ -348,6 +348,7 @@ export function vhdlActionEdits(source: string, action: SourceAction): Edit[] {
           ? target.label
           : target.assignmentTarget),
     );
+  if (driver?.structured) throw new Error('Edit this procedural block in the HDL editor.');
   if (action.kind === 'connect') {
     const from = graph.nodes.find((n) => n.key === action.source),
       net = ast.nets.find((n) => n.name === from?.sourceNet);

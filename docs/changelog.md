@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Simulation tests, FSM views and linked projects
+
+- Record, persist, import/export and independently replay bounded simulation test sequences. Expected values compare exactly, including unknown bits; a CLI supports CI regression runs.
+- Derive diagrams and complete-text tables for supported enum state register drivers, including reset/hold paths and active-state highlighting.
+- Explicitly link up to 16 live shared source buffers for hierarchy viewing, simulation and test execution. Selections persist, missing/changed dependencies invalidate the parent, and graph construction/copying is disabled while linked.
+- Add architecture-local VHDL enum declarations, typed state assignments and comparisons, named case choices and nested combinational processes. VHDL enum initialization follows the leftmost literal. An independent GHDL reference covers 771 samples.
+- Add desktop workflow acceptance for recording clock pulses, passing/failing replay, active state views, VHDL enum diagrams and unsaved cross-file dependency changes.
+
 ## 0.9.9 — Editor companions beta
 
 - Added a shared LSP companion for live HDL buffers beyond VS Code, bundled with Windows and Debian runtime launchers and editor setup instructions.

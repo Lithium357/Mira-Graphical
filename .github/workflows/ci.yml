@@ -48,6 +48,8 @@ jobs:
             test-results/clocked-multiplier.png
             test-results/clocked-smoke.json
             test-results/launch-features-smoke.json
+            test-results/workflow-features-smoke.json
+            test-results/workflow-*.png
             test-results/enum-fsm.png
   windows-installer:
     name: Windows installer
@@ -187,6 +189,7 @@ jobs:
       - run: pnpm test:clocked
       - run: pnpm test:projects
       - run: pnpm test:enums
+      - run: pnpm test:vhdl-enums
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -197,6 +200,7 @@ jobs:
             test-results/clocked-reference/
             test-results/projects-reference/
             test-results/enum-reference/
+            test-results/vhdl-enum-reference/
   acceptance:
     name: Real-time release acceptance
     runs-on: windows-latest

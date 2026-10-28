@@ -14,6 +14,8 @@ import { simulate, type SimulationState } from '../verilog/simulation.js';
 import { PatchDraft } from '../verilog/patches.js';
 import { locateDiagnostic } from './diagnostics.js';
 import { autoLayout } from './auto-layout.js';
+import { stateMachines, type StateMachine } from '../verilog/fsm.js';
+import { runSimulationTest } from '../verilog/test-vectors.js';
 import {
   sourceActionEdits,
   validateConstructionProof,
@@ -48,6 +50,9 @@ export type Recovery = {
   graphActions?: SourceAction[];
 };
 export type State = {
+  projectSources?: string[];
+  projectRevision?: string;
+  machines?: StateMachine[];
   uri: string;
   version: number;
   activeModule?: string;
@@ -98,6 +103,48 @@ type DraftFrame = {
 };
 type ConstructionDraft = DraftFrame & { undo: DraftFrame[]; redo: DraftFrame[] };
 export class Session {
+  private sources: { uri: string; version: number; text: string }[] = [];
+  private sourceError?: string;
+  linkSources(
+    sources: { uri: string; version: number; text: string }[],
+    error?: string,
+    requested = sources.map((s) => s.uri),
+  ) {
+    if (this.inFlight || this.draft || this.edits.size)
+      throw new Error('Synchronize or discard graph edits before changing project sources.');
+    this.sources = sources;
+    this.sourceError =
+      error ??
+      (this.text.length + sources.reduce((n, s) => n + s.text.length + 1, 0) > 1_000_000
+        ? 'Linked project exceeds 1 million UTF-16 units.'
+        : undefined);
+    this.state.projectSources = requested;
+    this.state.projectRevision = hash(
+      JSON.stringify([sources.map((s) => [s.uri, s.version, hash(s.text)]), this.sourceError]),
+    );
+    this.state.readOnly = this.readOnly || requested.length > 0;
+    this.simulation = undefined;
+    this.pendingText = true;
+    this.authority = 'text';
+    this.activity();
+  }
+  private analysisSource() {
+    if (this.sourceError) throw new Error(this.sourceError);
+    const source = [this.text, ...this.sources.map((s) => s.text)].join('\n');
+    if (source.length > 1_000_000)
+      throw new Error('Linked project exceeds 1 million UTF-16 units.');
+    return source;
+  }
+  runTest(test: unknown) {
+    this.editableConstruction(true);
+    return runSimulationTest(
+      parse(
+        this.sources.length ? this.analysisSource() : (this.draft?.table.text ?? this.text),
+        this.state.graph!.module,
+      ),
+      test,
+    );
+  }
   private simulation?: { key: string; state?: SimulationState };
   private lastCheckpoint?: { text: string; version: number; table?: PatchDraft; edits: string };
   state: State;
@@ -163,7 +210,7 @@ export class Session {
     this.state.redoCount = this.draft?.redo.length ?? 0;
     this.state.canConstruct =
       !!this.state.graph &&
-      !this.readOnly &&
+      !this.state.readOnly &&
       this.connected &&
       !this.pendingText &&
       !this.inFlight &&
@@ -236,7 +283,7 @@ export class Session {
     this.graphChange(id, { kind: 'operator', value: op });
   }
   graphChange(id: string, change: GraphChange) {
-    if (this.readOnly)
+    if (this.state.readOnly)
       throw new Error('This editor supports live viewing only; edit the source in your editor.');
     if (!this.connected || this.inFlight || this.conflicted)
       throw new Error(
@@ -266,7 +313,7 @@ export class Session {
     this.activity();
   }
   private editableConstruction(allowReadOnly = false) {
-    if (this.readOnly && !allowReadOnly)
+    if (this.state.readOnly && !allowReadOnly)
       throw new Error('This editor supports live viewing only; edit the source in your editor.');
     if (
       !this.connected ||
@@ -403,7 +450,9 @@ export class Session {
   }
   simulate(inputs: Record<string, string>, reset = false) {
     this.editableConstruction(true);
-    const source = this.draft?.table.text ?? this.text;
+    const source = this.sources.length
+      ? this.analysisSource()
+      : (this.draft?.table.text ?? this.text);
     const key = this.state.graph!.module + ':' + hash(source);
     const result = simulate(
       source,
@@ -416,6 +465,8 @@ export class Session {
   }
   copy(ids: string[]): ClipboardItem[] {
     this.editableConstruction(true);
+    if (this.state.projectSources?.length)
+      throw new Error('Copy components from an unlinked source document.');
     return copyComponents(
       this.draft?.table.text ?? this.text,
       this.draft?.graph ?? this.state.graph!,
@@ -426,7 +477,7 @@ export class Session {
     this.editableConstruction(true);
     if (this.draft?.table.edits().length || this.edits.size)
       throw new Error('Synchronize or discard pending edits before navigating modules.');
-    parse(this.text, name);
+    parse(this.analysisSource(), name);
     this.simulation = undefined;
     this.clearDraft();
     if (this.timer !== undefined) this.time.clear(this.timer);
@@ -499,10 +550,12 @@ export class Session {
     this.hooks.persist(this.state.uri, this.state.layout);
   }
   private commit() {
-    const first = parse(this.text);
+    const first = parse(this.analysisSource());
     const ast = first.library[this.state.activeModule ?? ''] ?? first;
     this.state.activeModule = ast.name;
+    this.state.machines = stateMachines(ast);
     const graph = project(ast, this.draft?.graph ?? this.state.graph, this.state.layout.identities);
+    if (this.state.readOnly) for (const n of graph.nodes) n.editable = false;
     const ids = new Set([
       ...graph.nodes.map((n) => n.id),
       ...Object.entries(this.state.layout.identities)
@@ -523,6 +576,7 @@ export class Session {
     this.draft = undefined;
     this.state.previewGraph = undefined;
     this.state.status = 'Synced';
+    this.state.detail = undefined;
     this.state.diagnostics = [];
     this.pendingText = false;
     this.authority = undefined;
@@ -590,8 +644,26 @@ export class Session {
       this.state.status = /unsupported/i.test(d.message)
         ? 'Unsupported construct'
         : 'Invalid source';
+      let source = this.text,
+        uri = this.state.uri,
+        offset = 0;
+      let next = this.text.length + 1;
+      for (const dependency of this.sources) {
+        if ((d.start ?? 0) >= next && (d.start ?? 0) <= next + dependency.text.length) {
+          source = dependency.text;
+          uri = dependency.uri;
+          offset = next;
+          break;
+        }
+        next += dependency.text.length + 1;
+      }
       this.state.diagnostics = [
-        locateDiagnostic(this.text, { message: d.message, start: d.start ?? 0, end: d.end ?? 0 }),
+        locateDiagnostic(source, {
+          uri,
+          message: uri === this.state.uri ? d.message : `${uri}: ${d.message}`,
+          start: Math.max(0, (d.start ?? 0) - offset),
+          end: Math.min(source.length, Math.max(0, (d.end ?? 0) - offset)),
+        }),
       ];
     }
     this.emit();

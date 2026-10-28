@@ -85,6 +85,13 @@ if (!process.argv.includes('--editor-only')) {
     env,
   );
   await launch(electron, ['.', '--smoke', `--workspace=${workspace}`], env);
+  const workflows = join(workspace, 'workflow-features');
+  mkdirSync(workflows);
+  await launch(
+    electron,
+    ['.', '--smoke', '--workflow-features-only', `--workspace=${workflows}`],
+    env,
+  );
 }
 const installed = join(output, `vsix-installed-${stamp}`),
   profile = join(output, `vsix-profile-${stamp}`);

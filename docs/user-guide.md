@@ -72,3 +72,7 @@ Keyboard arrow keys move selected nodes and save their positions. Newly shared m
 Unsupported constructs reject the projection rather than silently disappearing. Layout and graph identities are independent of source formatting and operator spelling. New nodes receive left-to-right dependency placement; a committed removal discards their old position. Renames and structural expression rewrites may create new identities. Recovery opens reviewable copies; merging recovered changes remains manual. Timed simulation, synthesis, multi-workspace window management and arbitrary Verilog support remain outside this version.
 
 See [keyboard and screen-reader use](accessibility.md) for canvas navigation, sample tables, first-run steps and the current validation limits.
+
+## Saved tests, state views and linked sources (main after 0.9.9)
+
+Use **Simulation → Saved tests** to save input sequences with expected outputs and rerun them after edits. **View → State machines** shows enum states and guarded transitions, with simulation highlighting. **View → Project sources** resolves definitions from explicitly shared live buffers across files. Linked graphs are read-only; source edits remain in the editor. See [the workflow guide and limits](simulation-tests.md).

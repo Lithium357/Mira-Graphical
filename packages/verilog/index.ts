@@ -47,6 +47,7 @@ const lexer = new Lexer(
   },
 );
 export type Diagnostic = {
+  uri?: string;
   message: string;
   start: number;
   end: number;
@@ -158,6 +159,7 @@ export function children(e: Expr): [string, Expr][] {
 }
 export type Module = {
   enumNames?: string[];
+  enumMembers?: { name: string; value: string; enumType: string }[];
   language?: 'verilog' | 'systemverilog' | 'vhdl';
   vhdl?: {
     entityStart: number;
@@ -1020,6 +1022,7 @@ function parseSingle(source: string, tokens: IToken[]): Module {
   }
   return {
     enumNames: [...enumTypes.keys(), ...enumMembers.keys()],
+    enumMembers: [...enumMembers].map(([name, member]) => ({ name, ...member })),
     language: tokens.some(
       (t) => ['logic', 'always_comb', 'always_ff'].includes(t.image) || t.tokenType === Fill,
     )

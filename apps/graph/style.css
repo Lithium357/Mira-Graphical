@@ -1131,3 +1131,77 @@ dl,
   color: #ffce88;
   background: #33291e;
 }
+
+/* Derived state view and project/test tools share the canvas and simulation dock. */
+.workspace-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: auto;
+  background: #0e1929;
+  color: #dce8f7;
+  padding: 18px;
+}
+.workspace-overlay h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.workspace-overlay p {
+  max-width: 85ch;
+  line-height: 1.5;
+}
+.workspace-overlay table,
+.saved-tests table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+.workspace-overlay th,
+.workspace-overlay td,
+.saved-tests th,
+.saved-tests td {
+  padding: 8px;
+  border: 1px solid #3b506b;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.fsm-diagram {
+  overflow: auto;
+  max-height: 460px;
+  margin-top: 12px;
+  border: 1px solid #3b506b;
+}
+.fsm-diagram svg {
+  width: 100%;
+  min-width: 700px;
+  display: block;
+}
+.project-source {
+  display: block;
+  padding: 10px;
+  overflow-wrap: anywhere;
+}
+.project-source small {
+  display: block;
+  margin-left: 25px;
+}
+.saved-tests {
+  padding: 10px;
+  border-bottom: 1px solid #3b506b;
+}
+.saved-tests p {
+  max-width: 90ch;
+  line-height: 1.5;
+}
+.test-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.saved-tests textarea {
+  display: block;
+  width: 100%;
+  min-height: 100px;
+  font-family: monospace;
+}

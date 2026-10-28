@@ -122,6 +122,8 @@ export function parseVhdl(source: string, selected?: string): Module {
   const tokens = tokenizeVhdl(source);
   let i = 0,
     nesting = 0;
+  let enumTypes = new Map<string, { width: number; enumType: string }>();
+  let enumMembers = new Map<string, { value: string; enumType: string }>();
   const library: Record<string, Module> = Object.create(null);
   const entities = new Map<
     string,
@@ -177,7 +179,11 @@ export function parseVhdl(source: string, selected?: string): Module {
     return { msb, lsb, width: Math.abs(msb - lsb) + 1, bit };
   };
   const netType = (context: Set<string>) => {
-    const nativeType = take().image as VhdlType;
+    const token = take();
+    const custom = enumTypes.get(token.image);
+    if (custom)
+      return { ...custom, msb: custom.width - 1, lsb: 0, nativeType: 'std_logic_vector' as const };
+    const nativeType = token.image as VhdlType;
     if (!['std_logic', 'std_logic_vector', 'unsigned'].includes(nativeType))
       fail('Supported VHDL types are std_logic, std_logic_vector and numeric_std unsigned.');
     if (!context.has(nativeType === 'unsigned' ? 'numeric_std' : 'std_logic_1164'))
@@ -257,7 +263,17 @@ export function parseVhdl(source: string, selected?: string): Module {
       }
     } else {
       const value = name();
-      left = { kind: 'ref', value, start: first.start, end: tokens[i - 1].end };
+      const member = enumMembers.get(value);
+      left = member
+        ? {
+            kind: 'literal',
+            ...member,
+            constantName: value,
+            start: first.start,
+            end: tokens[i - 1].end,
+            nativeType: 'std_logic_vector',
+          }
+        : { kind: 'ref', value, start: first.start, end: tokens[i - 1].end };
       if (peek() === '(') {
         const rangeStart = tokens[i].start,
           bounds = range();
@@ -333,23 +349,34 @@ export function parseVhdl(source: string, selected?: string): Module {
   }
   function conditionExpr(): Expr {
     const c = expression(6);
-    take('=');
-    const bit = take().image;
-    if (bit !== "'1'" && bit !== "'0'") fail("Use a scalar selector = '1' or '0'.");
-    if (!['ref', 'slice', 'literal'].includes(c.kind)) fail("Use a scalar selector = '1'.");
-    return bit === "'1'"
-      ? c
-      : {
-          kind: 'unary',
-          op: '!',
-          value: c,
-          start: c.start,
-          end: tokens[i - 1].end,
-          tokenStart: c.start,
-          tokenEnd: c.start,
-          synthetic: true,
-        };
+    const equality = take('=');
+    const rhs = expression(6);
+    if (rhs.kind === 'literal' && rhs.nativeType === 'std_logic' && !rhs.enumType)
+      return rhs.value === "1'b1"
+        ? c
+        : {
+            kind: 'unary',
+            op: '!',
+            value: c,
+            start: c.start,
+            end: rhs.end,
+            tokenStart: c.start,
+            tokenEnd: c.start,
+            synthetic: true,
+          };
+    return {
+      kind: 'op',
+      op: '===',
+      left: c,
+      right: rhs,
+      start: c.start,
+      end: rhs.end,
+      tokenStart: equality.start,
+      tokenEnd: equality.end,
+      synthetic: true,
+    };
   }
+
   const closing = (kind: string, unit: string) => {
     const start = take('end').start;
     if (peek() === kind) take();
@@ -383,6 +410,8 @@ export function parseVhdl(source: string, selected?: string): Module {
       continue;
     }
     if (peek() === 'entity') {
+      enumTypes = new Map();
+      enumMembers = new Map();
       const start = take().start,
         entity = name();
       take('is');
@@ -444,10 +473,49 @@ export function parseVhdl(source: string, selected?: string): Module {
       );
     const context = new Set([...definition.imports, ...imports]);
     imports = new Set();
+    enumTypes = new Map();
+    enumMembers = new Map();
     const nets = structuredClone(definition.nets),
       assigns: Module['assigns'] = [],
       instances: Module['instances'] = [];
-    while (peek() === 'signal') {
+    while (peek() === 'signal' || peek() === 'type') {
+      if (peek() === 'type') {
+        take();
+        const typeName = name();
+        if (
+          enumTypes.has(typeName) ||
+          enumMembers.has(typeName) ||
+          nets.some((n) => n.name === typeName)
+        )
+          fail('Duplicate enum type declaration.');
+        take('is');
+        take('(');
+        const members: string[] = [];
+        do {
+          const member = name();
+          if (
+            members.includes(member) ||
+            member === typeName ||
+            enumTypes.has(member) ||
+            enumMembers.has(member) ||
+            nets.some((n) => n.name === member)
+          )
+            fail('Duplicate enum member declaration.');
+          members.push(member);
+          if (members.length > 128) fail('Limit: 128 enum members.');
+          if (peek() !== ',') break;
+          take();
+        } while (true);
+        take(')');
+        take(';');
+        const width = Math.max(1, Math.ceil(Math.log2(members.length))),
+          enumType = entity + ':' + typeName;
+        enumTypes.set(typeName, { width, enumType });
+        members.forEach((member, value) =>
+          enumMembers.set(member, { value: width + "'d" + value, enumType }),
+        );
+        continue;
+      }
       const start = take().start,
         names = [name()];
       while (peek() === ',') {
@@ -496,7 +564,7 @@ export function parseVhdl(source: string, selected?: string): Module {
         if (label && peek() !== ';' && name() !== label) fail('Process end label mismatch.');
         take(';');
       };
-      if (sensitivity[0] !== 'all') {
+      {
         let level = 0;
         const empty = (): Statement => ({ kind: 'block', items: [] });
         const block = (): Statement => {
@@ -518,6 +586,7 @@ export function parseVhdl(source: string, selected?: string): Module {
           return { kind: 'if', condition, yes, no };
         };
         const statement = (): Statement => {
+          const start = tokens[i].start;
           if (++level > 128) fail('VHDL clocked statement nesting exceeds 128.');
           let result: Statement;
           if (peek() === 'null') {
@@ -535,6 +604,7 @@ export function parseVhdl(source: string, selected?: string): Module {
             take('is');
             let fallback = empty();
             let seenDefault = false;
+            const choices = new Set<string>();
             const arms: { condition: Expr; body: Statement }[] = [];
             while (peek() === 'when') {
               if (seenDefault) fail('others must be the final case alternative.');
@@ -548,7 +618,11 @@ export function parseVhdl(source: string, selected?: string): Module {
                 continue;
               }
               const label = expression();
-              if (label.kind !== 'literal') fail('VHDL case choices must be literal bit strings.');
+              if (label.kind !== 'literal')
+                return fail('VHDL case choices must be literals or enum members.');
+              const key = nativeLiteral(label.value, 'std_logic_vector');
+              if (choices.has(key)) fail('Duplicate VHDL case choice.');
+              choices.add(key);
               take('=>');
               arms.push({
                 condition: {
@@ -566,6 +640,18 @@ export function parseVhdl(source: string, selected?: string): Module {
               });
               if (arms.length > 128) fail('VHDL case exceeds 128 arms.');
             }
+            const enumType =
+              selector.kind === 'ref'
+                ? nets.find((n) => n.name === selector.value)?.enumType
+                : undefined;
+            if (
+              !seenDefault &&
+              (!enumType ||
+                [...enumMembers.values()]
+                  .filter((m) => m.enumType === enumType)
+                  .some((m) => !choices.has(nativeLiteral(m.value, 'std_logic_vector'))))
+            )
+              fail('Case choices must cover every enum member or include others.');
             take('end');
             take('case');
             take(';');
@@ -578,8 +664,57 @@ export function parseVhdl(source: string, selected?: string): Module {
             result = { kind: 'assign', target: a.target, value: a.expr };
           }
           level--;
-          return result;
+          return { ...result, start, end: tokens[i - 1].end };
         };
+        if (sensitivity[0] === 'all') {
+          if (sensitivity.length !== 1)
+            fail('process(all) cannot contain other sensitivity items.');
+          const body = block();
+          finish();
+          const end = tokens[i - 1].end;
+          const targets = new Set<string>(),
+            reads: Expr[] = [];
+          const inspect = (s: Statement): void => {
+            if (s.kind === 'assign') {
+              targets.add(s.target);
+              reads.push(s.value);
+            } else if (s.kind === 'block') s.items.forEach(inspect);
+            else {
+              reads.push(s.condition);
+              inspect(s.yes);
+              inspect(s.no);
+            }
+          };
+          inspect(body);
+          const readsTarget = (e: Expr): boolean =>
+            ((e.kind === 'ref' || e.kind === 'slice') && targets.has(e.value)) ||
+            children(e).some(([, c]) => readsTarget(c));
+          if (reads.some(readsTarget))
+            fail(
+              'Read assigned VHDL signals in a separate process; ordered signal feedback in process(all) is unsupported.',
+            );
+          const drivers = lowerStatements(body, nets, false, processStart, end);
+          const single =
+            body.kind === 'block' && body.items.length === 1 ? body.items[0] : undefined;
+          const simple =
+            single?.kind === 'assign' ||
+            (single?.kind === 'if' &&
+              single.yes.kind === 'block' &&
+              single.no.kind === 'block' &&
+              single.yes.items.length === 1 &&
+              single.no.items.length === 1 &&
+              single.yes.items[0].kind === 'assign' &&
+              single.no.items[0].kind === 'assign');
+          for (const [target, expr] of drivers)
+            assigns.push({
+              target,
+              expr,
+              start: simple ? single!.start! : processStart,
+              end: simple ? single!.end! : end,
+              structured: !simple,
+            });
+          return;
+        }
         const edge = () => {
           const kind = take();
           if (!['rising_edge', 'falling_edge'].includes(kind.image))
@@ -672,41 +807,6 @@ export function parseVhdl(source: string, selected?: string): Module {
           });
         return;
       }
-      if (sensitivity.length !== 1) fail('process(all) cannot contain other sensitivity items.');
-      while (peek() !== 'end') {
-        if (peek() === 'null') {
-          take();
-          take(';');
-          continue;
-        }
-        if (peek() === 'if') {
-          const start = take().start,
-            condition = conditionExpr();
-          take('then');
-          const truthy = assignment();
-          take('else');
-          const falsy = assignment();
-          take('end');
-          take('if');
-          const end = take(';').end;
-          if (truthy.target !== falsy.target)
-            fail('Combinational if/else must drive the same signal on both paths.');
-          assigns.push({
-            target: truthy.target,
-            expr: {
-              kind: 'mux',
-              condition,
-              truthy: truthy.expr,
-              falsy: falsy.expr,
-              start: condition.start,
-              end,
-            },
-            start,
-            end,
-          });
-        } else assigns.push(assignment());
-      }
-      finish();
     };
     while (peek() !== 'end') {
       if (peek() === 'process') {
@@ -744,6 +844,8 @@ export function parseVhdl(source: string, selected?: string): Module {
     const end = closing('architecture', architecture);
     if (i - tokenStart > 4096) fail('Architecture exceeds 4096 tokens.');
     const ast: Module = {
+      enumNames: [...enumTypes.keys(), ...enumMembers.keys()],
+      enumMembers: [...enumMembers].map(([name, member]) => ({ name, ...member })),
       language: 'vhdl',
       name: entity,
       start: definition.start,
@@ -766,6 +868,11 @@ export function parseVhdl(source: string, selected?: string): Module {
         declarationsEnd,
       },
     };
+    if (
+      nets.some((n) => enumTypes.has(n.name) || enumMembers.has(n.name)) ||
+      instances.some((n) => enumTypes.has(n.name) || enumMembers.has(n.name))
+    )
+      fail('Duplicate enum/signal/instance declaration.');
     validateVhdlModule(ast, context);
     library[entity] = ast;
     if (Object.keys(library).length > 64) fail('Limit: 64 entities per document.');
@@ -782,6 +889,12 @@ export function parseVhdl(source: string, selected?: string): Module {
         const port = child.nets.find((n) => n.name === p.name && n.direction !== 'wire');
         if (port) {
           const actual = inferVhdl(p.expr, ast, port.nativeType);
+          if (p.expr.enumType)
+            error(
+              'Enum-typed instance ports and numeric enum coercions are unsupported.',
+              p.expr.start,
+              p.expr.end,
+            );
           if (actual.width !== port.width || actual.type !== port.nativeType)
             error(
               'Instance binding type/width does not match its named port.',
@@ -810,6 +923,7 @@ export function inferVhdl(
   if (e.kind === 'ref' || e.kind === 'slice') {
     const n = ast.nets.find((n) => n.name === e.value) ?? bad(`Undeclared VHDL signal ${e.value}.`);
     if (e.kind === 'slice') {
+      if (n.enumType) bad('Enum values cannot be sliced.');
       if (
         n.nativeType === 'std_logic' ||
         Math.min(e.msb, e.lsb) < Math.min(n.msb, n.lsb) ||
@@ -818,7 +932,10 @@ export function inferVhdl(
       )
         bad('Slice is out of bounds or reverses the declared direction.');
       result = { type: e.bit ? 'std_logic' : n.nativeType!, width: Math.abs(e.msb - e.lsb) + 1 };
-    } else result = { type: n.nativeType!, width: n.width };
+    } else {
+      e.enumType = n.enumType;
+      result = { type: n.nativeType!, width: n.width };
+    }
   } else if (e.kind === 'literal')
     result = {
       type: e.nativeType ?? (hint === 'unsigned' ? 'unsigned' : 'std_logic_vector'),
@@ -855,6 +972,7 @@ export function inferVhdl(
       bad(
         "Qualify array literals with unsigned'(...) or std_logic_vector'(...) instead of casting them.",
       );
+    if (e.value.enumType) bad('Enum casts and conversions are unsupported.');
     if (inner.type === 'std_logic')
       bad('Array conversions need an unsigned or std_logic_vector operand.');
     if (e.conversion === 'resize' && inner.type !== 'unsigned')
@@ -865,6 +983,7 @@ export function inferVhdl(
     };
   } else if (e.kind === 'concat') {
     const parts = e.parts.map((p) => inferVhdl(p, ast, hint));
+    if (e.parts.some((p) => p.enumType)) bad('Enum concatenations are unsupported.');
     const arrays = parts.filter((p) => p.type !== 'std_logic');
     const type = arrays[0]?.type ?? (hint === 'unsigned' ? 'unsigned' : 'std_logic_vector');
     if (arrays.some((p) => p.type !== type))
@@ -876,6 +995,9 @@ export function inferVhdl(
       b = inferVhdl(e.falsy, ast, a.type);
     if (condition.type !== 'std_logic' || condition.width !== 1)
       bad("A conditional assignment requires a std_logic selector = '1'.");
+    if (e.truthy.enumType !== e.falsy.enumType)
+      bad('Conditional branches need the same enum type.');
+    e.enumType = e.truthy.enumType;
     if (a.type !== b.type || a.width !== b.width)
       bad('Conditional branches need identical types and widths.');
     result = a;
@@ -888,6 +1010,8 @@ export function inferVhdl(
     if (e.synthetic && e.op === '===') {
       const a = inferVhdl(e.left, ast, hint),
         b = inferVhdl(e.right, ast, a.type);
+      if (e.left.enumType !== e.right.enumType)
+        bad('Case choices and comparisons need the same enum type.');
       if (a.type !== b.type || a.width !== b.width) bad('Case choice type/width mismatch.');
       e.nativeType = 'std_logic';
       e.nativeWidth = 1;
@@ -896,6 +1020,8 @@ export function inferVhdl(
     const arithmetic = ['+', '-', '*'].includes(e.op),
       a = inferVhdl(e.left, ast, arithmetic ? 'unsigned' : hint),
       b = inferVhdl(e.right, ast, a.type);
+    if (e.left.enumType || e.right.enumType)
+      bad('Arithmetic and bitwise enum operations are unsupported.');
     if (a.type !== b.type || (arithmetic && a.type !== 'unsigned'))
       bad(
         'Arithmetic requires numeric_std unsigned operands; use explicit unsigned(...) conversions.',
@@ -931,6 +1057,12 @@ function validateVhdlModule(ast: Module, context: Set<string>) {
       error('Assignments need a distinct declared non-input target.', a.start, a.end);
     driven.add(a.target);
     const inferred = inferVhdl(a.expr, ast, target.nativeType);
+    if (a.expr.enumType !== target.enumType)
+      error(
+        'Assignments need the same enum type; numeric enum coercions are unsupported.',
+        a.expr.start,
+        a.expr.end,
+      );
     if (inferred.type !== target.nativeType || inferred.width !== target.width)
       error(
         'Assignment type/width mismatch. Use unsigned/std_logic_vector conversions and explicit resize.',
@@ -996,7 +1128,7 @@ export function validateVhdlEdits(source: string, edits: Edit[]) {
     for (const e of expressions(scope).values()) {
       if (e.kind === 'op')
         allowed.set(`${e.tokenStart}:${e.tokenEnd}`, { kind: 'op', expr: e, scope });
-      if (e.kind === 'literal')
+      if (e.kind === 'literal' && !e.constantName)
         allowed.set(`${e.start}:${e.end}`, { kind: 'literal', expr: e, scope });
       if (e.kind === 'slice')
         allowed.set(`${e.rangeStart}:${e.rangeEnd}`, { kind: 'slice', expr: e, scope });

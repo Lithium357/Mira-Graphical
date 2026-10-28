@@ -182,6 +182,12 @@ else {
           return service!.openRecovery(c.id, c.preview, c.compare, c.expectedHash);
         if (typeof c.uri !== 'string' || !service!.sessions.has(c.uri))
           throw new Error('Document not shared.');
+        if (c.type === 'projectSources') return service!.linkProject(c.uri, c.uris);
+        if (c.type === 'testList') return service!.listTests(c.uri);
+        if (c.type === 'testSave') return service!.saveTest(c.uri, c.test);
+        if (c.type === 'testDelete' && typeof c.name === 'string' && typeof c.module === 'string')
+          return service!.deleteTest(c.uri, c.name, c.module);
+        if (c.type === 'testRun') return service!.sessions.get(c.uri)!.runTest(c.test);
         if (c.type === 'edit' && typeof c.id === 'string' && operators.includes(c.op as Operator))
           service!.graphEdit(c.uri, c.id, c.op as Operator);
         else if (
@@ -245,7 +251,11 @@ else {
       if (process.env.MIRA_SMOKE_BUILD !== 'false' && process.argv.includes('--smoke')) {
         const { desktopSmoke } = await import('../../scripts/desktop-smoke.js');
         try {
-          if (process.argv.includes('--window-activation-only')) {
+          if (process.argv.includes('--workflow-features-only')) {
+            const { workflowFeaturesSmoke } =
+              await import('../../scripts/workflow-features-smoke.js');
+            await workflowFeaturesSmoke(service, win, root);
+          } else if (process.argv.includes('--window-activation-only')) {
             const { windowActivationSmoke } =
               await import('../../scripts/window-activation-smoke.js');
             await windowActivationSmoke(win, root);

@@ -23,6 +23,8 @@ Using Vim, Neovim or Notepad++? See [other editor setup](docs/editors.md). Vim/N
 
 The app includes its runtime; Node and pnpm are unnecessary for installation. **0.9.9 is an unsigned public beta**. Windows may show an unknown-publisher/SmartScreen prompt. See [Windows installation and checksum verification](docs/distribution.md) or [Debian setup](docs/linux.md).
 
+**On main, after 0.9.9:** [saved simulation tests, derived FSM diagrams, linked project sources and VHDL enums](docs/simulation-tests.md). These additions are not in the downloads above yet.
+
 ## What you can do
 
 - Construct and wire arithmetic, bitwise operations, muxes, constants, ports, buses and reusable modules.

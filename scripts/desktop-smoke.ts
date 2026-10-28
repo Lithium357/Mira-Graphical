@@ -267,6 +267,11 @@ export async function desktopSmoke(service: SyncService, win: BrowserWindow, roo
     .get(comboURI)!
     .previewGraph!.nodes.find((n) => n.assignmentTarget === 'product')!;
   const a = graph.nodes.find((n) => n.label === 'a')!;
+  // Keep this drag away from the viewport edge, where connection auto-pan moves its target.
+  const wiringRow =
+    Math.max(0, ...Object.values(service.states.get(comboURI)!.layout.nodes).map((p) => p.y)) + 260;
+  service.move(comboURI, a.id, 100, wiringRow);
+  service.move(comboURI, product.id, 420, wiringRow);
   await until(() =>
     win.webContents.executeJavaScript(
       `Array.from(document.querySelectorAll('.react-flow__node')).every(n=>getComputedStyle(n).visibility==='visible'&&n.getBoundingClientRect().width>0)`,

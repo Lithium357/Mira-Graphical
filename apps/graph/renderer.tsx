@@ -22,6 +22,8 @@ import { SetupGuide, SetupPanel } from './setup-panel.js';
 import type { State } from '../../packages/core/index.js';
 import { nodeHeight } from '../../packages/core/auto-layout.js';
 import { SimulationPanel } from './simulation-panel.js';
+import { FsmPanel } from './fsm-panel.js';
+import { ProjectPanel } from './project-panel.js';
 import type { Simulation } from '../../packages/verilog/simulation.js';
 import type { ClipboardItem, InputPort } from '../../packages/protocol/index.js';
 import { ConstructionForm, WiringInspector } from './construction-form.js';
@@ -196,6 +198,8 @@ function Diagram({
   const [copyNote, setCopyNote] = useState('');
   const [wireLabels, setWireLabels] = useState(false);
   const [simulationOpen, setSimulationOpen] = useState(false);
+  const [fsmOpen, setFsmOpen] = useState(false);
+  const [projectOpen, setProjectOpen] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const inspector = useRef<HTMLElement>(null);
   const workspaceElement = useRef<HTMLDivElement>(null);
@@ -425,8 +429,9 @@ function Diagram({
       >
         {state.readOnly && (
           <p className="source-readonly" role="status">
-            Live viewing only · Edit HDL in your editor. Graph editing requires a client that
-            supports versioned edits.
+            {state.projectSources?.length
+              ? 'Linked project · Edit HDL in your editor. Disconnect Project sources to resume graph construction.'
+              : 'Live viewing only · Edit HDL in your editor. Graph editing requires a client that supports versioned edits.'}
           </p>
         )}
         <div className="construction-toolbar">
@@ -519,6 +524,22 @@ function Diagram({
                 />{' '}
                 Wire labels
               </label>
+              <button
+                onClick={() => {
+                  setFsmOpen(true);
+                  setProjectOpen(false);
+                }}
+              >
+                State machines
+              </button>
+              <button
+                onClick={() => {
+                  setProjectOpen(true);
+                  setFsmOpen(false);
+                }}
+              >
+                Project sources
+              </button>
               <button onClick={() => void flowInstance.current?.()}>Readable zoom</button>
               <button
                 onClick={async () => {
@@ -569,6 +590,23 @@ function Diagram({
           </button>
         </div>
         <div className="flow-surface">
+          {fsmOpen && (
+            <FsmPanel
+              machines={state.machines ?? []}
+              values={values}
+              module={graph?.module ?? ''}
+              stale={state.status !== 'Synced'}
+              onClose={() => setFsmOpen(false)}
+            />
+          )}
+          {projectOpen && (
+            <ProjectPanel
+              state={state}
+              shared={shared}
+              onClose={() => setProjectOpen(false)}
+              onError={onError}
+            />
+          )}
           <button
             className="canvas-skip"
             onClick={() => {
@@ -781,6 +819,7 @@ function Diagram({
               />
             )}
             <SimulationPanel
+              uri={state.uri}
               minimized={simulationMinimized}
               onMinimize={() => setSimulationMinimized((value) => !value)}
               onClose={() => {
@@ -790,7 +829,7 @@ function Diagram({
                   ?.focus();
               }}
               graph={graph}
-              revision={`${state.version}:${state.pendingSteps}`}
+              revision={`${state.version}:${state.pendingSteps}:${state.projectRevision}`}
               disabled={
                 !state.canConstruct &&
                 !((graph.sequential || state.readOnly) && state.status === 'Synced')
@@ -1080,8 +1119,9 @@ function Diagram({
                 )}
                 {state.readOnly && (
                   <p role="status">
-                    Live viewing only: this editor cannot apply versioned graph edits. Edit the HDL
-                    in your editor; simulation and layout remain available.
+                    {state.projectSources?.length
+                      ? 'Linked project: edit this module in its source editor. Simulation and layout remain available.'
+                      : 'Live viewing only: this editor cannot apply versioned graph edits. Edit the HDL in your editor; simulation and layout remain available.'}
                   </p>
                 )}
               </>

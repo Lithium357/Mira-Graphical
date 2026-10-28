@@ -15,6 +15,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Session, hash, type State, type Layout, type Clock, type Viewport } from './index.js';
 import { APP_VERSION } from '../protocol/version.js';
 import { RecoveryStore, recoveryFingerprint } from './recovery.js';
+import { validateSimulationTest, type SimulationTest } from '../verilog/test-vectors.js';
+import { isVhdl } from '../vhdl/index.js';
 import {
   MAX_MESSAGE_BYTES,
   validateMessage,
@@ -84,6 +86,89 @@ export class SyncService {
   private listeners = new Set<(states: State[]) => void>();
   private descriptor?: string;
   private closing = false;
+  private links = new Map<string, string[]>();
+  linkProject(uri: string, uris: unknown) {
+    const target = this.sessions.get(uri);
+    if (!target || !this.owners.has(uri)) throw new Error('Share the target document first.');
+    if (
+      !Array.isArray(uris) ||
+      uris.length > 15 ||
+      new Set(uris).size !== uris.length ||
+      uris.some(
+        (u) => typeof u !== 'string' || u === uri || !this.sessions.has(u) || !this.owners.has(u),
+      )
+    )
+      throw new Error('Choose up to 15 other explicitly shared source files.');
+    if (uris.some((u) => isVhdl(this.sessions.get(u)!.text) !== isVhdl(target.text)))
+      throw new Error(
+        'Link VHDL sources together, or Verilog/SystemVerilog sources together. Mixed-language elaboration is unsupported.',
+      );
+    target.linkSources(
+      uris.map((u) => ({
+        uri: u,
+        version: this.sessions.get(u)!.state.version,
+        text: this.sessions.get(u)!.text,
+      })),
+    );
+    if (uris.length) this.links.set(uri, uris);
+    else this.links.delete(uri);
+    this.atomic(join(this.metadata, `sources-${hash(uri)}.json`), uris);
+  }
+  private refreshProjects(changed: string) {
+    for (const [uri, uris] of this.links) {
+      if (uri !== changed && !uris.includes(changed)) continue;
+      const sources = uris
+        .filter((u) => this.sessions.has(u) && this.owners.has(u))
+        .map((u) => ({
+          uri: u,
+          version: this.sessions.get(u)!.state.version,
+          text: this.sessions.get(u)!.text,
+        }));
+      const mismatch = sources.some(
+        (s) => isVhdl(s.text) !== isVhdl(this.sessions.get(uri)?.text ?? ''),
+      );
+      this.sessions
+        .get(uri)
+        ?.linkSources(
+          sources,
+          sources.length !== uris.length
+            ? 'A linked source was closed or disconnected. Share it again or update Project sources.'
+            : mismatch
+              ? 'Mixed-language project sources are unsupported.'
+              : undefined,
+          uris,
+        );
+    }
+  }
+  private testsPath(uri: string) {
+    return join(this.metadata, `tests-${hash(uri)}.json`);
+  }
+  listTests(uri: string): SimulationTest[] {
+    if (!this.sessions.has(uri)) throw new Error('Document not shared.');
+    const path = this.testsPath(uri);
+    if (!existsSync(path)) return [];
+    if (lstatSync(path).isSymbolicLink() || lstatSync(path).size > 2_000_000)
+      throw new Error('Invalid or oversized saved test file.');
+    const data: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    if (!Array.isArray(data) || data.length > 32) throw new Error('Invalid saved tests.');
+    return data.map(validateSimulationTest);
+  }
+  saveTest(uri: string, input: unknown) {
+    const test = validateSimulationTest(input),
+      tests = this.listTests(uri);
+    const i = tests.findIndex((t) => t.name === test.name && t.module === test.module);
+    if (i < 0) tests.push(test);
+    else tests[i] = test;
+    if (tests.length > 32 || JSON.stringify(tests).length > 1_500_000)
+      throw new Error('Limit: 32 saved tests, 1.5 million characters per source.');
+    this.atomic(this.testsPath(uri), tests);
+    return tests;
+  }
+  deleteTest(uri: string, name: string, module: string) {
+    const tests = this.listTests(uri).filter((t) => t.name !== name || t.module !== module);
+    this.atomic(this.testsPath(uri), tests);
+    return tests;
+  }
   constructor(
     workspace: string,
     private clock?: Clock,
@@ -181,6 +266,29 @@ export class SyncService {
               this.editorReadOnly,
             );
             this.sessions.set(msg.uri, session);
+            const sourcesPath = join(this.metadata, `sources-${hash(msg.uri)}.json`);
+            if (!this.links.has(msg.uri) && existsSync(sourcesPath)) {
+              try {
+                if (lstatSync(sourcesPath).isSymbolicLink() || lstatSync(sourcesPath).size > 32768)
+                  throw new Error('Invalid project sources metadata.');
+                const uris: unknown = JSON.parse(readFileSync(sourcesPath, 'utf8'));
+                if (
+                  !Array.isArray(uris) ||
+                  uris.length > 15 ||
+                  new Set(uris).size !== uris.length ||
+                  uris.some((u) => typeof u !== 'string' || u === msg.uri)
+                )
+                  throw new Error('Invalid project sources metadata.');
+                for (const uri of uris) this.checkURI(uri);
+                if (uris.length) this.links.set(msg.uri, uris);
+              } catch (e) {
+                this.send(socket, {
+                  type: 'error',
+                  error: `Project sources not loaded: ${String(e)}`,
+                });
+              }
+            }
+            this.refreshProjects(msg.uri);
             return;
           }
           const session = this.sessions.get(msg.uri);
@@ -190,14 +298,18 @@ export class SyncService {
             // Sync-origin claims are not trusted: only a matching one-use patchResult can acknowledge a patch.
             if (msg.origin === 'sync') throw new Error('Unsolicited sync-origin document change.');
             session.userText(msg.version, msg.text);
+            this.refreshProjects(msg.uri);
           } else if (msg.type === 'document.patchResult') {
             if (!session.patchResult(msg.patchId, msg.ok, msg.currentVersion, msg.text))
               throw new Error('Unknown or expired patch token.');
+            this.refreshProjects(msg.uri);
           } else if (msg.type === 'document.close') {
             session.close();
             this.sessions.delete(msg.uri);
             this.owners.delete(msg.uri);
             this.states.delete(msg.uri);
+            this.links.delete(msg.uri);
+            this.refreshProjects(msg.uri);
             this.notify();
           }
         } catch (error) {
@@ -218,6 +330,7 @@ export class SyncService {
           if (owner === socket) {
             if (!this.closing) this.sessions.get(uri)?.disconnect();
             this.owners.delete(uri);
+            if (!this.closing) this.refreshProjects(uri);
           }
       });
     });

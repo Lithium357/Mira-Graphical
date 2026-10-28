@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "name": "Reset and start",
+  "module": "enum_fsm",
+  "vectors": [
+    {
+      "inputs": { "clk": "0", "reset": "1", "start": "0", "finish": "0" },
+      "expect": { "busy": "0", "done": "0", "state_code": "0" }
+    },
+    { "inputs": { "clk": "0", "reset": "0", "start": "1", "finish": "0" }, "expect": {} },
+    {
+      "inputs": { "clk": "1", "reset": "0", "start": "1", "finish": "0" },
+      "expect": { "busy": "1", "done": "0", "state_code": "1" }
+    }
+  ]
+}

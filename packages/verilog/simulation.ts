@@ -88,7 +88,14 @@ export function simulate(
   inputs: Record<string, string>,
   previous?: SimulationState,
 ): Simulation {
-  const root = elaborate(parse(source, selected));
+  return simulateModule(parse(source, selected), inputs, previous);
+}
+export function simulateModule(
+  ast: Module,
+  inputs: Record<string, string>,
+  previous?: SimulationState,
+): Simulation {
+  const root = elaborate(ast);
   if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs))
     throw new Error('Invalid input vector.');
   const inputNames = root.nets.filter((n) => n.direction === 'input').map((n) => n.name);
@@ -97,7 +104,16 @@ export function simulate(
   const signals: Simulation['signals'] = Object.create(null),
     nodes: Simulation['nodes'] = Object.create(null);
   let signalCount = 0;
-  let registers = previous?.registers ?? Object.create(null);
+  let registers = Object.assign(Object.create(null), previous?.registers);
+  // Native VHDL enumeration signals start at the leftmost literal, without a reset event.
+  if (ast.language === 'vhdl')
+    for (const n of root.nets) {
+      if (!n.enumType || Object.hasOwn(registers, n.name)) continue;
+      const member = Object.values(ast.library)
+        .flatMap((m) => m.enumMembers ?? [])
+        .find((m) => m.enumType === n.enumType);
+      if (member) registers[n.name] = format(literal(member.value));
+    }
   let advancing = true;
   let next: Record<string, string> = Object.assign(Object.create(null), registers);
   let events: Record<string, string> = Object.create(null);
@@ -151,7 +167,13 @@ export function simulate(
               (p) => p.expr.kind === 'ref' && p.expr.value === name,
             )!.name;
             result = instances.get(inst.name)!.get(port)!;
-          } else result = unknown(declaration.width);
+          } else
+            result =
+              ast.language === 'vhdl' &&
+              declaration.enumType &&
+              Object.hasOwn(registers, path + name)
+                ? input(registers[path + name], declaration.width)
+                : unknown(declaration.width);
         }
       }
       result = resize(result, declaration.width);

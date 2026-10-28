@@ -28,7 +28,9 @@
     "test:projects": "tsx scripts/reference-projects.ts",
     "test:enums": "tsx scripts/reference-enums.ts",
     "test:editors": "tsx scripts/lsp-editor-smoke.ts",
-    "test:acceptance": "tsx scripts/release-acceptance.ts"
+    "test:acceptance": "tsx scripts/release-acceptance.ts",
+    "test:simulation": "tsx scripts/run-simulation-tests.ts",
+    "test:vhdl-enums": "tsx scripts/reference-vhdl-enums.ts"
   },
   "dependencies": {
     "@xyflow/react": "12.12.0",

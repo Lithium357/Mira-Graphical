@@ -1,5 +1,13 @@
 # Verification report
 
+## Unreleased workflow coverage
+
+The unit suite covers saved-vector schema/width/unknown-bit validation, isolated replay, failed expectations, derived enum transitions/holds/resets, conservative mixed-width signed guards, VHDL enum typing and initialization, and authenticated multi-file invalidation/restoration. Dependency diagnostics retain their originating URI and local UTF-16 offsets. No test writes source files.
+
+`pnpm test:vhdl-enums` compares the native VHDL enum FSM with GHDL over **771 samples and 1,542 output checks**, including initialization before reset. The comparison has passed locally using the isolated GHDL 5.0.1 compiler in WSL. The regular compiler-reference CI job runs it alongside the existing language checks.
+
+The desktop workflow acceptance records an initial reset and clock pulse, saves/replays a passing test, exercises a deliberate failed expectation, checks active-state highlighting and a VHDL state diagram, then links separate live buffers and checks an unsaved dependency change. It retains `workflow-features-smoke.json` and screenshots in `test-results/`. These additions are on main after 0.9.9 and do not change the previously published beta artifacts.
+
 ## 0.9.1 installer upgrades
 
 The Windows installer CI job installs the published 0.9.0 setup after checking its pinned SHA-256. It checks the real replacement prompt for both versions and the existing location, declines it and verifies the original app bytes remain unchanged. A silent upgrade then retains a custom location, removes obsolete app files, leaves one app registration, installs the exact new app bundle and verifies the EXE version. Project, recovery and settings sentinels survive upgrade and same-version repair. A simulated newer registry version exercises the compiled downgrade refusal and verifies unchanged app bytes. The test restores the registry version and uninstalls from the disposable runner. It also installs the baseline for all users on the disposable administrator runner, verifies machine-scope downgrade refusal and upgrade without creating a second per-user copy, then uninstalls it. Personal installs are untouched by local smoke runs.
