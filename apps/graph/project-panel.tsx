@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { State } from '../../packages/core/index.js';
 const displayUri = (uri: string) => {
   try {
@@ -21,6 +21,10 @@ export function ProjectPanel({
 }) {
   const [uris, setUris] = useState(state.projectSources ?? []),
     [busy, setBusy] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
   const candidates = [...new Set([...shared.map((s) => s.uri), ...uris])].filter(
     (uri) => uri !== state.uri,
   );
@@ -29,11 +33,16 @@ export function ProjectPanel({
       className="workspace-overlay"
       aria-label="Project sources"
       onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          onClose();
+        }
       }}
     >
       <div className="simulation-heading">
-        <h2>Project sources</h2>
+        <h2 ref={heading} tabIndex={-1}>
+          Project sources
+        </h2>
         <span className="toolbar-spacer" />
         <button onClick={onClose}>Close project sources</button>
       </div>

@@ -104,6 +104,10 @@ export async function workflowFeaturesSmoke(
       (await win.webContents.capturePage()).toPNG(),
     );
     await click('Close state view');
+    assert(
+      await execute(`document.activeElement?.textContent==='View'`),
+      'Closing state view returns keyboard focus',
+    );
     const test = service.listTests(uri)[0];
     test.name = 'Deliberate failure';
     test.vectors[2].expect.busy = '0';
@@ -121,6 +125,7 @@ export async function workflowFeaturesSmoke(
     await wait(() => service.states.get(parent)?.status === 'Invalid source');
     await choose('[aria-label="Shared module"]', parent);
     await click('Project sources');
+    await wait(() => execute(`document.activeElement?.textContent==='Project sources'`));
     await execute(
       `(()=>{const label=Array.from(document.querySelectorAll('.project-source')).find(e=>e.textContent.includes('child.v'));label.querySelector('input').click();})()`,
     );

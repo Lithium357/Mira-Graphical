@@ -200,6 +200,12 @@ function Diagram({
   const [simulationOpen, setSimulationOpen] = useState(false);
   const [fsmOpen, setFsmOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
+  const viewSummary = useRef<HTMLElement>(null);
+  const closePanels = () => {
+    setFsmOpen(false);
+    setProjectOpen(false);
+    viewSummary.current?.focus();
+  };
   const [values, setValues] = useState<Record<string, string>>({});
   const inspector = useRef<HTMLElement>(null);
   const workspaceElement = useRef<HTMLDivElement>(null);
@@ -514,7 +520,7 @@ function Diagram({
               if ((e.target as HTMLElement).closest('button')) e.currentTarget.open = false;
             }}
           >
-            <summary>View</summary>
+            <summary ref={viewSummary}>View</summary>
             <div className="menu-popover">
               <label>
                 <input
@@ -596,16 +602,11 @@ function Diagram({
               values={values}
               module={graph?.module ?? ''}
               stale={state.status !== 'Synced'}
-              onClose={() => setFsmOpen(false)}
+              onClose={closePanels}
             />
           )}
           {projectOpen && (
-            <ProjectPanel
-              state={state}
-              shared={shared}
-              onClose={() => setProjectOpen(false)}
-              onError={onError}
-            />
+            <ProjectPanel state={state} shared={shared} onClose={closePanels} onError={onError} />
           )}
           <button
             className="canvas-skip"
