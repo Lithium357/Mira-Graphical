@@ -1146,6 +1146,13 @@ dl,
   margin: 0;
   font-size: 20px;
 }
+.workspace-overlay button {
+  background: #172b40;
+  color: #d4eced;
+  border: 1px solid #456177;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
 .workspace-overlay p {
   max-width: 85ch;
   line-height: 1.5;
@@ -1186,8 +1193,14 @@ dl,
   margin-left: 25px;
 }
 .saved-tests {
+  grid-column: 1 / -1;
+  min-width: 0;
   padding: 10px;
   border-bottom: 1px solid #3b506b;
+}
+.saved-tests > summary {
+  cursor: pointer;
+  font-weight: 600;
 }
 .saved-tests p {
   max-width: 90ch;

@@ -90,6 +90,7 @@ export async function workflowFeaturesSmoke(
       3,
       'Record the inactive clock sample too',
     );
+    await execute(`document.querySelector('.saved-tests').open=false`);
     await click('State machines');
     await wait(() =>
       execute(
